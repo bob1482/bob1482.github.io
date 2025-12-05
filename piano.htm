@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wicki-Hayden (trimmed right edge)</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #2c3e50;
+            font-family: sans-serif;
+            margin: 0;
+            color: white;
+            flex-direction: column;
+            overflow: hidden; 
+            user-select: none;
+        }
+
+        .wicki-board {
+            position: relative;
+            background: #1a252f;
+            padding: 60px 100px; 
+            border-radius: 20px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column-reverse; 
+            align-items: center;
+            zoom: 0.85; 
+        }
+
+        .row {
+            display: flex;
+            margin-bottom: 5px; 
+        }
+
+        /* --- CUSTOM ROW INDENTATION --- */
+        .row-4 { margin-left: -150px; } 
+        .row-3 { margin-left: -75px; }   
+        .row-2 { margin-left: 0px; }   
+        .row-1 { margin-left: 75px; }  
+        .row-0 { margin-left: 150px; }  
+
+
+        .key {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin: 0 12px;
+            cursor: pointer;
+            position: relative;
+            box-shadow: 0 5px 0 #000;
+            transition: transform 0.05s, box-shadow 0.05s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .key:active, .key.active {
+            transform: translateY(5px);
+            box-shadow: 0 0 0 #000;
+        }
+
+        .key.natural {
+            background: #ecf0f1;
+            color: #333;
+        }
+        .key.natural:active, .key.natural.active { background: #bdc3c7; }
+
+        .key.accidental {
+            background: #34495e;
+            color: #ecf0f1;
+            border: 2px solid #555;
+        }
+        .key.accidental:active, .key.accidental.active { background: #2c3e50; }
+    </style>
+</head>
+<body>
+
+    <div class="wicki-board" id="board"></div>
+
+    <script>
+        const ROWS = 5;
+        const COLS = 14;
+        const BASE_NOTE_FREQ = 130.81; 
+        
+        const KEY_MAPS = [
+            ['Esc', 'F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12', 'Delete'],
+            ['`', '1','2','3','4','5','6','7','8','9','0','-','='],
+            ['Tab', 'q','w','e','r','t','y','u','i','o','p','[',']'],
+            ['CapsLock', 'a','s','d','f','g','h','j','k','l',';','\'','Enter'],
+            ['ShiftLeft', 'z','x','c','v','b','n','m',',','.','/','ShiftRight', 'Control'] 
+        ];
+
+        const board = document.getElementById('board');
+
+        for (let r = 0; r < ROWS; r++) {
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'row row-' + r;
+
+            for (let c = 0; c < COLS; c++) {
+                
+                const mapRowIndex = (ROWS - 1) - r; 
+                let keyMapChar = '';
+                if (KEY_MAPS[mapRowIndex] && KEY_MAPS[mapRowIndex][c]) {
+                    keyMapChar = KEY_MAPS[mapRowIndex][c];
+                }
+
+                // Check for keys explicitly hidden by name
+                const isExplicitlyHidden = ['Esc', 'Control', '`', 'Enter', 'Tab', 'F1'].includes(keyMapChar);
+                
+                // Check if this is the last column of the bottom 4 rows (r=0 to 3)
+                const isTrimmedEnd = (r < 4 && c === COLS - 1);
+
+                const isHidden = isExplicitlyHidden || isTrimmedEnd;
+
+                // Pitch Calculation
+                let semitoneOffset = (r * 5) + (c * 2);
+                let freq = BASE_NOTE_FREQ * Math.pow(2, semitoneOffset / 12);
+                let noteIndex = (semitoneOffset) % 12;
+                let isNatural = [0, 2, 4, 5, 7, 9, 11].includes(noteIndex);
+
+                // Override for Right Shift (Row 0, Index 11) -> A#4
+                if (r === 0 && c === 11) {
+                    freq = 466.16; 
+                    isNatural = false; 
+                }
+
+                const key = document.createElement('div');
+                key.className = `key ${isNatural ? 'natural' : 'accidental'}`;
+                key.setAttribute('data-note', freq);
+
+                if (isHidden) {
+                    key.style.visibility = 'hidden';
+                    key.style.pointerEvents = 'none';
+                }
+
+                if (keyMapChar) {
+                    key.setAttribute('data-key', keyMapChar.toLowerCase());
+                }
+
+                key.addEventListener('mousedown', () => playKey(key));
+                rowDiv.appendChild(key);
+            }
+            board.appendChild(rowDiv);
+        }
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playSound(frequency) {
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    oscillator.type = 'triangle';
+    oscillator.frequency.value = frequency;
+
+    const now = audioCtx.currentTime;
+
+    // --- VOLUME LOGIC ---
+    let volume = (30 / frequency);
+    if (volume > 0.6) volume = 0.6;
+
+    // --- SUSTAIN SETTING ---
+    // Change this number to adjust length (e.g., 1.5 is short, 8.0 is long)
+    const noteDuration = 1.7; 
+
+    gainNode.gain.setValueAtTime(0, now);
+    
+    // Attack (fade in)
+    gainNode.gain.linearRampToValueAtTime(volume, now + 0.05); 
+    
+    // Decay/Sustain (fade out)
+    // We use the variable here:
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + noteDuration); 
+
+    oscillator.start(now);
+    
+    // Stop the oscillator at the same time the fade out ends
+    oscillator.stop(now + noteDuration);
+}
+
+        function playKey(keyElement) {
+            if(!keyElement) return;
+            if(keyElement.style.visibility === 'hidden') return;
+
+            keyElement.classList.add('active');
+            setTimeout(() => keyElement.classList.remove('active'), 150);
+            const noteFreq = keyElement.getAttribute('data-note');
+            playSound(noteFreq);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            let k = e.key.toLowerCase();
+            
+            if (e.key === 'Shift') {
+                k = e.code.toLowerCase(); 
+            }
+
+            const key = document.querySelector(`.key[data-key="${k}"]`);
+            
+            if (key && key.style.visibility !== 'hidden') {
+                e.preventDefault(); 
+                if (!e.repeat) {
+                    playKey(key);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
