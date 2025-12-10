@@ -9,7 +9,8 @@
         justify-content: center;
         align-items: center;
         min-height: 100vh;
-        background-color: #2c3e50;
+        /* MONOCHROME: Dark grey background */
+        background-color: #6b6b6b;
         font-family: sans-serif;
         margin: 0;
         color: white;
@@ -20,10 +21,11 @@
 
       .wicki-board {
         position: relative;
-        background: #1a252f;
+        /* MONOCHROME: Slightly lighter grey for the board */
+        background: #464646;
         padding: 60px 100px;
         border-radius: 20px;
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
         display: flex;
         flex-direction: column-reverse;
         align-items: center;
@@ -32,39 +34,50 @@
 
       .row {
         display: flex;
-        margin-bottom: 5px;
+        margin-bottom: 15px; /* Vertical spacing kept at 15px */
       }
 
       /* --- CUSTOM ROW INDENTATION --- */
+      /* CALCULATION FOR ALIGNMENT:
+         Key Width (60px) + Key Margin (12px * 2 = 24px) = 84px Total Unit Width
+         The offsets must be multiples of 84px to maintain the grid.
+      */
       .row-4 {
-        margin-left: -150px;
+        margin-left: -168px; /* -84 * 2 */
       }
       .row-3 {
-        margin-left: -75px;
+        margin-left: -84px; /* -84 * 1 */
       }
       .row-2 {
         margin-left: 0px;
       }
       .row-1 {
-        margin-left: 75px;
+        margin-left: 84px; /* 84 * 1 */
       }
       .row-0 {
-        margin-left: 150px;
+        margin-left: 168px; /* 84 * 2 */
       }
 
       .key {
-        width: 50px;
-        height: 50px;
+        /* BIGGER BUTTONS: Increased from 50px to 60px */
+        width: 60px;
+        height: 60px;
         border-radius: 50%;
         margin: 0 12px;
         cursor: pointer;
         position: relative;
         box-shadow: 0 5px 0 #000;
-        transition: transform 0.05s, box-shadow 0.05s;
+        transition: transform 0.05s, box-shadow 0.05s, background-color 0.1s;
         display: flex;
         justify-content: center;
         align-items: center;
         z-index: 10;
+        font-size: 18px; /* Increased font size for readability */
+        font-weight: bold;
+
+        /* --- STABILITY FIX --- */
+        box-sizing: border-box;
+        border: 2px solid transparent;
       }
 
       .key:active,
@@ -73,27 +86,31 @@
         box-shadow: 0 0 0 #000;
       }
 
+      /* WHITE KEYS */
       .key.natural {
-        background: #ecf0f1;
-        color: #333;
+        background: #aaaaaa;
+        color: #000000;
       }
       .key.natural:active,
       .key.natural.active {
-        background: #bdc3c7;
+        background: #727272; /* Light grey when pressed */
+        border-color: #101010;
       }
 
+      /* BLACK KEYS */
       .key.accidental {
-        background: #34495e;
-        color: #ecf0f1;
-        border: 2px solid #555;
+        background: #1f1f1f;
+        color: #ffffff;
+        border: 2px solid #555; /* Grey border to differentiate from background */
       }
       .key.accidental:active,
       .key.accidental.active {
-        background: #2c3e50;
+        background: #333333; /* Dark grey when pressed */
+        border-color: #777;
       }
     </style>
   </head>
-  <title>Piano</title>
+  <title>Classical Piano</title>
   <body>
     <div class="wicki-board" id="board"></div>
 
@@ -245,29 +262,75 @@
         }
       }
 
+      /* * UPDATED SOUND ENGINE V4 - Grand Piano Physics
+       * - Fixed "Short Bass": Drastically increased sustain for low frequencies.
+       * - Fixed "Dull Bass": Enforced a minimum brightness for the attack (Metallic strike).
+       */
       function playSound(frequency) {
-        const oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-
-        oscillator.type = "triangle";
-        oscillator.frequency.value = frequency;
-
         const now = audioCtx.currentTime;
 
+        // 1. DURATION: Bass notes need massive sustain
+        // Previously: 1.5 + (200/freq). New: 2.5 + (500/freq).
+        // Example: 65Hz (Low C) -> ~10 seconds.
+        const duration = 2.5 + 500 / frequency;
+
+        // 2. VOLUME
         let volume = 30 / frequency;
-        if (volume > 0.6) volume = 0.6;
+        if (volume > 1.0) volume = 1.0;
 
-        const noteDuration = 2;
+        const masterGain = audioCtx.createGain();
+        masterGain.connect(audioCtx.destination);
 
-        gainNode.gain.setValueAtTime(0, now);
-        gainNode.gain.linearRampToValueAtTime(volume, now + 0.05);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, now + noteDuration);
+        // ENVELOPE:
+        masterGain.gain.setValueAtTime(0, now);
+        masterGain.gain.linearRampToValueAtTime(volume, now + 0.015); // Slightly softer attack than v3
 
-        oscillator.start(now);
-        oscillator.stop(now + noteDuration);
+        // Decay to sustain level:
+        // Bass notes sustain louder for longer.
+        masterGain.gain.exponentialRampToValueAtTime(volume * 0.8, now + 0.4);
+
+        // Long release tail
+        masterGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+        // 3. FILTER (The Brightness)
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.Q.value = 0;
+        filter.connect(masterGain);
+
+        // Calculate attack brightness
+        // Rule: Even if freq is low, the initial "hit" must be bright (at least 2000Hz)
+        // This gives the "clang" before settling into the deep hum.
+        const attackBrightness = Math.max(frequency * 10, 2000);
+        const sustainBrightness = frequency * 3;
+
+        filter.frequency.setValueAtTime(attackBrightness, now);
+        // Decay the brightness slower (0.5s instead of 0.2s) to hear the string vibration
+        filter.frequency.exponentialRampToValueAtTime(
+          sustainBrightness,
+          now + 0.5
+        );
+        filter.frequency.linearRampToValueAtTime(frequency, now + duration);
+
+        // 4. OSCILLATORS
+        const osc1 = audioCtx.createOscillator();
+        osc1.type = "sine";
+        osc1.frequency.value = frequency;
+        osc1.connect(filter);
+        osc1.start(now);
+        osc1.stop(now + duration + 0.1);
+
+        const osc2 = audioCtx.createOscillator();
+        osc2.type = "triangle";
+        osc2.frequency.value = frequency;
+        osc2.detune.value = 3; // Slight shimmering
+        osc2.connect(filter);
+        osc2.start(now);
+        osc2.stop(now + duration + 0.1);
+
+        setTimeout(() => {
+          masterGain.disconnect();
+        }, (duration + 0.2) * 1000);
       }
 
       function playKey(keyElement) {
@@ -281,35 +344,30 @@
       }
 
       window.addEventListener("keydown", (e) => {
-        if (e.key === "ArrowRight") {
-          globalTranspose -= 7;
-          renderBoard();
-          return;
-        }
-        if (e.key === "ArrowLeft") {
-          globalTranspose += 7;
+        // --- NAVIGATION CONTROLS ---
+        if (e.key.startsWith("Arrow")) {
+          if (e.repeat) return;
+
+          if (e.key === "ArrowRight") globalTranspose -= 7;
+          else if (e.key === "ArrowLeft") globalTranspose += 7;
+          else if (e.key === "ArrowUp") globalTranspose += 12;
+          else if (e.key === "ArrowDown") globalTranspose -= 12;
+
           renderBoard();
           return;
         }
 
-        if (e.key === "ArrowUp") {
-          globalTranspose += 12;
-          renderBoard();
-          return;
-        }
-        if (e.key === "ArrowDown") {
-          globalTranspose -= 12;
-          renderBoard();
-          return;
+        // --- ROBUST KEY DETECTION FIX ---
+        let searchKey = e.key.toLowerCase();
+
+        // Override for Shift keys to use their physical code
+        if (e.code === "ShiftLeft" || e.code === "ShiftRight") {
+          searchKey = e.code.toLowerCase();
         }
 
-        let k = e.key.toLowerCase();
-        if (e.key === "Shift") {
-          k = e.code.toLowerCase();
-        }
-
-        // CSS.escape is vital here to handle the '\' character safely
-        const key = document.querySelector(`.key[data-key="${CSS.escape(k)}"]`);
+        const key = document.querySelector(
+          `.key[data-key="${CSS.escape(searchKey)}"]`
+        );
 
         if (key && key.style.visibility !== "hidden") {
           e.preventDefault();
