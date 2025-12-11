@@ -39,8 +39,8 @@
 
       /* --- CUSTOM ROW INDENTATION --- */
       /* CALCULATION FOR ALIGNMENT:
-         Key Width (60px) + Key Margin (12px * 2 = 24px) = 84px Total Unit Width
-         The offsets must be multiples of 84px to maintain the grid.
+          Key Width (60px) + Key Margin (12px * 2 = 24px) = 84px Total Unit Width
+          The offsets must be multiples of 84px to maintain the grid.
       */
       .row-4 {
         margin-left: -168px; /* -84 * 2 */
@@ -119,7 +119,7 @@
       const COLS = 14;
       const BASE_NOTE_FREQ = 130.81;
 
-      let globalTranspose = -9;
+      let globalTranspose = 3;
 
       const KEY_MAPS = [
         // Row 4 (Top Visual)
@@ -262,32 +262,33 @@
         }
       }
 
-      /* * UPDATED SOUND ENGINE V4 - Grand Piano Physics
-       * - Fixed "Short Bass": Drastically increased sustain for low frequencies.
-       * - Fixed "Dull Bass": Enforced a minimum brightness for the attack (Metallic strike).
+      /* * UPDATED SOUND ENGINE V5 - Safety Limiter Logic
+       * - Fixed "Exploding Bass": Clamped volume significantly for low Hz.
+       * - Fixed "Infinite Sustain": Hard capped duration to 4 seconds.
        */
       function playSound(frequency) {
         const now = audioCtx.currentTime;
 
-        // 1. DURATION: Bass notes need massive sustain
-        // Previously: 1.5 + (200/freq). New: 2.5 + (500/freq).
-        // Example: 65Hz (Low C) -> ~10 seconds.
-        const duration = 2.5 + 500 / frequency;
+        // 1. DURATION: Cap at 4 seconds.
+        // Previously, low notes (e.g. 50Hz) would last 20 seconds (1000/50).
+        let calculatedDuration = 1 + 500 / frequency;
+        const duration = Math.min(calculatedDuration, 3);
 
-        // 2. VOLUME
-        let volume = 30 / frequency;
-        if (volume > 1.0) volume = 1.0;
+        // 2. VOLUME:
+        // We use a gentler curve and a strict hard cap.
+        // Old formula: 30/freq (at 60hz this was 0.5, at 30hz this was 1.0)
+        // New formula: 20/freq, but never go above 0.35 total gain.
+        let volume = 15 / frequency;
 
         const masterGain = audioCtx.createGain();
         masterGain.connect(audioCtx.destination);
 
         // ENVELOPE:
         masterGain.gain.setValueAtTime(0, now);
-        masterGain.gain.linearRampToValueAtTime(volume, now + 0.015); // Slightly softer attack than v3
+        masterGain.gain.linearRampToValueAtTime(volume, now + 0.015);
 
-        // Decay to sustain level:
-        // Bass notes sustain louder for longer.
-        masterGain.gain.exponentialRampToValueAtTime(volume * 0.8, now + 0.4);
+        // Decay to sustain level (sustain is 60% of max volume)
+        masterGain.gain.exponentialRampToValueAtTime(volume * 0.6, now + 0.4);
 
         // Long release tail
         masterGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
@@ -298,14 +299,13 @@
         filter.Q.value = 0;
         filter.connect(masterGain);
 
-        // Calculate attack brightness
-        // Rule: Even if freq is low, the initial "hit" must be bright (at least 2000Hz)
-        // This gives the "clang" before settling into the deep hum.
-        const attackBrightness = Math.max(frequency * 10, 2000);
+        // Attack Brightness
+        // We cap the attack brightness so deep bass doesn't "click" too hard
+        const attackBrightness = Math.max(frequency * 8, 800);
         const sustainBrightness = frequency * 3;
 
         filter.frequency.setValueAtTime(attackBrightness, now);
-        // Decay the brightness slower (0.5s instead of 0.2s) to hear the string vibration
+
         filter.frequency.exponentialRampToValueAtTime(
           sustainBrightness,
           now + 0.5
@@ -323,7 +323,8 @@
         const osc2 = audioCtx.createOscillator();
         osc2.type = "triangle";
         osc2.frequency.value = frequency;
-        osc2.detune.value = 3; // Slight shimmering
+        // Reduced detune slightly for cleaner bass
+        osc2.detune.value = 2;
         osc2.connect(filter);
         osc2.start(now);
         osc2.stop(now + duration + 0.1);
@@ -340,7 +341,8 @@
         keyElement.classList.add("active");
         setTimeout(() => keyElement.classList.remove("active"), 150);
         const noteFreq = keyElement.getAttribute("data-note");
-        playSound(noteFreq);
+        // Ensure we parse the float before sending it to audio
+        playSound(parseFloat(noteFreq));
       }
 
       window.addEventListener("keydown", (e) => {
@@ -348,8 +350,8 @@
         if (e.key.startsWith("Arrow")) {
           if (e.repeat) return;
 
-          if (e.key === "ArrowRight") globalTranspose -= 7;
-          else if (e.key === "ArrowLeft") globalTranspose += 7;
+          if (e.key === "ArrowRight") globalTranspose += 5;
+          else if (e.key === "ArrowLeft") globalTranspose -= 5;
           else if (e.key === "ArrowUp") globalTranspose += 12;
           else if (e.key === "ArrowDown") globalTranspose -= 12;
 
