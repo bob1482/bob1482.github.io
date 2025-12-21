@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Classical Piano (Wicki-Hayden)</title>
     <style>
       body {
         display: flex;
@@ -11,7 +12,7 @@
         min-height: 100vh;
         /* MONOCHROME: Dark grey background */
         background-color: #6b6b6b;
-        font-family: sans-serif;
+        font-family: "Courier New", Courier, monospace;
         margin: 0;
         color: white;
         flex-direction: column;
@@ -19,47 +20,165 @@
         user-select: none;
       }
 
+      /* --- SETTINGS BUTTON --- */
+      #settings-btn {
+        background: transparent;
+        border: none;
+        color: #888;
+        cursor: pointer;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        padding: 10px;
+        transition: transform 0.3s, color 0.3s;
+        border-radius: 50%;
+      }
+
+      #settings-btn:hover {
+        color: #fff;
+        background: rgba(255,255,255,0.1);
+      }
+
+      /* Rotate the gear when open */
+      #settings-btn.open {
+        color: #fff;
+        transform: rotate(90deg);
+      }
+
+      /* STATUS DISPLAY STYLING */
+      /* STATUS DISPLAY (Now inside controls) */
+      #status-display {
+        /* Remove absolute positioning so it sits in the flex container */
+        position: static; 
+        
+        /* Match the style of .btn-row / .control-btn */
+        background: #333;
+        color: #fff;
+        font-size: 14px;
+        padding: 0 15px;
+        border-radius: 8px;
+        
+        /* Layout alignment */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 40px; /* Match height of other control groups */
+        min-width: 150px;
+        
+        /* consistent shadow with other controls */
+        box-shadow: inset 0 0 5px rgba(0,0,0,0.5); 
+        white-space: nowrap;
+      }
+
+      /* --- TRADITIONAL PIANO STRIP --- */
+      #piano-strip {
+        position: relative;
+        height: 140px;
+        margin-bottom: 30px; 
+        margin-top: 30px; 
+        background: #464646;
+        padding: 30px 0; 
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        
+        /* Updated for wider piano */
+        display: block; 
+        overflow-x: auto; /* Adds scrollbar only if screen is too small */
+        overflow-y: hidden;
+        white-space: nowrap;
+        width: 90%; 
+        max-width: 1150px;
+        
+        /* Smooth scrolling */
+        scroll-behavior: smooth;
+        
+        /* Scrollbar styling */
+        scrollbar-width: thin;
+        scrollbar-color: #666 #333;
+      }
+      
+      /* Webkit Scrollbar styling */
+      #piano-strip::-webkit-scrollbar { height: 10px; }
+      #piano-strip::-webkit-scrollbar-track { background: #333; border-radius: 5px; }
+      #piano-strip::-webkit-scrollbar-thumb { background: #666; border-radius: 5px; }
+
+      .piano-wrapper {
+        position: relative;
+        height: 120px;
+        margin: 0 auto; /* Centers if screen is wider than piano */
+      }
+
+
+      .p-key {
+        position: absolute;
+        box-sizing: border-box;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.1s, transform 0.05s;
+        top: 0;
+      }
+
+      /* CSS for JS activation */
+      .p-key:active,
+      .p-key.active {
+        transform: scale(0.98);
+      }
+
+      /* Traditional White Keys */
+      .p-key.white {
+        background: #e0e0e0;
+        border: 1px solid #999;
+        height: 120px;
+        width: 35px;
+        z-index: 1;
+      }
+      .p-key.white:active,
+      .p-key.white.active {
+        background: #ccc;
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+      }
+
+      /* Traditional Black Keys */
+      .p-key.black {
+        background: #111;
+        border: 1px solid #000;
+        height: 75px;
+        width: 20px;
+        z-index: 2;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+      }
+      .p-key.black:active,
+      .p-key.black.active {
+        background: #333;
+        box-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+      }
+
+      /* --- WICKI BOARD STYLING --- */
       .wicki-board {
         position: relative;
-        /* MONOCHROME: Slightly lighter grey for the board */
         background: #464646;
-        padding: 60px 100px;
+        padding: 60px 0px;
         border-radius: 20px;
         box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
         display: flex;
         flex-direction: column-reverse;
         align-items: center;
         zoom: 0.85;
+        margin-bottom: 20px;
       }
 
       .row {
         display: flex;
-        margin-bottom: 15px; /* Vertical spacing kept at 15px */
+        margin-bottom: 15px;
       }
 
-      /* --- CUSTOM ROW INDENTATION --- */
-      /* CALCULATION FOR ALIGNMENT:
-          Key Width (60px) + Key Margin (12px * 2 = 24px) = 84px Total Unit Width
-          The offsets must be multiples of 84px to maintain the grid.
-      */
-      .row-4 {
-        margin-left: -168px; /* -84 * 2 */
-      }
-      .row-3 {
-        margin-left: -84px; /* -84 * 1 */
-      }
-      .row-2 {
-        margin-left: 0px;
-      }
-      .row-1 {
-        margin-left: 84px; /* 84 * 1 */
-      }
-      .row-0 {
-        margin-left: 168px; /* 84 * 2 */
-      }
+      /* Key Width (60px) + Key Margin (24px) = 84px Unit */
+      .row-4 { margin-left: -168px; }
+      .row-3 { margin-left: -84px; }
+      .row-2 { margin-left: 0px; }
+      .row-1 { margin-left: 84px; }
+      .row-0 { margin-left: 168px; }
 
       .key {
-        /* BIGGER BUTTONS: Increased from 50px to 60px */
         width: 60px;
         height: 60px;
         border-radius: 50%;
@@ -72,10 +191,9 @@
         justify-content: center;
         align-items: center;
         z-index: 10;
-        font-size: 18px; /* Increased font size for readability */
+        font-size: 18px;
         font-weight: bold;
-
-        /* --- STABILITY FIX --- */
+        font-family: sans-serif;
         box-sizing: border-box;
         border: 2px solid transparent;
       }
@@ -86,300 +204,154 @@
         box-shadow: 0 0 0 #000;
       }
 
-      /* WHITE KEYS */
       .key.natural {
         background: #aaaaaa;
         color: #000000;
       }
       .key.natural:active,
       .key.natural.active {
-        background: #727272; /* Light grey when pressed */
+        background: #727272;
         border-color: #101010;
       }
 
-      /* BLACK KEYS */
       .key.accidental {
         background: #1f1f1f;
         color: #ffffff;
-        border: 2px solid #555; /* Grey border to differentiate from background */
+        border: 2px solid #555;
       }
       .key.accidental:active,
       .key.accidental.active {
-        background: #333333; /* Dark grey when pressed */
+        background: #333333;
         border-color: #777;
       }
+
+      /* --- CONTROL PANEL STYLING --- */
+      #controls {
+        margin-top: 20px;
+        display: flex;
+        gap: 20px;
+        background: #464646;
+        padding: 15px 30px;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      }
+
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .control-label {
+        font-size: 12px;
+        color: #aaa;
+        margin-bottom: 5px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .btn-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #333;
+        padding: 5px;
+        border-radius: 8px;
+      }
+
+      .control-btn {
+        background: #666;
+        border: none;
+        color: white;
+        width: 30px;
+        height: 30px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 16px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 3px 0 #222;
+      }
+
+      .control-btn:active {
+        transform: translateY(2px);
+        box-shadow: 0 1px 0 #222;
+        background: #888;
+      }
+
+      .control-val {
+        width: 40px;
+        text-align: center;
+        font-size: 14px;
+        font-weight: bold;
+      }
+
     </style>
   </head>
-  <title>Classical Piano</title>
   <body>
+
+    <div id="piano-strip"></div>
+
     <div class="wicki-board" id="board"></div>
 
+    <button id="settings-btn" onclick="toggleSettings()" title="Toggle Settings">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </button>
+
+    <div id="controls" style="display: none;">
+      
+      <div class="control-group">
+        <span class="control-label">Monitor</span>
+        <div id="status-display">Last Note: -- Hz</div>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">Volume</span>
+        <div class="btn-row">
+          <button class="control-btn" onclick="changeVolume(-0.1)">-</button>
+          <span class="control-val" id="disp-vol">50%</span>
+          <button class="control-btn" onclick="changeVolume(0.1)">+</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">Sustain</span>
+        <div class="btn-row">
+          <button class="control-btn" onclick="changeSustain(-0.25)">-</button>
+          <span class="control-val" id="disp-sus">1.0x</span>
+          <button class="control-btn" onclick="changeSustain(0.25)">+</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">Transpose</span>
+        <div class="btn-row">
+          <button class="control-btn" onclick="changeTranspose(-1)">-</button>
+          <span class="control-val" id="disp-trans">0</span>
+          <button class="control-btn" onclick="changeTranspose(1)">+</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="piano.js"></script>
     <script>
-      const ROWS = 5;
-      const COLS = 14;
-      const BASE_NOTE_FREQ = 130.81;
-
-      let globalTranspose = 3;
-
-      const KEY_MAPS = [
-        // Row 4 (Top Visual)
-        [
-          "Esc",
-          "F1",
-          "F2",
-          "F3",
-          "F4",
-          "F5",
-          "F6",
-          "F7",
-          "F8",
-          "F9",
-          "F10",
-          "F11",
-          "F12",
-          "Delete",
-        ],
-        // Row 3 (Numbers) - Added Backspace
-        [
-          "`",
-          "1",
-          "2",
-          "3",
-          "4",
-          "5",
-          "6",
-          "7",
-          "8",
-          "9",
-          "0",
-          "-",
-          "=",
-          "Backspace",
-        ],
-        // Row 2 (Tab/QWERTY) - Added Backslash
-        [
-          "Tab",
-          "q",
-          "w",
-          "e",
-          "r",
-          "t",
-          "y",
-          "u",
-          "i",
-          "o",
-          "p",
-          "[",
-          "]",
-          "\\",
-        ],
-        // Row 1 (Caps)
-        [
-          "CapsLock",
-          "a",
-          "s",
-          "d",
-          "f",
-          "g",
-          "h",
-          "j",
-          "k",
-          "l",
-          ";",
-          "'",
-          "Enter",
-        ],
-        // Row 0 (Shift)
-        [
-          "ShiftLeft",
-          "z",
-          "x",
-          "c",
-          "v",
-          "b",
-          "n",
-          "m",
-          ",",
-          ".",
-          "/",
-          "ShiftRight",
-          "Control",
-        ],
-      ];
-
-      const board = document.getElementById("board");
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-      function renderBoard() {
-        board.innerHTML = "";
-
-        for (let r = 0; r < ROWS; r++) {
-          const rowDiv = document.createElement("div");
-          rowDiv.className = "row row-" + r;
-
-          for (let c = 0; c < COLS; c++) {
-            const mapRowIndex = ROWS - 1 - r;
-            let keyMapChar = "";
-            if (KEY_MAPS[mapRowIndex] && KEY_MAPS[mapRowIndex][c]) {
-              keyMapChar = KEY_MAPS[mapRowIndex][c];
-            }
-
-            const isExplicitlyHidden = ["Esc", "Control", "`", "F1"].includes(
-              keyMapChar
-            );
-
-            // Logic Update: Only trim the last column for the bottom 2 rows now (r=0 and r=1)
-            // This allows Backspace (r=3) and Backslash (r=2) to appear in column 13.
-            const isTrimmedEnd = r < 2 && c === COLS - 1;
-
-            const isHidden = isExplicitlyHidden || isTrimmedEnd;
-
-            // --- PITCH CALCULATION ---
-            let semitoneOffset = r * 5 + c * 2 + globalTranspose;
-
-            let freq = BASE_NOTE_FREQ * Math.pow(2, semitoneOffset / 12);
-
-            let noteIndex = ((semitoneOffset % 12) + 12) % 12;
-            let isNatural = [0, 2, 4, 5, 7, 9, 11].includes(noteIndex);
-
-            const key = document.createElement("div");
-            key.className = `key ${isNatural ? "natural" : "accidental"}`;
-            key.setAttribute("data-note", freq);
-
-            if (isHidden) {
-              key.style.visibility = "hidden";
-              key.style.pointerEvents = "none";
-            }
-
-            if (keyMapChar) {
-              key.setAttribute("data-key", keyMapChar.toLowerCase());
-            }
-
-            key.addEventListener("mousedown", () => playKey(key));
-            rowDiv.appendChild(key);
-          }
-          board.appendChild(rowDiv);
+      // INLINE SCRIPT FOR UI TOGGLE
+      function toggleSettings() {
+        const c = document.getElementById("controls");
+        const btn = document.getElementById("settings-btn");
+        if (c.style.display === "none") {
+          c.style.display = "flex";
+          btn.classList.add("open");
+        } else {
+          c.style.display = "none";
+          btn.classList.remove("open");
         }
       }
-
-      /* * UPDATED SOUND ENGINE V5 - Safety Limiter Logic
-       * - Fixed "Exploding Bass": Clamped volume significantly for low Hz.
-       * - Fixed "Infinite Sustain": Hard capped duration to 4 seconds.
-       */
-      function playSound(frequency) {
-        const now = audioCtx.currentTime;
-
-        // 1. DURATION: Cap at 4 seconds.
-        // Previously, low notes (e.g. 50Hz) would last 20 seconds (1000/50).
-        let calculatedDuration = 1 + 500 / frequency;
-        const duration = Math.min(calculatedDuration, 3);
-
-        // 2. VOLUME:
-        // We use a gentler curve and a strict hard cap.
-        // Old formula: 30/freq (at 60hz this was 0.5, at 30hz this was 1.0)
-        // New formula: 20/freq, but never go above 0.35 total gain.
-        let volume = 15 / frequency;
-
-        const masterGain = audioCtx.createGain();
-        masterGain.connect(audioCtx.destination);
-
-        // ENVELOPE:
-        masterGain.gain.setValueAtTime(0, now);
-        masterGain.gain.linearRampToValueAtTime(volume, now + 0.015);
-
-        // Decay to sustain level (sustain is 60% of max volume)
-        masterGain.gain.exponentialRampToValueAtTime(volume * 0.6, now + 0.4);
-
-        // Long release tail
-        masterGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-        // 3. FILTER (The Brightness)
-        const filter = audioCtx.createBiquadFilter();
-        filter.type = "lowpass";
-        filter.Q.value = 0;
-        filter.connect(masterGain);
-
-        // Attack Brightness
-        // We cap the attack brightness so deep bass doesn't "click" too hard
-        const attackBrightness = Math.max(frequency * 8, 800);
-        const sustainBrightness = frequency * 3;
-
-        filter.frequency.setValueAtTime(attackBrightness, now);
-
-        filter.frequency.exponentialRampToValueAtTime(
-          sustainBrightness,
-          now + 0.5
-        );
-        filter.frequency.linearRampToValueAtTime(frequency, now + duration);
-
-        // 4. OSCILLATORS
-        const osc1 = audioCtx.createOscillator();
-        osc1.type = "sine";
-        osc1.frequency.value = frequency;
-        osc1.connect(filter);
-        osc1.start(now);
-        osc1.stop(now + duration + 0.1);
-
-        const osc2 = audioCtx.createOscillator();
-        osc2.type = "triangle";
-        osc2.frequency.value = frequency;
-        // Reduced detune slightly for cleaner bass
-        osc2.detune.value = 2;
-        osc2.connect(filter);
-        osc2.start(now);
-        osc2.stop(now + duration + 0.1);
-
-        setTimeout(() => {
-          masterGain.disconnect();
-        }, (duration + 0.2) * 1000);
-      }
-
-      function playKey(keyElement) {
-        if (!keyElement) return;
-        if (keyElement.style.visibility === "hidden") return;
-
-        keyElement.classList.add("active");
-        setTimeout(() => keyElement.classList.remove("active"), 150);
-        const noteFreq = keyElement.getAttribute("data-note");
-        // Ensure we parse the float before sending it to audio
-        playSound(parseFloat(noteFreq));
-      }
-
-      window.addEventListener("keydown", (e) => {
-        // --- NAVIGATION CONTROLS ---
-        if (e.key.startsWith("Arrow")) {
-          if (e.repeat) return;
-
-          if (e.key === "ArrowRight") globalTranspose += 5;
-          else if (e.key === "ArrowLeft") globalTranspose -= 5;
-          else if (e.key === "ArrowUp") globalTranspose += 12;
-          else if (e.key === "ArrowDown") globalTranspose -= 12;
-
-          renderBoard();
-          return;
-        }
-
-        // --- ROBUST KEY DETECTION FIX ---
-        let searchKey = e.key.toLowerCase();
-
-        // Override for Shift keys to use their physical code
-        if (e.code === "ShiftLeft" || e.code === "ShiftRight") {
-          searchKey = e.code.toLowerCase();
-        }
-
-        const key = document.querySelector(
-          `.key[data-key="${CSS.escape(searchKey)}"]`
-        );
-
-        if (key && key.style.visibility !== "hidden") {
-          e.preventDefault();
-          if (!e.repeat) {
-            playKey(key);
-          }
-        }
-      });
-
-      renderBoard();
     </script>
   </body>
 </html>
