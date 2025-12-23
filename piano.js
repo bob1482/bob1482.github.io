@@ -2,10 +2,15 @@ const ROWS = 5;
 const COLS = 14;
 const BASE_NOTE_FREQ = 130.81; // Approx C3
 
+// --- OPTIMIZATION: LATENCY SETTINGS ---
+Tone.setContext(new Tone.Context({ latencyHint: "interactive" }));
+Tone.context.lookAhead = 0;
+
 // --- SETTINGS STATE ---
-let globalTranspose = 3;
+let globalTranspose = -3;
 let globalVolume = 0.5;
 let sustainMultiplier = 1.0;
+let isLoaded = false; 
 
 // --- KEY MAP CONFIGURATION ---
 const KEY_MAPS = [
@@ -17,106 +22,121 @@ const KEY_MAPS = [
 ];
 
 const board = document.getElementById("board");
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-// --- GLOBAL MIX BUS ---
-const masterOut = audioCtx.createGain();
-masterOut.gain.value = globalVolume; 
-masterOut.connect(audioCtx.destination);
+// --- TONE.JS SETUP ---
+const reverb = new Tone.Reverb({
+    decay: 2.5,
+    preDelay: 0.01, 
+    wet: 0.3
+}).toDestination();
+
+const sampler = new Tone.Sampler({
+    urls: {
+        "A0": "A0.mp3",
+        "C1": "C1.mp3", "D#1": "Ds1.mp3", "F#1": "Fs1.mp3", "A1": "A1.mp3",
+        "C2": "C2.mp3", "D#2": "Ds2.mp3", "F#2": "Fs2.mp3", "A2": "A2.mp3",
+        "C3": "C3.mp3", "D#3": "Ds3.mp3", "F#3": "Fs3.mp3", "A3": "A3.mp3",
+        "C4": "C4.mp3", "D#4": "Ds4.mp3", "F#4": "Fs4.mp3", "A4": "A4.mp3",
+        "C5": "C5.mp3", "D#5": "Ds5.mp3", "F#5": "Fs5.mp3", "A5": "A5.mp3",
+        "C6": "C6.mp3", "D#6": "Ds6.mp3", "F#6": "Fs6.mp3", "A6": "A6.mp3",
+        "C7": "C7.mp3", "D#7": "Ds7.mp3", "F#7": "Fs7.mp3", "A7": "A7.mp3",
+        "C8": "C8.mp3"
+    },
+    baseUrl: "https://tonejs.github.io/audio/salamander/",
+    onload: () => {
+        isLoaded = true;
+        reverb.generate(); 
+        updateUI();
+        console.log("Samples loaded.");
+    }
+}).connect(reverb);
+
+Tone.Destination.volume.value = Tone.gainToDb(globalVolume);
 
 // --- HELPER: UPDATE UI ---
-function updateUI(freq = null) {
-  // Update Frequency Display
-  const statusDiv = document.getElementById("status-display");
-  if (freq) {
-    statusDiv.innerText = `Last Note: ${freq.toFixed(0)} Hz`;
-  }
-
-  // Update Control Panel Values
-  document.getElementById("disp-vol").innerText = Math.round(globalVolume * 100) + "%";
-  document.getElementById("disp-sus").innerText = sustainMultiplier.toFixed(2) + "x";
-  document.getElementById("disp-trans").innerText = (globalTranspose - 3) > 0 ? "+" + (globalTranspose - 3) : (globalTranspose - 3);
+function updateUI() {
+  document.getElementById("disp-vol").innerText = Math.round(globalVolume * 200);
+  document.getElementById("disp-sus").innerText = sustainMultiplier.toFixed(2) * 100;
+  document.getElementById("disp-trans").innerText = (globalTranspose + 3) > 0 ? "+" + (globalTranspose + 3) : (globalTranspose + 3);
 }
 
 // --- CONTROL FUNCTIONS ---
 function changeVolume(delta) {
   globalVolume += delta;
   if (globalVolume > 1.0) globalVolume = 1.0;
-  if (globalVolume < 0.0) globalVolume = 0.0;
-  masterOut.gain.setTargetAtTime(globalVolume, audioCtx.currentTime, 0.02);
+  if (globalVolume < 0.1) globalVolume = 0.1;
+  Tone.Destination.volume.rampTo(Tone.gainToDb(globalVolume), 0.1);
   updateUI();
 }
 
 function changeSustain(delta) {
   sustainMultiplier += delta;
-  if (sustainMultiplier < 0.25) sustainMultiplier = 0.25;
-  if (sustainMultiplier > 4.0) sustainMultiplier = 4.0;
+  if (sustainMultiplier < 0.2) sustainMultiplier = 0.2;
+  if (sustainMultiplier > 2.0) sustainMultiplier = 2.0;
   updateUI();
 }
 
 function changeTranspose(delta) {
   globalTranspose += delta;
-  if (globalTranspose < -9) globalTranspose = -9;
+  if (globalTranspose < -27) globalTranspose = -27;
   if (globalTranspose > 15) globalTranspose = 15;
   renderBoard();
   updateUI();
 }
 
-// --- RENDER TRADITIONAL PIANO ---
-// --- RENDER TRADITIONAL PIANO (6 OCTAVES) ---
-// --- RENDER TRADITIONAL PIANO (4 OCTAVES) ---
+// --- RENDER TRADITIONAL PIANO (88 KEYS, FIXED) ---
 function renderTraditionalPiano() {
   const strip = document.getElementById("piano-strip");
-  strip.innerHTML = ""; // Clear existing
+  strip.innerHTML = ""; 
 
   const wrapper = document.createElement("div");
   wrapper.className = "piano-wrapper";
   strip.appendChild(wrapper);
 
-  const whiteKeyWidth = 35;
-  const blackKeyWidth = 20;
+  // 88 keys total (A0 to C8)
+  const totalNotes = 88;
+  const totalWhiteKeys = 52; 
   
-  // 4 Octaves (C2 to C6) = 48 semitones + 1 final C = 49 notes
-  const startOffset = 0; // Start 1 octave below Base Frequency (C3)
-  const totalNotes = 48; 
+  // A0 is -27 semitones relative to C3
+  const startOffset = -27; 
   
+  // Calculate widths as pure percentages to fit screen
+  const whiteKeyWidthPercent = 100 / totalWhiteKeys;
+  const blackKeyWidthPercent = whiteKeyWidthPercent * 0.7; // Slightly narrower than white
+
   let whiteKeyCount = 0;
 
   for(let i = 0; i < totalNotes; i++) {
-      // Calculate semitone relative to C3 (0)
-      const currentSemitone = startOffset + i;
-
-      // Normalize index for color lookup (handles negative numbers)
-      const noteInOctave = ((currentSemitone % 12) + 12) % 12;
-      
-      const isWhite = [0, 2, 4, 5, 7, 9, 11].includes(noteInOctave);
+      const currentSemitone = startOffset + i; 
       const freq = BASE_NOTE_FREQ * Math.pow(2, currentSemitone / 12);
-      
       const freqStr = freq.toFixed(2);
+
+      // Determine Note Color
+      // Note index relative to A (0): A=0, A#=1, B=2, C=3, C#=4, D=5...
+      const noteIndex = i % 12;
+      // White keys are at indices: 0(A), 2(B), 3(C), 5(D), 7(E), 8(F), 10(G)
+      const isWhite = [0, 2, 3, 5, 7, 8, 10].includes(noteIndex);
 
       const key = document.createElement("div");
       key.setAttribute("data-note", freqStr);
-      
+      key.title = freqStr + " Hz";
+
       if (isWhite) {
           key.className = "p-key white";
-          key.style.left = (whiteKeyCount * whiteKeyWidth) + "px";
+          key.style.width = whiteKeyWidthPercent + "%";
+          key.style.left = (whiteKeyCount * whiteKeyWidthPercent) + "%";
           whiteKeyCount++;
       } else {
           key.className = "p-key black";
-          key.style.left = (whiteKeyCount * whiteKeyWidth - (blackKeyWidth / 2)) + "px";
+          key.style.width = blackKeyWidthPercent + "%";
+          // Center black key on the boundary of the previous white key
+          // Logic: (PreviousWhiteCount * WhiteWidth) - (HalfBlackWidth)
+          key.style.left = ((whiteKeyCount * whiteKeyWidthPercent) - (blackKeyWidthPercent / 2)) + "%";
       }
 
       key.addEventListener("mousedown", () => triggerNoteByFreq(freq));
       wrapper.appendChild(key);
   }
-  
-  wrapper.style.width = (whiteKeyCount * whiteKeyWidth) + "px";
-  
-  // Center the view on Middle C (approximate)
-  setTimeout(() => {
-    // 40px * 15 keys is roughly where C3 starts in this new layout
-    strip.scrollLeft = (15 * 40) - (strip.clientWidth / 2);
-  }, 100);
 }
 
 // --- RENDER WICKI BOARD ---
@@ -142,7 +162,6 @@ function renderBoard() {
       let noteIndex = ((semitoneOffset % 12) + 12) % 12;
       let isNatural = [0, 2, 4, 5, 7, 9, 11].includes(noteIndex);
 
-      // USE TOFIXED(2) for consistency
       const freqStr = freq.toFixed(2);
 
       const key = document.createElement("div");
@@ -157,7 +176,6 @@ function renderBoard() {
         key.setAttribute("data-key", keyMapChar.toLowerCase());
       }
 
-      // Click listener
       key.addEventListener("mousedown", () => triggerNoteByFreq(freq));
       rowDiv.appendChild(key);
     }
@@ -166,67 +184,29 @@ function renderBoard() {
 }
 
 // --- UNIFIED TRIGGER & HIGHLIGHT ---
-function triggerNoteByFreq(freq) {
-  const freqStr = freq.toFixed(2);
-  
-  // 1. Play Sound
-  playSound(freq);
-  updateUI(freq);
+async function triggerNoteByFreq(freq) {
+  if (Tone.context.state !== 'running') {
+    await Tone.start();
+  }
 
-  // 2. Highlight ALL keys (Wicki or Piano) with this frequency
+  if (!isLoaded) return;
+
+  const freqStr = freq.toFixed(2);
+  playSound(freq);
+
+  // Highlight Keys (both Wicki and Piano strip)
   const allKeys = document.querySelectorAll(`[data-note="${freqStr}"]`);
-  
   allKeys.forEach(k => {
     k.classList.add("active");
-    // Remove active class quickly
     setTimeout(() => k.classList.remove("active"), 200);
   });
 }
 
 // --- SOUND ENGINE ---
 function playSound(frequency) {
-  if(audioCtx.state === 'suspended') audioCtx.resume();
-  const now = audioCtx.currentTime;
-
-  let baseDuration = 1 + 500 / frequency;
-  const duration = Math.min(baseDuration * sustainMultiplier, 8); 
-  let volume = 15 / frequency;
-
-  const noteGain = audioCtx.createGain();
-  noteGain.connect(masterOut);
-
-  noteGain.gain.setValueAtTime(0, now);
-  noteGain.gain.linearRampToValueAtTime(volume, now + 0.015);
-  noteGain.gain.exponentialRampToValueAtTime(volume * 0.6, now + 0.4 * sustainMultiplier);
-  noteGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-  const filter = audioCtx.createBiquadFilter();
-  filter.type = "lowpass";
-  filter.Q.value = 0;
-  filter.connect(noteGain);
-
-  const attackBrightness = Math.max(frequency * 8, 800);
-  const sustainBrightness = frequency * 3;
-  filter.frequency.setValueAtTime(attackBrightness, now);
-  filter.frequency.exponentialRampToValueAtTime(sustainBrightness, now + 0.5 * sustainMultiplier);
-  filter.frequency.linearRampToValueAtTime(frequency, now + duration);
-
-  const osc1 = audioCtx.createOscillator();
-  osc1.type = "sine";
-  osc1.frequency.value = frequency;
-  osc1.connect(filter);
-  osc1.start(now);
-  osc1.stop(now + duration + 0.1);
-
-  const osc2 = audioCtx.createOscillator();
-  osc2.type = "triangle";
-  osc2.frequency.value = frequency;
-  osc2.detune.value = 2; 
-  osc2.connect(filter);
-  osc2.start(now);
-  osc2.stop(now + duration + 0.1);
-
-  setTimeout(() => { noteGain.disconnect(); }, (duration + 0.2) * 1000);
+  let baseDuration = 2;
+  const duration = Math.min(baseDuration * sustainMultiplier, 4); 
+  sampler.triggerAttackRelease(frequency, duration);
 }
 
 // --- INPUT LISTENERS ---
@@ -252,12 +232,17 @@ window.addEventListener("keydown", (e) => {
   if (key && key.style.visibility !== "hidden") {
     e.preventDefault();
     if (!e.repeat) {
-      // Get frequency from the key element and trigger unified system
       const freq = parseFloat(key.getAttribute("data-note"));
       triggerNoteByFreq(freq);
     }
   }
 });
+
+window.addEventListener('click', async () => {
+  if (Tone.context.state !== 'running') {
+    await Tone.start();
+  }
+}, { once: true });
 
 // Initial Render
 renderBoard();
