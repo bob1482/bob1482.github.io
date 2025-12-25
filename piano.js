@@ -2,10 +2,6 @@ const ROWS = 5;
 const COLS = 14;
 const BASE_NOTE_FREQ = 130.81; // Approx C3
 
-// --- OPTIMIZATION: LATENCY SETTINGS ---
-Tone.setContext(new Tone.Context({ latencyHint: "interactive" }));
-Tone.context.lookAhead = 0;
-
 // --- SETTINGS STATE ---
 let globalTranspose = -3;
 let globalVolume = 0.5;
