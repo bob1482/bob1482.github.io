@@ -150,9 +150,6 @@ function renderBoard() {
         keyMapChar = KEY_MAPS[mapRowIndex][c];
       }
 
-      const isExplicitlyHidden = ["Esc", "Control", "`", "F1"].includes(keyMapChar);
-      const isTrimmedEnd = r < 2 && c === COLS - 1;
-      const isHidden = isExplicitlyHidden || isTrimmedEnd;
 
       // --- CUSTOM ROW SHIFT LOGIC ---
       let rowManualShift = 0;
