@@ -1,20 +1,21 @@
 const ROWS = 5;
-const COLS = 14;
+const COLS = 11;
 const BASE_NOTE_FREQ = 130.81; // Approx C3
 
 // --- SETTINGS STATE ---
-let globalTranspose = -3;
+let globalTranspose = 0;
 let globalVolume = 0.5;
 let sustainMultiplier = 1.0;
 let isLoaded = false; 
 
 // --- KEY MAP CONFIGURATION ---
 const KEY_MAPS = [
-  ["Esc","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12","Delete"],
-  ["`","1","2","3","4","5","6","7","8","9","0","-","=","Backspace"],
-  ["Tab","q","w","e","r","t","y","u","i","o","p","[","]","\\"],
-  ["CapsLock","a","s","d","f","g","h","j","k","l",";","'","Enter"],
-  ["ShiftLeft","z","x","c","v","b","n","m",",",".","/","ShiftRight","Control"]
+  //["F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11"],
+  ["F3","F4","F5","F6","F7","F9","F10","F11","F12"],
+  ["2","3","4","5","6","7","8","9","0","-","="],
+  ["w","e","r","t","y","u","i","o","p","[","]"],
+  ["a","s","d","f","g","h","j","k","l",";","'"],
+  ["z","x","c","v","b","n","m",",",".","/","ShiftRight"]
 ];
 
 const board = document.getElementById("board");
@@ -51,9 +52,9 @@ Tone.Destination.volume.value = Tone.gainToDb(globalVolume);
 
 // --- HELPER: UPDATE UI ---
 function updateUI() {
-  document.getElementById("disp-vol").innerText = Math.round(globalVolume * 200);
-  document.getElementById("disp-sus").innerText = sustainMultiplier.toFixed(2) * 100;
-  document.getElementById("disp-trans").innerText = (globalTranspose + 3) > 0 ? "+" + (globalTranspose + 3) : (globalTranspose + 3);
+  document.getElementById("disp-vol").innerText = Math.round(globalVolume * 10);
+  document.getElementById("disp-sus").innerText = sustainMultiplier.toFixed(2) * 5;
+  document.getElementById("disp-trans").innerText = globalTranspose;
 }
 
 // --- CONTROL FUNCTIONS ---
@@ -74,8 +75,8 @@ function changeSustain(delta) {
 
 function changeTranspose(delta) {
   globalTranspose += delta;
-  if (globalTranspose < -27) globalTranspose = -27;
-  if (globalTranspose > 15) globalTranspose = 15;
+  if (globalTranspose < -24) globalTranspose = -24;
+  if (globalTranspose > 24) globalTranspose = 24;
   renderBoard();
   updateUI();
 }
@@ -153,7 +154,17 @@ function renderBoard() {
       const isTrimmedEnd = r < 2 && c === COLS - 1;
       const isHidden = isExplicitlyHidden || isTrimmedEnd;
 
-      let semitoneOffset = r * 5 + c * 2 + globalTranspose;
+      // --- CUSTOM ROW SHIFT LOGIC ---
+      let rowManualShift = 0;
+      if (r === 4) {
+        rowManualShift = 4; // Top row: +4 notes
+      } else if (r === 3) {
+        rowManualShift = 2; // 2nd row: +2 notes
+      } else if (r === 2) {
+        rowManualShift = 2; // 3rd row: +2 notes
+      }
+      
+      let semitoneOffset = r * 5 + c * 2 + globalTranspose + rowManualShift;
       let freq = BASE_NOTE_FREQ * Math.pow(2, semitoneOffset / 12);
       let noteIndex = ((semitoneOffset % 12) + 12) % 12;
       let isNatural = [0, 2, 4, 5, 7, 9, 11].includes(noteIndex);
@@ -164,10 +175,7 @@ function renderBoard() {
       key.className = `key ${isNatural ? "natural" : "accidental"}`;
       key.setAttribute("data-note", freqStr);
 
-      if (isHidden) {
-        key.style.visibility = "hidden";
-        key.style.pointerEvents = "none";
-      }
+      
       if (keyMapChar) {
         key.setAttribute("data-key", keyMapChar.toLowerCase());
       }
@@ -209,8 +217,8 @@ function playSound(frequency) {
 window.addEventListener("keydown", (e) => {
   if (e.key.startsWith("Arrow")) {
     if (e.repeat) return;
-    if (e.key === "ArrowRight") changeTranspose(5);
-    else if (e.key === "ArrowLeft") changeTranspose(-5);
+    if (e.key === "ArrowRight") changeTranspose(1);
+    else if (e.key === "ArrowLeft") changeTranspose(-1);
     else if (e.key === "ArrowUp") changeTranspose(12);
     else if (e.key === "ArrowDown") changeTranspose(-12);
     return;

@@ -12,10 +12,10 @@
         align-items: center;
         min-height: 100vh;
         /* MONOCHROME: Dark grey background */
-        background-color: #6b6b6b;
+        background-color: #474747;
         font-family: "Courier New", Courier, monospace;
         margin: 0;
-        color: white;
+        color: rgb(190, 190, 190);
         flex-direction: column;
         overflow: hidden;
         user-select: none;
@@ -28,14 +28,11 @@
         left: 0;
         width: 100%;
         /* Fixed height relative to viewport, constrained by min/max pixels */
-        height: 15vh; 
-        min-height: 80px;
-        max-height: 150px;
+        height: 17vh; 
         margin: 0;
         padding: 0;
         background: #222;
         border-top: 4px solid #111;
-        box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.5);
         display: block;
         overflow: hidden; /* No scrolling */
         z-index: 1000;
@@ -59,7 +56,7 @@
       }
 
       .p-key.white {
-        background: #e0e0e0;
+        background: #acacac;
         border: 1px solid #666; 
         border-top: none;
         height: 100%;
@@ -67,7 +64,7 @@
       }
       .p-key.white:active,
       .p-key.white.active {
-        background: #ccc;
+        background: #555555;
         box-shadow: inset 0 0 5px rgba(0,0,0,0.4);
       }
 
@@ -80,22 +77,16 @@
       }
       .p-key.black:active,
       .p-key.black.active {
-        background: #444;
+        background: #7b7b7b;
+        box-shadow: inset 0 0 5px rgba(215, 215, 215, 0.4);
       }
 
       /* --- WICKI BOARD STYLING --- */
       .wicki-board {
         position: relative;
-        background: #464646;
-        padding: 60px 0px;
-        border-radius: 20px;
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
         display: flex;
         flex-direction: column-reverse;
         align-items: center;
-        zoom: 0.85;
-        /* Add margin bottom so it doesn't get covered by the fixed piano strip */
-        margin-bottom: 16vh; 
       }
 
       .row {
@@ -103,11 +94,11 @@
         margin-bottom: 15px;
       }
 
-      .row-4 { margin-left: -168px; }
-      .row-3 { margin-left: -84px; }
+      .row-4 { margin-left: 0px; }
+      .row-3 { margin-left: -83px; }
       .row-2 { margin-left: 0px; }
-      .row-1 { margin-left: 84px; }
-      .row-0 { margin-left: 168px; }
+      .row-1 { margin-left: -83px; }
+      .row-0 { margin-left: 0px; }
 
       .key {
         width: 60px;
@@ -247,7 +238,7 @@
         </div>
       </div>
       <div class="control-group">
-        <span class="control-label">Transp</span>
+        <span class="control-label">Transpose</span>
         <div class="btn-row">
           <button class="control-btn" onclick="changeTranspose(-1)">-</button>
           <span class="control-val" id="disp-trans">0</span>

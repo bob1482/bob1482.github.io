@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Classical Piano (Wicki-Hayden)</title>
+    <style>
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        /* MONOCHROME: Dark grey background */
+        background-color: #6b6b6b;
+        font-family: "Courier New", Courier, monospace;
+        margin: 0;
+        color: white;
+        flex-direction: column;
+        overflow: hidden;
+        user-select: none;
+      }
+
+      /* --- SETTINGS BUTTON --- */
+      #settings-btn {
+        background: transparent;
+        border: none;
+        color: #888;
+        cursor: pointer;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        padding: 10px;
+        transition: transform 0.3s, color 0.3s;
+        border-radius: 50%;
+      }
+
+      #settings-btn:hover {
+        color: #fff;
+        background: rgba(255,255,255,0.1);
+      }
+
+      /* Rotate the gear when open */
+      #settings-btn.open {
+        color: #fff;
+        transform: rotate(90deg);
+      }
+
+      /* STATUS DISPLAY STYLING */
+      /* STATUS DISPLAY (Now inside controls) */
+      #status-display {
+        /* Remove absolute positioning so it sits in the flex container */
+        position: static; 
+        
+        /* Match the style of .btn-row / .control-btn */
+        background: #333;
+        color: #fff;
+        font-size: 14px;
+        padding: 0 15px;
+        border-radius: 8px;
+        
+        /* Layout alignment */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 40px; /* Match height of other control groups */
+        min-width: 150px;
+        
+        /* consistent shadow with other controls */
+        box-shadow: inset 0 0 5px rgba(0,0,0,0.5); 
+        white-space: nowrap;
+      }
+
+      /* --- TRADITIONAL PIANO STRIP --- */
+      #piano-strip {
+        position: relative;
+        height: 140px;
+        margin-bottom: 30px; 
+        margin-top: 30px; 
+        background: #464646;
+        padding: 30px 0; 
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        
+        /* Updated for wider piano */
+        display: block; 
+        overflow-x: auto; /* Adds scrollbar only if screen is too small */
+        overflow-y: hidden;
+        white-space: nowrap;
+        width: 90%; 
+        max-width: 1150px;
+        
+        /* Smooth scrolling */
+        scroll-behavior: smooth;
+        
+        /* Scrollbar styling */
+        scrollbar-width: thin;
+        scrollbar-color: #666 #333;
+      }
+      
+      /* Webkit Scrollbar styling */
+      #piano-strip::-webkit-scrollbar { height: 10px; }
+      #piano-strip::-webkit-scrollbar-track { background: #333; border-radius: 5px; }
+      #piano-strip::-webkit-scrollbar-thumb { background: #666; border-radius: 5px; }
+
+      .piano-wrapper {
+        position: relative;
+        height: 120px;
+        margin: 0 auto; /* Centers if screen is wider than piano */
+      }
+
+
+      .p-key {
+        position: absolute;
+        box-sizing: border-box;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.1s, transform 0.05s;
+        top: 0;
+      }
+
+      /* CSS for JS activation */
+      .p-key:active,
+      .p-key.active {
+        transform: scale(0.98);
+      }
+
+      /* Traditional White Keys */
+      .p-key.white {
+        background: #e0e0e0;
+        border: 1px solid #999;
+        height: 120px;
+        width: 35px;
+        z-index: 1;
+      }
+      .p-key.white:active,
+      .p-key.white.active {
+        background: #ccc;
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+      }
+
+      /* Traditional Black Keys */
+      .p-key.black {
+        background: #111;
+        border: 1px solid #000;
+        height: 75px;
+        width: 20px;
+        z-index: 2;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+      }
+      .p-key.black:active,
+      .p-key.black.active {
+        background: #333;
+        box-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+      }
+
+      /* --- WICKI BOARD STYLING --- */
+      .wicki-board {
+        position: relative;
+        background: #464646;
+        padding: 60px 0px;
+        border-radius: 20px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+        display: flex;
+        flex-direction: column-reverse;
+        align-items: center;
+        zoom: 0.85;
+        margin-bottom: 20px;
+      }
+
+      .row {
+        display: flex;
+        margin-bottom: 15px;
+      }
+
+      /* Key Width (60px) + Key Margin (24px) = 84px Unit */
+      .row-4 { margin-left: -168px; }
+      .row-3 { margin-left: -84px; }
+      .row-2 { margin-left: 0px; }
+      .row-1 { margin-left: 84px; }
+      .row-0 { margin-left: 168px; }
+
+      .key {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        margin: 0 12px;
+        cursor: pointer;
+        position: relative;
+        box-shadow: 0 5px 0 #000;
+        transition: transform 0.05s, box-shadow 0.05s, background-color 0.1s;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+        font-size: 18px;
+        font-weight: bold;
+        font-family: sans-serif;
+        box-sizing: border-box;
+        border: 2px solid transparent;
+      }
+
+      .key:active,
+      .key.active {
+        transform: translateY(5px);
+        box-shadow: 0 0 0 #000;
+      }
+
+      .key.natural {
+        background: #aaaaaa;
+        color: #000000;
+      }
+      .key.natural:active,
+      .key.natural.active {
+        background: #727272;
+        border-color: #101010;
+      }
+
+      .key.accidental {
+        background: #1f1f1f;
+        color: #ffffff;
+        border: 2px solid #555;
+      }
+      .key.accidental:active,
+      .key.accidental.active {
+        background: #333333;
+        border-color: #777;
+      }
+
+      /* --- CONTROL PANEL STYLING --- */
+      #controls {
+        margin-top: 20px;
+        display: flex;
+        gap: 20px;
+        background: #464646;
+        padding: 15px 30px;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      }
+
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .control-label {
+        font-size: 12px;
+        color: #aaa;
+        margin-bottom: 5px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .btn-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #333;
+        padding: 5px;
+        border-radius: 8px;
+      }
+
+      .control-btn {
+        background: #666;
+        border: none;
+        color: white;
+        width: 30px;
+        height: 30px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 16px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 3px 0 #222;
+      }
+
+      .control-btn:active {
+        transform: translateY(2px);
+        box-shadow: 0 1px 0 #222;
+        background: #888;
+      }
+
+      .control-val {
+        width: 40px;
+        text-align: center;
+        font-size: 14px;
+        font-weight: bold;
+      }
+
+    </style>
+  </head>
+  <body>
+
+    <div id="piano-strip"></div>
+
+    <div class="wicki-board" id="board"></div>
+
+    <button id="settings-btn" onclick="toggleSettings()" title="Toggle Settings">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </button>
+
+    <div id="controls" style="display: none;">
+      
+      <div class="control-group">
+        <span class="control-label">Monitor</span>
+        <div id="status-display">Last Note: -- Hz</div>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">Volume</span>
+        <div class="btn-row">
+          <button class="control-btn" onclick="changeVolume(-0.1)">-</button>
+          <span class="control-val" id="disp-vol">50%</span>
+          <button class="control-btn" onclick="changeVolume(0.1)">+</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">Sustain</span>
+        <div class="btn-row">
+          <button class="control-btn" onclick="changeSustain(-0.25)">-</button>
+          <span class="control-val" id="disp-sus">1.0x</span>
+          <button class="control-btn" onclick="changeSustain(0.25)">+</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">Transpose</span>
+        <div class="btn-row">
+          <button class="control-btn" onclick="changeTranspose(-1)">-</button>
+          <span class="control-val" id="disp-trans">0</span>
+          <button class="control-btn" onclick="changeTranspose(1)">+</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="testing.js"></script>
+    <script>
+      // INLINE SCRIPT FOR UI TOGGLE
+      function toggleSettings() {
+        const c = document.getElementById("controls");
+        const btn = document.getElementById("settings-btn");
+        if (c.style.display === "none") {
+          c.style.display = "flex";
+          btn.classList.add("open");
+        } else {
+          c.style.display = "none";
+          btn.classList.remove("open");
+        }
+      }
+    </script>
+  </body>
+</html>
