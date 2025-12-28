@@ -21,6 +21,17 @@
         user-select: none;
       }
 
+      /* --- SYNTHESIA VISUALIZER CANVAS --- */
+      #synthesia-canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 83vh; /* Occupy space above the piano strip (100 - 17) */
+        z-index: 1;   /* Behind the controls/wicki board */
+        pointer-events: none; /* Let clicks pass through */
+      }
+
       /* --- TRADITIONAL PIANO STRIP (FIXED BOTTOM) --- */
       #piano-strip {
         position: fixed;
@@ -52,6 +63,14 @@
         cursor: pointer;
         transition: background-color 0.1s;
         top: 0;
+        /* Text Alignment */
+        display: flex;
+        justify-content: center;
+        align-items: flex-end;
+        padding-bottom: 8px;
+        font-size: 10px;
+        font-weight: bold;
+        overflow: hidden;
       }
 
       .p-key.white {
@@ -60,6 +79,7 @@
         border-top: none;
         height: 100%;
         z-index: 1;
+        color: #333;
       }
       .p-key.white:active,
       .p-key.white.active {
@@ -73,6 +93,9 @@
         border-top: none;
         height: 65%; 
         z-index: 10;
+        color: #ddd;
+        font-size: 9px;
+        padding-bottom: 5px;
       }
       .p-key.black:active,
       .p-key.black.active {
@@ -86,6 +109,8 @@
         flex-direction: row;
         gap: 60px; /* Space between left and right hands */
         margin-bottom: 50px;
+        z-index: 10; /* Above the canvas */
+        position: relative;
       }
 
       /* --- WICKI BOARD STYLING --- */
@@ -94,10 +119,6 @@
         display: flex;
         flex-direction: column-reverse;
         align-items: center;
-        /* Optional: distinct background for halves to see separation
-        background: rgba(0,0,0,0.1); 
-        border-radius: 20px;
-        padding: 10px; */
       }
 
       .row {
@@ -125,7 +146,7 @@
         justify-content: center;
         align-items: center;
         z-index: 10;
-        font-size: 18px;
+        font-size: 16px;
         font-weight: bold;
         font-family: sans-serif;
         box-sizing: border-box;
@@ -235,6 +256,8 @@
     </style>
   </head>
   <body>
+    <canvas id="synthesia-canvas"></canvas>
+
     <div id="board-wrapper">
       <div class="wicki-board" id="board-left"></div>
       <div class="wicki-board" id="board-right"></div>
@@ -258,6 +281,11 @@
         </div>
       </div>
       
+      <div class="control-group">
+        <span class="control-label">Labels</span>
+        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="cycleLabels()" id="btn-labels">NOTES</button>
+      </div>
+
       <div class="control-group">
         <span class="control-label">Transpose</span>
         <span class="side-label">LEFT</span>
