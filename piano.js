@@ -1,5 +1,5 @@
 const ROWS = 5;
-const COLS = 11;
+const COLS = 12;
 const BASE_NOTE_FREQ = 130.81; // Approx C3
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
@@ -21,8 +21,8 @@ const SHIFT_MODES = ["5 / 12", "1 / 2"];
 // --- F-KEY MODES ---
 let fKeyMode = 0; // 0 = Default (F3...), 1 = Full (F1...)
 const F_ROW_VARIANTS = [
-  ["F3","F4","F5","F6","F7","F9","F10","F11","F12"], // Default
-  ["F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11"] // New
+  ["F2","F3","F4","F5","F6","F7","F9","F10","F11","F12"], // Default
+  ["F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11", "F12"] // New
 ];
 const F_KEY_LABELS = ["F3-F12", "F1-F11"];
 
@@ -46,10 +46,10 @@ let freqToKeyMap = {};
 // We initialize the first row with the default variant
 const KEY_MAPS = [
   F_ROW_VARIANTS[0], // Index 0: Function Keys (Dynamic)
-  ["2","3","4","5","6","7","8","9","0","-","="],
-  ["w","e","r","t","y","u","i","o","p","[","]"],
-  ["a","s","d","f","g","h","j","k","l",";","'"],
-  ["z","x","c","v","b","n","m",",",".","/","ShiftRight"]
+  ["1","2","3","4","5","6","7","8","9","0","-","="],
+  ["q","w","e","r","t","y","u","i","o","p","[","]"],
+  ["CapsLock","a","s","d","f","g","h","j","k","l",";","'"],
+  ["ShiftLeft","z","x","c","v","b","n","m",",",".","/","ShiftRight"]
 ];
 
 const boardLeft = document.getElementById("board-left");
@@ -106,7 +106,9 @@ function getLabelText(semitoneOffset, keyChar) {
 
   if (labelMode === 1) { 
     if (!keyChar) return "";
-    if (keyChar === "ShiftRight") return "SHF";
+    if (keyChar === "ShiftRight") return "SL";
+    if (keyChar === "CapsLock") return "CL";
+    if (keyChar === "ShiftLeft") return "SR";
     return keyChar.toUpperCase();
   }
 
@@ -135,11 +137,11 @@ function changeSustain(delta) {
 function changeTranspose(side, delta) {
   if (side === 'left') {
     transposeLeft += delta;
-    if (transposeLeft < -36) transposeLeft = -36;
+    if (transposeLeft < -30) transposeLeft = -30;
     if (transposeLeft > 24) transposeLeft = 24;
   } else {
     transposeRight += delta;
-    if (transposeRight < -36) transposeRight = -36;
+    if (transposeRight < -30) transposeRight = -30;
     if (transposeRight > 24) transposeRight = 24;
   }
   renderBoard(); 
@@ -189,7 +191,7 @@ function renderBoard() {
   boardRight.innerHTML = "";
   freqToKeyMap = {};
 
-  const SPLIT_COL = 5; 
+  const SPLIT_COL = 6; 
 
   for (let r = 0; r < ROWS; r++) {
     const rowDivL = document.createElement("div");
@@ -356,8 +358,8 @@ function playSound(frequency) {
   
   // Mode 1: Wave (Synthesizer)
   else {
-    let baseDuration = 1 + 500 / frequency;
-    duration = Math.min(baseDuration * sustainMultiplier, 8); 
+    let baseDuration = 1500 / frequency;
+    duration = Math.min(baseDuration * sustainMultiplier, 4); 
     playWaveSound(frequency, duration);
   }
 }
@@ -368,13 +370,16 @@ function playWaveSound(frequency, duration) {
   const now = ctx.currentTime;
 
   let volume = 15 / frequency; 
-  volume = volume * 5; 
+  volume = volume * 4; 
+
+  if(volume > 1)
+    volume = 1;
 
   const noteGain = ctx.createGain();
   Tone.connect(noteGain, Tone.Destination);
 
   noteGain.gain.setValueAtTime(0, now);
-  noteGain.gain.linearRampToValueAtTime(volume, now + 0.015);
+  noteGain.gain.linearRampToValueAtTime(volume, now + 0.1);
   noteGain.gain.exponentialRampToValueAtTime(volume * 0.6, now + 0.4 * sustainMultiplier);
   noteGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
@@ -396,13 +401,6 @@ function playWaveSound(frequency, duration) {
   osc1.start(now);
   osc1.stop(now + duration + 0.1);
 
-  const osc2 = ctx.createOscillator();
-  osc2.type = "triangle";
-  osc2.frequency.value = frequency;
-  osc2.detune.value = 2; 
-  osc2.connect(filter);
-  osc2.start(now);
-  osc2.stop(now + duration + 0.1);
 
   setTimeout(() => { 
     noteGain.disconnect(); 
