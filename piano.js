@@ -418,8 +418,8 @@ window.addEventListener("keydown", (e) => {
     // Determine Step Sizes based on Shift Mode
     // Mode 0: small=1, large=12
     // Mode 1: small=2, large=5
-    const smallStep = shiftMode === 0 ? 1 : 2;
-    const largeStep = shiftMode === 0 ? 12 : 5;
+    const smallStep = shiftMode === 0 ? 5 : 1;
+    const largeStep = shiftMode === 0 ? 12 : 2;
 
     if (e.key === "ArrowRight") { changeTranspose('right', smallStep); changeTranspose('left', smallStep); }
     else if (e.key === "ArrowLeft") { changeTranspose('right', -smallStep); changeTranspose('left', -smallStep); }
