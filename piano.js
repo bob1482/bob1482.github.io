@@ -16,7 +16,7 @@ const SOUND_MODES = ["PIANO", "WAVE"];
 
 // --- SHIFT MODES ---
 let shiftMode = 0; // 0 = 1/12 (Semitone/Octave), 1 = 2/5 (Whole/Fourth)
-const SHIFT_MODES = ["1 / 12", "2 / 5"];
+const SHIFT_MODES = ["5 / 12", "1 / 2"];
 
 // --- F-KEY MODES ---
 let fKeyMode = 0; // 0 = Default (F3...), 1 = Full (F1...)
