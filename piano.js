@@ -3,14 +3,14 @@ const COLS = 11;
 const BASE_NOTE_FREQ = 130.81; // Approx C3
 
 // --- SETTINGS STATE ---
-let globalTranspose = 0;
+let transposeLeft = 0;
+let transposeRight = 0;
 let globalVolume = 0.5;
 let sustainMultiplier = 1.0;
 let isLoaded = false; 
 
 // --- KEY MAP CONFIGURATION ---
 const KEY_MAPS = [
-  //["F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11"],
   ["F3","F4","F5","F6","F7","F9","F10","F11","F12"],
   ["2","3","4","5","6","7","8","9","0","-","="],
   ["w","e","r","t","y","u","i","o","p","[","]"],
@@ -18,7 +18,8 @@ const KEY_MAPS = [
   ["z","x","c","v","b","n","m",",",".","/","ShiftRight"]
 ];
 
-const board = document.getElementById("board");
+const boardLeft = document.getElementById("board-left");
+const boardRight = document.getElementById("board-right");
 
 // --- TONE.JS SETUP ---
 const reverb = new Tone.Reverb({
@@ -54,7 +55,8 @@ Tone.Destination.volume.value = Tone.gainToDb(globalVolume);
 function updateUI() {
   document.getElementById("disp-vol").innerText = Math.round(globalVolume * 10);
   document.getElementById("disp-sus").innerText = sustainMultiplier.toFixed(2) * 5;
-  document.getElementById("disp-trans").innerText = globalTranspose;
+  document.getElementById("disp-trans-l").innerText = transposeLeft;
+  document.getElementById("disp-trans-r").innerText = transposeRight;
 }
 
 // --- CONTROL FUNCTIONS ---
@@ -73,10 +75,16 @@ function changeSustain(delta) {
   updateUI();
 }
 
-function changeTranspose(delta) {
-  globalTranspose += delta;
-  if (globalTranspose < -24) globalTranspose = -24;
-  if (globalTranspose > 24) globalTranspose = 24;
+function changeTranspose(side, delta) {
+  if (side === 'left') {
+    transposeLeft += delta;
+    if (transposeLeft < -36) transposeLeft = -36;
+    if (transposeLeft > 24) transposeLeft = 24;
+  } else {
+    transposeRight += delta;
+    if (transposeRight < -36) transposeRight = -36;
+    if (transposeRight > 24) transposeRight = 24;
+  }
   renderBoard();
   updateUI();
 }
@@ -90,16 +98,12 @@ function renderTraditionalPiano() {
   wrapper.className = "piano-wrapper";
   strip.appendChild(wrapper);
 
-  // 88 keys total (A0 to C8)
   const totalNotes = 88;
   const totalWhiteKeys = 52; 
-  
-  // A0 is -27 semitones relative to C3
   const startOffset = -27; 
   
-  // Calculate widths as pure percentages to fit screen
   const whiteKeyWidthPercent = 100 / totalWhiteKeys;
-  const blackKeyWidthPercent = whiteKeyWidthPercent * 0.7; // Slightly narrower than white
+  const blackKeyWidthPercent = whiteKeyWidthPercent * 0.7; 
 
   let whiteKeyCount = 0;
 
@@ -108,10 +112,7 @@ function renderTraditionalPiano() {
       const freq = BASE_NOTE_FREQ * Math.pow(2, currentSemitone / 12);
       const freqStr = freq.toFixed(2);
 
-      // Determine Note Color
-      // Note index relative to A (0): A=0, A#=1, B=2, C=3, C#=4, D=5...
       const noteIndex = i % 12;
-      // White keys are at indices: 0(A), 2(B), 3(C), 5(D), 7(E), 8(F), 10(G)
       const isWhite = [0, 2, 3, 5, 7, 8, 10].includes(noteIndex);
 
       const key = document.createElement("div");
@@ -126,8 +127,6 @@ function renderTraditionalPiano() {
       } else {
           key.className = "p-key black";
           key.style.width = blackKeyWidthPercent + "%";
-          // Center black key on the boundary of the previous white key
-          // Logic: (PreviousWhiteCount * WhiteWidth) - (HalfBlackWidth)
           key.style.left = ((whiteKeyCount * whiteKeyWidthPercent) - (blackKeyWidthPercent / 2)) + "%";
       }
 
@@ -136,12 +135,20 @@ function renderTraditionalPiano() {
   }
 }
 
-// --- RENDER WICKI BOARD ---
+// --- RENDER SPLIT WICKI BOARD ---
 function renderBoard() {
-  board.innerHTML = "";
+  boardLeft.innerHTML = "";
+  boardRight.innerHTML = "";
+
+  const SPLIT_COL = 5; // Columns 0-4 = Left, 5-10 = Right
+
   for (let r = 0; r < ROWS; r++) {
-    const rowDiv = document.createElement("div");
-    rowDiv.className = "row row-" + r;
+    // Create Row containers for both sides
+    const rowDivL = document.createElement("div");
+    rowDivL.className = "row row-" + r;
+    
+    const rowDivR = document.createElement("div");
+    rowDivR.className = "row row-" + r;
 
     for (let c = 0; c < COLS; c++) {
       const mapRowIndex = ROWS - 1 - r;
@@ -150,18 +157,20 @@ function renderBoard() {
         keyMapChar = KEY_MAPS[mapRowIndex][c];
       }
 
-
       // --- CUSTOM ROW SHIFT LOGIC ---
       let rowManualShift = 0;
       if (r === 4) {
-        rowManualShift = 4; // Top row: +4 notes
+        rowManualShift = 4; 
       } else if (r === 3) {
-        rowManualShift = 2; // 2nd row: +2 notes
+        rowManualShift = 2; 
       } else if (r === 2) {
-        rowManualShift = 2; // 3rd row: +2 notes
+        rowManualShift = 2; 
       }
       
-      let semitoneOffset = r * 5 + c * 2 + globalTranspose + rowManualShift;
+      // Determine side and apply specific transpose
+      let activeTranspose = (c < SPLIT_COL) ? transposeLeft : transposeRight;
+
+      let semitoneOffset = r * 5 + c * 2 + activeTranspose + rowManualShift;
       let freq = BASE_NOTE_FREQ * Math.pow(2, semitoneOffset / 12);
       let noteIndex = ((semitoneOffset % 12) + 12) % 12;
       let isNatural = [0, 2, 4, 5, 7, 9, 11].includes(noteIndex);
@@ -171,16 +180,22 @@ function renderBoard() {
       const key = document.createElement("div");
       key.className = `key ${isNatural ? "natural" : "accidental"}`;
       key.setAttribute("data-note", freqStr);
-
       
       if (keyMapChar) {
         key.setAttribute("data-key", keyMapChar.toLowerCase());
       }
 
       key.addEventListener("mousedown", () => triggerNoteByFreq(freq));
-      rowDiv.appendChild(key);
+
+      // Append to correct board side
+      if (c < SPLIT_COL) {
+        rowDivL.appendChild(key);
+      } else {
+        rowDivR.appendChild(key);
+      }
     }
-    board.appendChild(rowDiv);
+    boardLeft.appendChild(rowDivL);
+    boardRight.appendChild(rowDivR);
   }
 }
 
@@ -212,12 +227,13 @@ function playSound(frequency) {
 
 // --- INPUT LISTENERS ---
 window.addEventListener("keydown", (e) => {
+  // Arrow keys control Right Hand Transpose (Melody)
   if (e.key.startsWith("Arrow")) {
     if (e.repeat) return;
-    if (e.key === "ArrowRight") changeTranspose(1);
-    else if (e.key === "ArrowLeft") changeTranspose(-1);
-    else if (e.key === "ArrowUp") changeTranspose(12);
-    else if (e.key === "ArrowDown") changeTranspose(-12);
+    if (e.key === "ArrowRight") changeTranspose('right', 1);
+    else if (e.key === "ArrowLeft") changeTranspose('right', -1);
+    else if (e.key === "ArrowUp") changeTranspose('right', 12);
+    else if (e.key === "ArrowDown") changeTranspose('right', -12);
     return;
   }
 
@@ -226,11 +242,13 @@ window.addEventListener("keydown", (e) => {
     searchKey = e.code.toLowerCase();
   }
 
+  // Helper function to find key in either board
+  // We search globally for the data-key
   const key = document.querySelector(
-    `.wicki-board .key[data-key="${CSS.escape(searchKey)}"]`
+    `.key[data-key="${CSS.escape(searchKey)}"]`
   );
 
-  if (key && key.style.visibility !== "hidden") {
+  if (key && key.offsetParent !== null) { // offsetParent checks visibility
     e.preventDefault();
     if (!e.repeat) {
       const freq = parseFloat(key.getAttribute("data-note"));

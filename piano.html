@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Classical Piano (Wicki-Hayden)</title>
+    <title>Split Classical Piano (Wicki-Hayden)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
       body {
@@ -27,14 +27,13 @@
         bottom: 0;
         left: 0;
         width: 100%;
-        /* Fixed height relative to viewport, constrained by min/max pixels */
         height: 17vh; 
         margin: 0;
         padding: 0;
         background: #222;
         border-top: 4px solid #111;
         display: block;
-        overflow: hidden; /* No scrolling */
+        overflow: hidden; 
         z-index: 1000;
       }
 
@@ -81,12 +80,24 @@
         box-shadow: inset 0 0 5px rgba(215, 215, 215, 0.4);
       }
 
+      /* --- BOARD CONTAINER (SPLIT) --- */
+      #board-wrapper {
+        display: flex;
+        flex-direction: row;
+        gap: 60px; /* Space between left and right hands */
+        margin-bottom: 50px;
+      }
+
       /* --- WICKI BOARD STYLING --- */
       .wicki-board {
         position: relative;
         display: flex;
         flex-direction: column-reverse;
         align-items: center;
+        /* Optional: distinct background for halves to see separation
+        background: rgba(0,0,0,0.1); 
+        border-radius: 20px;
+        padding: 10px; */
       }
 
       .row {
@@ -94,6 +105,7 @@
         margin-bottom: 15px;
       }
 
+      /* Margins ensure the honeycomb stagger logic */
       .row-4 { margin-left: 0px; }
       .row-3 { margin-left: -83px; }
       .row-2 { margin-left: 0px; }
@@ -149,7 +161,6 @@
 
       /* --- CONTROL PANEL STYLING --- */
       #controls {
-        /* Move controls up slightly so they are visible above the piano strip if needed */
         position: absolute;
         top: 20px;
         right: 20px;
@@ -215,10 +226,19 @@
         font-weight: bold;
       }
 
+      .side-label {
+        color: #888;
+        font-size: 9px;
+        margin-bottom: 2px;
+      }
+
     </style>
   </head>
   <body>
-    <div class="wicki-board" id="board"></div>
+    <div id="board-wrapper">
+      <div class="wicki-board" id="board-left"></div>
+      <div class="wicki-board" id="board-right"></div>
+    </div>
 
     <div id="controls">
       <div class="control-group">
@@ -237,12 +257,20 @@
           <button class="control-btn" onclick="changeSustain(0.2)">+</button>
         </div>
       </div>
+      
       <div class="control-group">
         <span class="control-label">Transpose</span>
+        <span class="side-label">LEFT</span>
         <div class="btn-row">
-          <button class="control-btn" onclick="changeTranspose(-1)">-</button>
-          <span class="control-val" id="disp-trans">0</span>
-          <button class="control-btn" onclick="changeTranspose(1)">+</button>
+          <button class="control-btn" onclick="changeTranspose('left', -1)">-</button>
+          <span class="control-val" id="disp-trans-l">0</span>
+          <button class="control-btn" onclick="changeTranspose('left', 1)">+</button>
+        </div>
+        <span class="side-label" style="margin-top:5px;">RIGHT</span>
+        <div class="btn-row">
+          <button class="control-btn" onclick="changeTranspose('right', -1)">-</button>
+          <span class="control-val" id="disp-trans-r">0</span>
+          <button class="control-btn" onclick="changeTranspose('right', 1)">+</button>
         </div>
       </div>
     </div>
