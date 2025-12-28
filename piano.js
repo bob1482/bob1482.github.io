@@ -4,18 +4,19 @@ const BASE_NOTE_FREQ = 130.81; // Approx C3
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 // --- SETTINGS STATE ---
-let transposeLeft = 0;
-let transposeRight = 0;
+let transposeLeft = 3;
+let transposeRight = 3;
 let globalVolume = 0.5;
 let sustainMultiplier = 1.0;
 let isLoaded = false; 
+let sequenceIndex = 0;
 
 // --- SOUND MODES ---
 let soundMode = 0; // 0 = Piano, 1 = Wave
 const SOUND_MODES = ["PIANO", "WAVE"];
 
 // --- SHIFT MODES ---
-let shiftMode = 0; // 0 = 1/12 (Semitone/Octave), 1 = 2/5 (Whole/Fourth)
+let shiftMode = 1; // 0 = 1/12 (Semitone/Octave), 1 = 2/5 (Whole/Fourth)
 const SHIFT_MODES = ["5 / 12", "1 / 2"];
 
 // --- F-KEY MODES ---
@@ -33,10 +34,10 @@ let activeVoices = [];
 // --- VISUALIZER STATE ---
 let keyCoordinates = {}; 
 let visualNotes = [];    
-const NOTE_SPEED = 4;    
+const NOTE_SPEED = 2;    
 
 // Label States: 0 = Notes, 1 = Keys, 2 = None
-let labelMode = 1; // Default to Keys
+let labelMode = 2; // Default to Keys
 const LABEL_MODES = ["NOTES", "KEYS", "NONE"];
 
 // Map to store which frequency is currently mapped to which keyboard key
@@ -358,7 +359,7 @@ function playSound(frequency) {
   
   // Mode 1: Wave (Synthesizer)
   else {
-    let baseDuration = 1500 / frequency;
+    let baseDuration = 1 + 2000 / frequency;
     duration = Math.min(baseDuration * sustainMultiplier, 4); 
     playWaveSound(frequency, duration);
   }
@@ -369,8 +370,7 @@ function playWaveSound(frequency, duration) {
   const ctx = Tone.context.rawContext; 
   const now = ctx.currentTime;
 
-  let volume = 15 / frequency; 
-  volume = volume * 4; 
+  let volume = 75 / frequency; 
 
   if(volume > 1)
     volume = 1;
@@ -423,6 +423,33 @@ window.addEventListener("keydown", (e) => {
     else if (e.key === "ArrowLeft") { changeTranspose('right', -smallStep); changeTranspose('left', -smallStep); }
     else if (e.key === "ArrowUp") { changeTranspose('right', largeStep); changeTranspose('left', largeStep); }
     else if (e.key === "ArrowDown") { changeTranspose('right', -largeStep); changeTranspose('left', -largeStep); }
+    return;
+  }
+
+  if (e.code === "Space") {
+    e.preventDefault(); // Prevent page scrolling
+    if (e.repeat) return;
+
+    const input = document.getElementById("input-sequence").value;
+    // Extract all numbers (including negatives) from the string
+    const sequence = input.match(/-?\d+/g);
+
+    if (sequence && sequence.length > 0) {
+      // Get the current number in the loop
+      const targetTranspose = parseInt(sequence[sequenceIndex % sequence.length]);
+      
+      // Apply to both sides
+      transposeLeft = targetTranspose;
+      transposeRight = targetTranspose;
+      
+      // Update the UI and Re-render the board
+      renderBoard();
+      updateUI();
+      
+      // Move to the next number for the next press
+      sequenceIndex++;
+      console.log(`Sequenced to: ${targetTranspose}`);
+    }
     return;
   }
 
