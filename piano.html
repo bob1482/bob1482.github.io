@@ -174,7 +174,6 @@
         color: #ffffff;
         border: 2px solid #555;
       }
-      .key.accidental:active,
       .key.accidental.active {
         background: #333333;
         border-color: #777;
@@ -284,6 +283,26 @@
       <div class="control-group">
         <span class="control-label">Labels</span>
         <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="cycleLabels()" id="btn-labels">NOTES</button>
+      </div>
+      
+      <div class="control-group">
+        <span class="control-label">Sound</span>
+        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleSoundMode()" id="btn-sound">PIANO</button>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">Board</span>
+        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleBoard()" id="btn-board">HIDE</button>
+      </div>
+      
+      <div class="control-group">
+        <span class="control-label">Shift</span>
+        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleShiftMode()" id="btn-shift">1 / 12</button>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">F-Keys</span>
+        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleFKeys()" id="btn-fkeys">F3-F12</button>
       </div>
 
       <div class="control-group">

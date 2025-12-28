@@ -10,26 +10,42 @@ let globalVolume = 0.5;
 let sustainMultiplier = 1.0;
 let isLoaded = false; 
 
+// --- SOUND MODES ---
+let soundMode = 0; // 0 = Piano, 1 = Wave
+const SOUND_MODES = ["PIANO", "WAVE"];
+
+// --- SHIFT MODES ---
+let shiftMode = 0; // 0 = 1/12 (Semitone/Octave), 1 = 2/5 (Whole/Fourth)
+const SHIFT_MODES = ["1 / 12", "2 / 5"];
+
+// --- F-KEY MODES ---
+let fKeyMode = 0; // 0 = Default (F3...), 1 = Full (F1...)
+const F_ROW_VARIANTS = [
+  ["F3","F4","F5","F6","F7","F9","F10","F11","F12"], // Default
+  ["F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11"] // New
+];
+const F_KEY_LABELS = ["F3-F12", "F1-F11"];
+
 // --- POLYPHONY STATE ---
 const MAX_POLYPHONY = 30; 
 let activeVoices = [];    
 
 // --- VISUALIZER STATE ---
-let keyCoordinates = {}; // Maps freq string -> {x, width}
-let visualNotes = [];    // Array of active/floating note objects
-const NOTE_SPEED = 4;    // Pixels per frame (Speed of rising notes)
+let keyCoordinates = {}; 
+let visualNotes = [];    
+const NOTE_SPEED = 4;    
 
 // Label States: 0 = Notes, 1 = Keys, 2 = None
-let labelMode = 0;
+let labelMode = 1; // Default to Keys
 const LABEL_MODES = ["NOTES", "KEYS", "NONE"];
 
 // Map to store which frequency is currently mapped to which keyboard key
 let freqToKeyMap = {};
 
 // --- KEY MAP CONFIGURATION ---
+// We initialize the first row with the default variant
 const KEY_MAPS = [
-  //["F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11"],
-  ["F3","F4","F5","F6","F7","F9","F10","F11","F12"],
+  F_ROW_VARIANTS[0], // Index 0: Function Keys (Dynamic)
   ["2","3","4","5","6","7","8","9","0","-","="],
   ["w","e","r","t","y","u","i","o","p","[","]"],
   ["a","s","d","f","g","h","j","k","l",";","'"],
@@ -66,7 +82,7 @@ const sampler = new Tone.Sampler({
         reverb.generate(); 
         updateUI();
         console.log("Samples loaded.");
-        startVisualizerLoop(); // Start animation loop
+        startVisualizerLoop(); 
     }
 }).connect(reverb);
 
@@ -79,6 +95,9 @@ function updateUI() {
   document.getElementById("disp-trans-l").innerText = transposeLeft;
   document.getElementById("disp-trans-r").innerText = transposeRight;
   document.getElementById("btn-labels").innerText = LABEL_MODES[labelMode];
+  document.getElementById("btn-sound").innerText = SOUND_MODES[soundMode];
+  document.getElementById("btn-shift").innerText = SHIFT_MODES[shiftMode];
+  document.getElementById("btn-fkeys").innerText = F_KEY_LABELS[fKeyMode];
 }
 
 // --- HELPER: GET NOTE LABEL ---
@@ -131,6 +150,37 @@ function cycleLabels() {
   labelMode = (labelMode + 1) % 3;
   updateUI();
   renderBoard(); 
+}
+
+function toggleBoard() {
+  const wrapper = document.getElementById("board-wrapper");
+  const btn = document.getElementById("btn-board");
+  
+  if (wrapper.style.display === "none") {
+    wrapper.style.display = "flex";
+    btn.innerText = "HIDE";
+  } else {
+    wrapper.style.display = "none";
+    btn.innerText = "SHOW";
+  }
+}
+
+function toggleSoundMode() {
+  soundMode = (soundMode + 1) % 2;
+  updateUI();
+}
+
+function toggleShiftMode() {
+  shiftMode = (shiftMode + 1) % 2;
+  updateUI();
+}
+
+function toggleFKeys() {
+  fKeyMode = (fKeyMode + 1) % 2;
+  // Update the map
+  KEY_MAPS[0] = F_ROW_VARIANTS[fKeyMode];
+  renderBoard();
+  updateUI();
 }
 
 // --- RENDER SPLIT WICKI BOARD ---
@@ -200,7 +250,7 @@ function renderBoard() {
 function renderTraditionalPiano() {
   const strip = document.getElementById("piano-strip");
   strip.innerHTML = ""; 
-  keyCoordinates = {}; // Reset coordinates map
+  keyCoordinates = {}; 
 
   const wrapper = document.createElement("div");
   wrapper.className = "piano-wrapper";
@@ -254,7 +304,7 @@ function renderTraditionalPiano() {
 // 1. PRESS
 async function pressNote(freq) {
   if (Tone.context.state !== 'running') await Tone.start();
-  if (!isLoaded) return;
+  if (!isLoaded && soundMode === 0) return; // Wait for samples if in piano mode
 
   const freqStr = freq.toFixed(2);
   
@@ -262,7 +312,7 @@ async function pressNote(freq) {
   const allKeys = document.querySelectorAll(`[data-note="${freqStr}"]`);
   allKeys.forEach(k => k.classList.add("active"));
   
-  startVisualNote(freqStr); // Trigger Canvas Note
+  startVisualNote(freqStr); 
 
   playSound(freq);
 }
@@ -273,41 +323,108 @@ function releaseNote(freq) {
   const allKeys = document.querySelectorAll(`[data-note="${freqStr}"]`);
   allKeys.forEach(k => k.classList.remove("active"));
   
-  endVisualNote(freqStr); // Release Canvas Note
+  endVisualNote(freqStr); 
 }
 
 // --- SOUND ENGINE ---
 function playSound(frequency) {
-  let baseDuration = 2;
-  const duration = Math.min(baseDuration * sustainMultiplier, 4); 
   const now = Date.now();
+  let duration;
 
-  activeVoices = activeVoices.filter(v => now < (v.timestamp + (v.duration * 1000)));
+  // Mode 0: Sampler (Piano)
+  if (soundMode === 0) {
+    let baseDuration = 2;
+    duration = Math.min(baseDuration * sustainMultiplier, 4);
 
-  if (activeVoices.length >= MAX_POLYPHONY) {
-    const stolenVoice = activeVoices.shift();
-    if (stolenVoice) {
-       sampler.triggerRelease(stolenVoice.freq, Tone.now());
+    activeVoices = activeVoices.filter(v => now < (v.timestamp + (v.duration * 1000)));
+
+    if (activeVoices.length >= MAX_POLYPHONY) {
+      const stolenVoice = activeVoices.shift();
+      if (stolenVoice) {
+         sampler.triggerRelease(stolenVoice.freq, Tone.now());
+      }
     }
+
+    activeVoices.push({
+      freq: frequency,
+      timestamp: now,
+      duration: duration
+    });
+
+    sampler.triggerAttackRelease(frequency, duration);
+  } 
+  
+  // Mode 1: Wave (Synthesizer)
+  else {
+    let baseDuration = 1 + 500 / frequency;
+    duration = Math.min(baseDuration * sustainMultiplier, 8); 
+    playWaveSound(frequency, duration);
   }
-
-  activeVoices.push({
-    freq: frequency,
-    timestamp: now,
-    duration: duration
-  });
-
-  sampler.triggerAttackRelease(frequency, duration);
 }
+
+// --- WAVE ENGINE ---
+function playWaveSound(frequency, duration) {
+  const ctx = Tone.context.rawContext; 
+  const now = ctx.currentTime;
+
+  let volume = 15 / frequency; 
+  volume = volume * 5; 
+
+  const noteGain = ctx.createGain();
+  Tone.connect(noteGain, Tone.Destination);
+
+  noteGain.gain.setValueAtTime(0, now);
+  noteGain.gain.linearRampToValueAtTime(volume, now + 0.015);
+  noteGain.gain.exponentialRampToValueAtTime(volume * 0.6, now + 0.4 * sustainMultiplier);
+  noteGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.Q.value = 0;
+  filter.connect(noteGain);
+
+  const attackBrightness = Math.max(frequency * 8, 800);
+  const sustainBrightness = frequency * 3;
+  filter.frequency.setValueAtTime(attackBrightness, now);
+  filter.frequency.exponentialRampToValueAtTime(sustainBrightness, now + 0.5 * sustainMultiplier);
+  filter.frequency.linearRampToValueAtTime(frequency, now + duration);
+
+  const osc1 = ctx.createOscillator();
+  osc1.type = "sine";
+  osc1.frequency.value = frequency;
+  osc1.connect(filter);
+  osc1.start(now);
+  osc1.stop(now + duration + 0.1);
+
+  const osc2 = ctx.createOscillator();
+  osc2.type = "triangle";
+  osc2.frequency.value = frequency;
+  osc2.detune.value = 2; 
+  osc2.connect(filter);
+  osc2.start(now);
+  osc2.stop(now + duration + 0.1);
+
+  setTimeout(() => { 
+    noteGain.disconnect(); 
+  }, (duration + 0.2) * 1000);
+}
+
 
 // --- INPUT LISTENERS ---
 window.addEventListener("keydown", (e) => {
   if (e.key.startsWith("Arrow")) {
     if (e.repeat) return;
-    if (e.key === "ArrowRight") { changeTranspose('right', 1); changeTranspose('left', 1); }
-    else if (e.key === "ArrowLeft") { changeTranspose('right', -1); changeTranspose('left', -1); }
-    else if (e.key === "ArrowUp") { changeTranspose('right', 12); changeTranspose('left', 12); }
-    else if (e.key === "ArrowDown") { changeTranspose('right', -12); changeTranspose('left', -12); }
+    
+    // Determine Step Sizes based on Shift Mode
+    // Mode 0: small=1, large=12
+    // Mode 1: small=2, large=5
+    const smallStep = shiftMode === 0 ? 1 : 2;
+    const largeStep = shiftMode === 0 ? 12 : 5;
+
+    if (e.key === "ArrowRight") { changeTranspose('right', smallStep); changeTranspose('left', smallStep); }
+    else if (e.key === "ArrowLeft") { changeTranspose('right', -smallStep); changeTranspose('left', -smallStep); }
+    else if (e.key === "ArrowUp") { changeTranspose('right', largeStep); changeTranspose('left', largeStep); }
+    else if (e.key === "ArrowDown") { changeTranspose('right', -largeStep); changeTranspose('left', -largeStep); }
     return;
   }
 
@@ -316,7 +433,7 @@ window.addEventListener("keydown", (e) => {
 
   const key = document.querySelector(`.key[data-key="${CSS.escape(searchKey)}"]`);
 
-  if (key && key.offsetParent !== null) { 
+  if (key) { 
     e.preventDefault();
     if (!e.repeat) {
       const freq = parseFloat(key.getAttribute("data-note"));
@@ -331,7 +448,7 @@ window.addEventListener("keyup", (e) => {
 
   const key = document.querySelector(`.key[data-key="${CSS.escape(searchKey)}"]`);
 
-  if (key && key.offsetParent !== null) { 
+  if (key) { 
     e.preventDefault();
     const freq = parseFloat(key.getAttribute("data-note"));
     releaseNote(freq);
@@ -367,7 +484,6 @@ function updateKeyCoordinates() {
 }
 
 function getNoteColor(freqStr) {
-  // CHANGED: Returns a static gray instead of rainbow HSL
   return '#888888'; 
 }
 
