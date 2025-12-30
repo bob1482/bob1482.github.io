@@ -23,9 +23,12 @@ const SHIFT_MODES = ["5 / 12", "1 / 2"];
 let fKeyMode = 0; // 0 = Default (F3...), 1 = Full (F1...)
 const F_ROW_VARIANTS = [
   ["F2","F3","F4","F5","F6","F7","F9","F10","F11","F12"], // Default
-  ["F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11", "F12"] // New
+  ["F1","F2","F3","F4","","F5","F6","F7","F8","F9","F10","F11"], // New
+  ["","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11"], // New
+  ["F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12"] // New
+  
 ];
-const F_KEY_LABELS = ["F3-F12", "F1-F11"];
+const F_KEY_LABELS = ["laptop","100r","100s","1-1"];
 
 // --- POLYPHONY STATE ---
 const MAX_POLYPHONY = 30; 
@@ -37,7 +40,7 @@ let visualNotes = [];
 const NOTE_SPEED = 2;    
 
 // Label States: 0 = Notes, 1 = Keys, 2 = None
-let labelMode = 2; // Default to Keys
+let labelMode = 1; // Default to Keys
 const LABEL_MODES = ["NOTES", "KEYS", "NONE"];
 
 // Map to store which frequency is currently mapped to which keyboard key
@@ -179,7 +182,7 @@ function toggleShiftMode() {
 }
 
 function toggleFKeys() {
-  fKeyMode = (fKeyMode + 1) % 2;
+  fKeyMode = (fKeyMode + 1) % 4;
   // Update the map
   KEY_MAPS[0] = F_ROW_VARIANTS[fKeyMode];
   renderBoard();
