@@ -6,16 +6,14 @@
     <title>Split Classical Piano (Wicki-Hayden)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎹</text></svg>">
 
-   
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
       body {
         display: flex;
-        justify-content: center;
+        /* Align content from the top now that we have a top bar */
+        justify-content: flex-start; 
         align-items: center;
         min-height: 100vh;
-        /* MONOCHROME: Dark grey background */
         background-color: #474747;
         font-family: "Courier New", Courier, monospace;
         margin: 0;
@@ -31,9 +29,9 @@
         top: 0;
         left: 0;
         width: 100%;
-        height: 83vh; /* Occupy space above the piano strip (100 - 17) */
-        z-index: 1;   /* Behind the controls/wicki board */
-        pointer-events: none; /* Let clicks pass through */
+        height: 83vh; 
+        z-index: 1;   
+        pointer-events: none; 
       }
 
       /* --- TRADITIONAL PIANO STRIP (FIXED BOTTOM) --- */
@@ -67,7 +65,6 @@
         cursor: pointer;
         transition: background-color 0.1s;
         top: 0;
-        /* Text Alignment */
         display: flex;
         justify-content: center;
         align-items: flex-end;
@@ -107,96 +104,20 @@
         box-shadow: inset 0 0 5px rgba(215, 215, 215, 0.4);
       }
 
-      /* --- BOARD CONTAINER (SPLIT) --- */
-      #board-wrapper {
+      /* --- CONTROL PANEL STYLING (UPDATED: TOP BAR) --- */
+      #controls {
+        position: relative; /* Flows with the document */
+        width: 100%;
         display: flex;
-        flex-direction: row;
-        gap: 0px; /* CHANGED: Set gap to 0px to close the visual space */
-        margin-bottom: 50px;
-        z-index: 10; /* Above the canvas */
-        position: relative;
-        left: -50px;
-        top: -30px;
-      }
-
-      /* --- WICKI BOARD STYLING --- */
-      .wicki-board {
-        position: relative;
-        display: flex;
-        flex-direction: column-reverse;
-        align-items: center;
-      }
-
-      .row {
-        display: flex;
-        margin-bottom: 15px;
-      }
-
-      /* Margins ensure the honeycomb stagger logic */
-      .row-4 { margin-left: 0px; }
-      .row-3 { margin-left: -83px; }
-      .row-2 { margin-left: 0px; }
-      .row-1 { margin-left: -83px; }
-      .row-0 { margin-left: 0px; }
-
-      .key {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        margin: 0 12px;
-        cursor: pointer;
-        position: relative;
-        box-shadow: 0 5px 0 #000;
-        transition: transform 0.05s, box-shadow 0.05s, background-color 0.1s;
-        display: flex;
+        flex-direction: row; /* Horizontal layout */
         justify-content: center;
         align-items: center;
-        z-index: 10;
-        font-size: 16px;
-        font-weight: bold;
-        font-family: sans-serif;
-        box-sizing: border-box;
-        border: 2px solid transparent;
-      }
-
-      .key:active,
-      .key.active {
-        transform: translateY(5px);
-        box-shadow: 0 0 0 #000;
-      }
-
-      .key.natural {
-        background: #aaaaaa;
-        color: #000000;
-      }
-      .key.natural:active,
-      .key.natural.active {
-        background: #727272;
-        border-color: #101010;
-      }
-
-      .key.accidental {
-        background: #1f1f1f;
-        color: #ffffff;
-        border: 2px solid #555;
-      }
-      .key.accidental.active {
-        background: #333333;
-        border-color: #777;
-      }
-
-      /* --- CONTROL PANEL STYLING --- */
-      #controls {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-        background: #464646;
-        padding: 15px;
-        border-radius: 15px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        flex-wrap: wrap; /* Wrap on smaller screens */
+        gap: 20px;
+        background: #363636; /* Darker bar background */
+        padding: 10px 0;
+        border-bottom: 1px solid #555;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         z-index: 50;
       }
 
@@ -218,13 +139,13 @@
         display: flex;
         align-items: center;
         gap: 5px;
-        background: #333;
+        background: #222;
         padding: 4px;
         border-radius: 6px;
       }
 
       .control-btn {
-        background: #666;
+        background: #555;
         border: none;
         color: white;
         width: 25px;
@@ -236,13 +157,13 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        box-shadow: 0 2px 0 #222;
+        box-shadow: 0 2px 0 #111;
       }
 
       .control-btn:active {
         transform: translateY(2px);
-        box-shadow: 0 1px 0 #222;
-        background: #888;
+        box-shadow: 0 1px 0 #111;
+        background: #777;
       }
 
       .control-val {
@@ -258,16 +179,93 @@
         margin-bottom: 2px;
       }
 
+      /* --- BOARD CONTAINER (SPLIT) --- */
+      #board-wrapper {
+        display: flex;
+        flex-direction: row;
+        gap: 0px; 
+        /* Adjust margin to center it vertically in the remaining space */
+        margin-top: 5vh; 
+        z-index: 10; 
+        position: relative;
+        left: 10px;
+        top: 20px;
+      }
+
+      /* --- WICKI BOARD STYLING --- */
+      .wicki-board {
+        position: relative;
+        display: flex;
+        flex-direction: column-reverse;
+        align-items: center;
+      }
+
+      .row {
+        display: flex;
+        margin-bottom: 15px;
+      }
+
+      .row-4 { margin-left: 0px; }
+      .row-3 { margin-left: -83px; }
+      .row-2 { margin-left: 0px; }
+      .row-1 { margin-left: -83px; }
+      .row-0 { margin-left: 0px; }
+
+      .key {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        margin: 0 12px;
+        cursor: pointer;
+        position: relative;
+        box-shadow: 0 5px 0 rgba(0,0,0,0.5); /* Semi-transparent shadow */
+        transition: transform 0.05s, box-shadow 0.05s, background-color 0.1s;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+        font-size: 16px;
+        font-weight: bold;
+        font-family: sans-serif;
+        box-sizing: border-box;
+        border: 2px solid transparent;
+        backdrop-filter: blur(2px); /* Blur behind the key */
+      }
+
+      .key:active,
+      .key.active {
+        transform: translateY(5px);
+        box-shadow: 0 0 0 #000;
+      }
+
+      /* --- TRANSPARENT KEYS --- */
+      .key.natural {
+        /* Alpha 0.4 = Transparent Grey */
+        background: rgba(170, 170, 170, 0.4); 
+        color: #000;
+        border: 2px solid rgba(170, 170, 170, 0.5);
+      }
+      .key.natural:active,
+      .key.natural.active {
+        background: rgba(114, 114, 114, 0.8);
+        border-color: #101010;
+      }
+
+      .key.accidental {
+        /* Alpha 0.4 = Transparent Black */
+        background: rgba(31, 31, 31, 0.4);
+        color: #fff;
+        border: 2px solid rgba(85, 85, 85, 0.5);
+      }
+      .key.accidental.active {
+        background: rgba(51, 51, 51, 0.8);
+        border-color: #777;
+      }
+
     </style>
   </head>
   <body>
-    <canvas id="synthesia-canvas"></canvas>
-
-    <div id="board-wrapper">
-      <div class="wicki-board" id="board-left"></div>
-      <div class="wicki-board" id="board-right"></div>
-    </div>
-
+    
     <div id="controls">
       <div class="control-group">
         <span class="control-label">Volume</span>
@@ -313,28 +311,40 @@
 
       <div class="control-group">
         <span class="control-label">Transpose</span>
-        <span class="side-label">LEFT</span>
-        <div class="btn-row">
-          <button class="control-btn" onclick="changeTranspose('left', -1)">-</button>
-          <span class="control-val" id="disp-trans-l">0</span>
-          <button class="control-btn" onclick="changeTranspose('left', 1)">+</button>
-        </div>
-        <span class="side-label" style="margin-top:5px;">RIGHT</span>
-        <div class="btn-row">
-          <button class="control-btn" onclick="changeTranspose('right', -1)">-</button>
-          <span class="control-val" id="disp-trans-r">0</span>
-          <button class="control-btn" onclick="changeTranspose('right', 1)">+</button>
+        <div style="display: flex; gap: 10px;">
+          <div style="display:flex; flex-direction:column; align-items:center;">
+            <span class="side-label">LEFT</span>
+            <div class="btn-row">
+              <button class="control-btn" onclick="changeTranspose('left', -1)">-</button>
+              <span class="control-val" id="disp-trans-l">0</span>
+              <button class="control-btn" onclick="changeTranspose('left', 1)">+</button>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center;">
+            <span class="side-label">RIGHT</span>
+            <div class="btn-row">
+              <button class="control-btn" onclick="changeTranspose('right', -1)">-</button>
+              <span class="control-val" id="disp-trans-r">0</span>
+              <button class="control-btn" onclick="changeTranspose('right', 1)">+</button>
+            </div>
+          </div>
         </div>
       </div>
 
       <div class="control-group">
-  <span class="control-label">Seq. Transpose</span>
-  <input type="text" id="input-sequence" 
-         value="-3 2 14" 
-         style="width: 80px; background: #333; color: white; border: 1px solid #666; border-radius: 4px; padding: 4px; font-size: 11px; text-align: center;">
-  <span class="side-label" style="margin-top: 5px;">Hit SPACE to cycle</span>
-</div>
+        <span class="control-label">Seq. Transpose</span>
+        <input type="text" id="input-sequence" 
+               value="-3 2 14" 
+               style="width: 80px; background: #222; color: white; border: 1px solid #666; border-radius: 4px; padding: 4px; font-size: 11px; text-align: center;">
+        <span class="side-label" style="margin-top: 5px;">Hit SPACE</span>
+      </div>
+    </div>
 
+    <canvas id="synthesia-canvas"></canvas>
+
+    <div id="board-wrapper">
+      <div class="wicki-board" id="board-left"></div>
+      <div class="wicki-board" id="board-right"></div>
     </div>
 
     <div id="piano-strip"></div>
