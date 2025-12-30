@@ -115,6 +115,7 @@
         margin-bottom: 50px;
         z-index: 10; /* Above the canvas */
         position: relative;
+        left: -50px;
         top: -30px;
       }
 
@@ -184,40 +185,35 @@
         border-color: #777;
       }
 
-     /* Updated Control Panel to be a Top Heading Bar */
-#controls {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  display: flex;
-  flex-direction: row; /* Horizontal layout */
-  justify-content: center;
-  align-items: center;
-  gap: 25px;
-  background: #333; /* Slightly darker for a "header" look */
-  padding: 10px 0;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-  z-index: 50;
-  border-bottom: 2px solid #555;
-}
+      /* --- CONTROL PANEL STYLING --- */
+      #controls {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        background: #464646;
+        padding: 15px;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        z-index: 50;
+      }
 
-.control-group {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
 
-/* Adjust the board so it doesn't hide under the header */
-#board-wrapper {
-  display: flex;
-  flex-direction: row;
-  gap: 0px;
-  margin-top: 100px; /* Pushes the board down below the header */
-  margin-bottom: 50px;
-  z-index: 10;
-  position: relative;
-}
+      .control-label {
+        font-size: 10px;
+        color: #aaa;
+        margin-bottom: 5px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
       .btn-row {
         display: flex;
         align-items: center;
@@ -273,52 +269,73 @@
     </div>
 
     <div id="controls">
-  <div class="control-group">
-    <span class="control-label">Volume</span>
-    <div class="btn-row">
-      <button class="control-btn" onclick="changeVolume(-0.1)">-</button>
-      <span class="control-val" id="disp-vol">50%</span>
-      <button class="control-btn" onclick="changeVolume(0.1)">+</button>
-    </div>
-  </div>
+      <div class="control-group">
+        <span class="control-label">Volume</span>
+        <div class="btn-row">
+          <button class="control-btn" onclick="changeVolume(-0.1)">-</button>
+          <span class="control-val" id="disp-vol">50%</span>
+          <button class="control-btn" onclick="changeVolume(0.1)">+</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <span class="control-label">Sustain</span>
+        <div class="btn-row">
+          <button class="control-btn" onclick="changeSustain(-0.2)">-</button>
+          <span class="control-val" id="disp-sus">1.0x</span>
+          <button class="control-btn" onclick="changeSustain(0.2)">+</button>
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <span class="control-label">Labels</span>
+        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="cycleLabels()" id="btn-labels">NOTES</button>
+      </div>
+      
+      <div class="control-group">
+        <span class="control-label">Sound</span>
+        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleSoundMode()" id="btn-sound">PIANO</button>
+      </div>
 
-  <div class="control-group">
-    <span class="control-label">Sustain</span>
-    <div class="btn-row">
-      <button class="control-btn" onclick="changeSustain(-0.2)">-</button>
-      <span class="control-val" id="disp-sus">1.0x</span>
-      <button class="control-btn" onclick="changeSustain(0.2)">+</button>
-    </div>
-  </div>
+      <div class="control-group">
+        <span class="control-label">Board</span>
+        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleBoard()" id="btn-board">HIDE</button>
+      </div>
+      
+      <div class="control-group">
+        <span class="control-label">Shift</span>
+        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleShiftMode()" id="btn-shift">1 / 12</button>
+      </div>
 
-  <div class="control-group">
-    <span class="control-label">Transpose L/R</span>
-    <div class="btn-row">
-      <button class="control-btn" onclick="changeTranspose('left', -1)">L-</button>
-      <span class="control-val" id="disp-trans-l">0</span>
-      <button class="control-btn" onclick="changeTranspose('left', 1)">L+</button>
-      <div style="width: 10px;"></div>
-      <button class="control-btn" onclick="changeTranspose('right', -1)">R-</button>
-      <span class="control-val" id="disp-trans-r">0</span>
-      <button class="control-btn" onclick="changeTranspose('right', 1)">R+</button>
-    </div>
-  </div>
+      <div class="control-group">
+        <span class="control-label">F-Keys</span>
+        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleFKeys()" id="btn-fkeys">F3-F12</button>
+      </div>
 
-  <div class="control-group">
-    <span class="control-label">Modes</span>
-    <div class="btn-row">
-      <button class="control-btn" style="width: 60px; font-size: 10px;" onclick="cycleLabels()" id="btn-labels">NOTES</button>
-      <button class="control-btn" style="width: 60px; font-size: 10px;" onclick="toggleSoundMode()" id="btn-sound">PIANO</button>
-      <button class="control-btn" style="width: 60px; font-size: 10px;" onclick="toggleFKeys()" id="btn-fkeys">Fkeys</button>
-    </div>
-  </div>
+      <div class="control-group">
+        <span class="control-label">Transpose</span>
+        <span class="side-label">LEFT</span>
+        <div class="btn-row">
+          <button class="control-btn" onclick="changeTranspose('left', -1)">-</button>
+          <span class="control-val" id="disp-trans-l">0</span>
+          <button class="control-btn" onclick="changeTranspose('left', 1)">+</button>
+        </div>
+        <span class="side-label" style="margin-top:5px;">RIGHT</span>
+        <div class="btn-row">
+          <button class="control-btn" onclick="changeTranspose('right', -1)">-</button>
+          <span class="control-val" id="disp-trans-r">0</span>
+          <button class="control-btn" onclick="changeTranspose('right', 1)">+</button>
+        </div>
+      </div>
 
-  <div class="control-group">
-    <span class="control-label">Seq. Transpose (Space)</span>
-    <input type="text" id="input-sequence" value="-3 2 14" 
-           style="width: 80px; background: #222; color: white; border: 1px solid #666; border-radius: 4px; padding: 4px; font-size: 11px; text-align: center;">
-  </div>
+      <div class="control-group">
+  <span class="control-label">Seq. Transpose</span>
+  <input type="text" id="input-sequence" 
+         value="-3 2 14" 
+         style="width: 80px; background: #333; color: white; border: 1px solid #666; border-radius: 4px; padding: 4px; font-size: 11px; text-align: center;">
+  <span class="side-label" style="margin-top: 5px;">Hit SPACE to cycle</span>
 </div>
+
+    </div>
 
     <div id="piano-strip"></div>
 
