@@ -134,7 +134,8 @@
         align-items: center;
         flex-wrap: wrap; 
         gap: 20px;
-        background: #363636; 
+        background: rgba(0, 0, 0, 0.3);
+        
         padding: 10px 0;
         border-bottom: 1px solid #555;
         box-shadow: 0 5px 15px rgba(0,0,0,0.3);
@@ -337,7 +338,6 @@
         <div class="btn-row">
           <button class="control-btn" id="btn-record" onclick="toggleRecording()" title="Record">●</button>
           <button class="control-btn" id="btn-play" onclick="togglePlayback()" title="Play">▶</button>
-          <button class="control-btn" onclick="clearRecording()" title="Clear">✖</button>
         </div>
       </div>
       
@@ -379,7 +379,8 @@
 
     <div id="piano-strip"></div>
     <script src="piano_core.js"></script>
-    <script src="piano_ui.js"></script>
+<script src="piano_visualizer.js"></script> 
+<script src="piano_ui.js"></script>
 
   </body>
 </html>
