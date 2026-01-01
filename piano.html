@@ -165,6 +165,17 @@
         box-shadow: 0 1px 0 #111;
         background: #777;
       }
+      
+      /* Specific styles for recording states */
+      .control-btn.recording {
+        background-color: #d9534f;
+        box-shadow: 0 0 5px #d9534f;
+      }
+      
+      .control-btn.playing {
+        background-color: #5cb85c;
+        box-shadow: 0 0 5px #5cb85c;
+      }
 
       .control-val {
         width: 35px;
@@ -283,7 +294,6 @@
           <button class="control-btn" onclick="changeSustain(0.2)">+</button>
         </div>
       </div>
-      
       <div class="control-group">
         <span class="control-label">Labels</span>
         <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="cycleLabels()" id="btn-labels">NOTES</button>
@@ -293,7 +303,7 @@
         <span class="control-label">Sound</span>
         <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleSoundMode()" id="btn-sound">PIANO</button>
       </div>
-
+      
       <div class="control-group">
         <span class="control-label">Board</span>
         <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleBoard()" id="btn-board">HIDE</button>
@@ -303,14 +313,24 @@
         <span class="control-label">Shift</span>
         <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleShiftMode()" id="btn-shift">1 / 12</button>
       </div>
-
+      
       <div class="control-group">
         <span class="control-label">F-Keys</span>
         <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleFKeys()" id="btn-fkeys">F3-F12</button>
       </div>
-
+      
       <div class="control-group">
-        <span class="control-label">Transpose</span>
+        <span class="control-label">Recorder</span>
+        <div class="btn-row">
+          <button class="control-btn" id="btn-record" onclick="toggleRecording()" title="Record">●</button>
+          <button class="control-btn" id="btn-play" onclick="togglePlayback()" title="Play">▶</button>
+          <button class="control-btn" onclick="clearRecording()" title="Clear">✖</button>
+        </div>
+      </div>
+      
+      
+      
+      <div class="control-group">
         <div style="display: flex; gap: 10px;">
           <div style="display:flex; flex-direction:column; align-items:center;">
             <span class="side-label">LEFT</span>
@@ -332,11 +352,10 @@
       </div>
 
       <div class="control-group">
-        <span class="control-label">Seq. Transpose</span>
+        <span class="side-label" style="margin-top: 5px;">transequence</span>
         <input type="text" id="input-sequence" 
                value="-3 2 14" 
                style="width: 80px; background: #222; color: white; border: 1px solid #666; border-radius: 4px; padding: 4px; font-size: 11px; text-align: center;">
-        <span class="side-label" style="margin-top: 5px;">Hit SPACE</span>
       </div>
     </div>
 
@@ -348,7 +367,8 @@
     </div>
 
     <div id="piano-strip"></div>
+    <script src="piano_core.js"></script>
+    <script src="piano_ui.js"></script>
 
-    <script src="piano.js"></script>
   </body>
 </html>
