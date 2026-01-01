@@ -52,7 +52,10 @@ let recordedEvents = [];
 let recordingStartTime = 0;
 
 // --- AUDIO ENGINE (TONE.JS) ---
-const MAX_POLYPHONY = 30; 
+// Lookahead allows the system to schedule audio slightly in the future for perfect timing
+Tone.context.lookAhead = 0.05; 
+
+const MAX_POLYPHONY = 64; 
 let activeVoices = []; 
 
 const reverb = new Tone.Reverb({
@@ -77,7 +80,6 @@ const sampler = new Tone.Sampler({
         isLoaded = true;
         reverb.generate(); 
         console.log("Samples loaded.");
-        // We dispatch a custom event so UI knows to update
         window.dispatchEvent(new Event('samplesLoaded'));
     }
 }).connect(reverb);
@@ -86,9 +88,11 @@ Tone.Destination.volume.value = Tone.gainToDb(globalVolume);
 
 // --- AUDIO FUNCTIONS ---
 
-// Trigger the actual sound (called by UI)
-function triggerSound(frequency) {
-  const now = Date.now();
+// UPDATED: Accepts 'when' (AudioContext Time) for precise scheduling
+function triggerSound(frequency, when = 0) {
+  // If no time provided, use current AudioContext time
+  if (when === 0) when = Tone.now();
+
   let duration;
 
   // Mode 0: Sampler (Piano)
@@ -96,45 +100,48 @@ function triggerSound(frequency) {
     let baseDuration = 2;
     duration = Math.min(baseDuration * sustainMultiplier, 4);
 
-    activeVoices = activeVoices.filter(v => now < (v.timestamp + (v.duration * 1000)));
+    // Clean up old voices based on scheduled time
+    const voiceEndTime = when + duration;
+    activeVoices = activeVoices.filter(v => v.endTime > when);
 
     if (activeVoices.length >= MAX_POLYPHONY) {
       const stolenVoice = activeVoices.shift();
       if (stolenVoice) {
-         sampler.triggerRelease(stolenVoice.freq, Tone.now());
+         sampler.triggerRelease(stolenVoice.freq, when);
       }
     }
 
     activeVoices.push({
       freq: frequency,
-      timestamp: now,
-      duration: duration
+      endTime: voiceEndTime
     });
 
-    sampler.triggerAttackRelease(frequency, duration);
+    // Precise attack
+    sampler.triggerAttackRelease(frequency, duration, when);
   } 
   
   // Mode 1: Wave (Synthesizer)
   else {
     let baseDuration = 1 + 2000 / frequency;
     duration = Math.min(baseDuration * sustainMultiplier, 4); 
-    playWaveSound(frequency, duration);
+    playWaveSound(frequency, duration, when);
   }
 }
 
-function playWaveSound(frequency, duration) {
+function playWaveSound(frequency, duration, when) {
   const ctx = Tone.context.rawContext; 
-  const now = ctx.currentTime;
+  
   let volume = 75 / frequency; 
   if(volume > 1) volume = 1;
 
   const noteGain = ctx.createGain();
   Tone.connect(noteGain, Tone.Destination);
 
-  noteGain.gain.setValueAtTime(0, now);
-  noteGain.gain.linearRampToValueAtTime(volume, now + 0.1);
-  noteGain.gain.exponentialRampToValueAtTime(volume * 0.6, now + 0.4 * sustainMultiplier);
-  noteGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  // Use 'when' for all automations
+  noteGain.gain.setValueAtTime(0, when);
+  noteGain.gain.linearRampToValueAtTime(volume, when + 0.05);
+  noteGain.gain.exponentialRampToValueAtTime(volume * 0.6, when + 0.2 * sustainMultiplier);
+  noteGain.gain.exponentialRampToValueAtTime(0.0001, when + duration);
 
   const filter = ctx.createBiquadFilter();
   filter.type = "lowpass";
@@ -143,16 +150,24 @@ function playWaveSound(frequency, duration) {
 
   const attackBrightness = Math.max(frequency * 8, 800);
   const sustainBrightness = frequency * 3;
-  filter.frequency.setValueAtTime(attackBrightness, now);
-  filter.frequency.exponentialRampToValueAtTime(sustainBrightness, now + 0.5 * sustainMultiplier);
-  filter.frequency.linearRampToValueAtTime(frequency, now + duration);
+  
+  filter.frequency.setValueAtTime(attackBrightness, when);
+  filter.frequency.exponentialRampToValueAtTime(sustainBrightness, when + 0.5 * sustainMultiplier);
+  filter.frequency.linearRampToValueAtTime(frequency, when + duration);
 
   const osc1 = ctx.createOscillator();
   osc1.type = "sine";
   osc1.frequency.value = frequency;
   osc1.connect(filter);
-  osc1.start(now);
-  osc1.stop(now + duration + 0.1);
+  
+  osc1.start(when);
+  osc1.stop(when + duration + 0.1);
 
-  setTimeout(() => { noteGain.disconnect(); }, (duration + 0.2) * 1000);
+  // Cleanup relative to AudioContext time
+  const timeUntilCleanup = (when + duration + 0.2 - Tone.now()) * 1000;
+  if (timeUntilCleanup > 0) {
+      setTimeout(() => { noteGain.disconnect(); }, timeUntilCleanup);
+  } else {
+      noteGain.disconnect();
+  }
 }

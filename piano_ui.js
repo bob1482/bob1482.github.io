@@ -1,21 +1,24 @@
 // ==========================================
-// PIANO UI: Rendering, Inputs, Visuals, Interaction
+// PIANO UI: High-Precision & Optimized
 // ==========================================
 
 // --- DOM ELEMENTS ---
 const boardLeft = document.getElementById("board-left");
 const boardRight = document.getElementById("board-right");
-const boardWrapper = document.getElementById("board-wrapper"); // Cache wrapper
+const boardWrapper = document.getElementById("board-wrapper"); 
 const canvas = document.getElementById("synthesia-canvas");
 const ctx = canvas.getContext("2d");
 
-// --- VISUALIZER & PLAYBACK STATE ---
+// --- CACHE & POOLS (Anti-Lag) ---
+let domKeyCache = {};   
+let notePool = [];      
+let visualNotes = [];   
+let fallingNotes = [];  
 let keyCoordinates = {}; 
-let visualNotes = [];    
-let fallingNotes = []; 
-let playbackTimeouts = [];
-const NOTE_SPEED = 2;    
-const FALL_DURATION = 1500; 
+
+// SETTINGS
+const NOTE_SPEED = 4;      
+const FALL_DURATION = 2.0; 
 
 // --- INITIALIZATION ---
 window.addEventListener('samplesLoaded', () => {
@@ -23,63 +26,64 @@ window.addEventListener('samplesLoaded', () => {
     startVisualizerLoop();
 });
 
-// Run initial render immediately
 renderBoard();
 updateUI();
 
 
-// --- CORE INTERACTION (PRESS/RELEASE) ---
+// --- INTERACTION ---
 
-// 1. PRESS
 async function pressNote(freq, isAutomated = false) {
   if (Tone.context.state !== 'running') await Tone.start();
   if (!isLoaded && soundMode === 0) return; 
 
-  // Record Logic
+  // RECORDING: Use Tone.now() (AudioContext Time)
   if (isRecording && !isAutomated) {
-    recordedEvents.push({
-      type: 'on',
-      freq: freq,
-      time: Date.now() - recordingStartTime
-    });
+    recordedEvents.push({ type: 'on', freq: freq, time: Tone.now() - recordingStartTime });
   }
 
   const freqStr = freq.toFixed(2);
-  
-  // UI: Active Class
-  const allKeys = document.querySelectorAll(`[data-note="${freqStr}"]`);
-  allKeys.forEach(k => k.classList.add("active"));
-  
-  // Visuals: Start note rising from bottom
-  startVisualNote(freqStr); 
 
-  // Audio: Trigger Sound in Core
-  triggerSound(freq);
+  // FAST DOM UPDATE
+  const keys = getCachedKeys(freqStr);
+  for (let i = 0; i < keys.length; i++) {
+      keys[i].classList.add("active");
+  }
+  
+  // VISUALS
+  if(!isAutomated) startManualVisualNote(freqStr); 
+
+  // AUDIO (0 = Immediate)
+  if(!isAutomated) triggerSound(freq, 0); 
 }
 
-// 2. RELEASE
 function releaseNote(freq, isAutomated = false) {
   if (isRecording && !isAutomated) {
-    recordedEvents.push({
-      type: 'off',
-      freq: freq,
-      time: Date.now() - recordingStartTime
-    });
+    recordedEvents.push({ type: 'off', freq: freq, time: Tone.now() - recordingStartTime });
   }
 
   const freqStr = freq.toFixed(2);
-  const allKeys = document.querySelectorAll(`[data-note="${freqStr}"]`);
-  allKeys.forEach(k => k.classList.remove("active"));
+  const keys = getCachedKeys(freqStr);
+  for (let i = 0; i < keys.length; i++) {
+      keys[i].classList.remove("active");
+  }
   
-  endVisualNote(freqStr); 
+  endManualVisualNote(freqStr); 
+}
+
+// --- DOM CACHING ---
+function getCachedKeys(freqStr) {
+    if (!domKeyCache[freqStr]) {
+        domKeyCache[freqStr] = document.querySelectorAll(`[data-note="${freqStr}"]`);
+    }
+    return domKeyCache[freqStr];
 }
 
 // --- RENDERERS ---
-
 function renderBoard() {
   boardLeft.innerHTML = "";
   boardRight.innerHTML = "";
-  freqToKeyMap = {}; // Reset map
+  domKeyCache = {}; 
+  freqToKeyMap = {}; 
   const SPLIT_COL = 6; 
 
   for (let r = 0; r < ROWS; r++) {
@@ -108,7 +112,6 @@ function renderBoard() {
       let isNatural = [0, 2, 4, 5, 7, 9, 11].includes(noteIndex);
 
       const freqStr = freq.toFixed(2);
-      
       if (keyMapChar) freqToKeyMap[freqStr] = keyMapChar;
 
       const key = document.createElement("div");
@@ -135,17 +138,14 @@ function renderTraditionalPiano() {
   const strip = document.getElementById("piano-strip");
   strip.innerHTML = ""; 
   keyCoordinates = {}; 
-
   const wrapper = document.createElement("div");
   wrapper.className = "piano-wrapper";
   strip.appendChild(wrapper);
-
   const totalNotes = 88;
   const startOffset = -27; 
   const totalWhiteKeys = 52; 
   const whiteKeyWidthPercent = 100 / totalWhiteKeys;
   const blackKeyWidthPercent = whiteKeyWidthPercent * 0.7; 
-
   let whiteKeyCount = 0;
 
   for(let i = 0; i < totalNotes; i++) {
@@ -157,8 +157,6 @@ function renderTraditionalPiano() {
 
       const key = document.createElement("div");
       key.setAttribute("data-note", freqStr);
-      key.title = freqStr + " Hz";
-
       const mappedKey = freqToKeyMap[freqStr];
       key.innerText = getLabelText(currentSemitone, mappedKey);
 
@@ -176,12 +174,10 @@ function renderTraditionalPiano() {
       key.addEventListener("mousedown", () => pressNote(freq));
       key.addEventListener("mouseup", () => releaseNote(freq));
       key.addEventListener("mouseleave", () => releaseNote(freq));
-
       wrapper.appendChild(key);
   }
 }
 
-// --- HELPER: GET LABELS ---
 function getLabelText(semitoneOffset, keyChar) {
   if (labelMode === 2) return ""; 
   if (labelMode === 1) { 
@@ -197,7 +193,6 @@ function getLabelText(semitoneOffset, keyChar) {
   return NOTE_NAMES[noteIndex] + octave;
 }
 
-// --- UI UPDATER ---
 function updateUI() {
   document.getElementById("disp-vol").innerText = Math.round(globalVolume * 10);
   document.getElementById("disp-sus").innerText = sustainMultiplier.toFixed(2) * 5;
@@ -207,13 +202,10 @@ function updateUI() {
   document.getElementById("btn-sound").innerText = SOUND_MODES[soundMode];
   document.getElementById("btn-shift").innerText = SHIFT_MODES[shiftMode];
   document.getElementById("btn-fkeys").innerText = F_KEY_LABELS[fKeyMode];
-
   const btnRecord = document.getElementById("btn-record");
   const btnPlay = document.getElementById("btn-play");
-
   if (isRecording) btnRecord.classList.add("recording");
   else btnRecord.classList.remove("recording");
-
   if (isPlaying) {
     btnPlay.innerText = "■"; 
     btnPlay.classList.add("playing");
@@ -223,7 +215,7 @@ function updateUI() {
   }
 }
 
-// --- BUTTON HANDLERS ---
+// --- BUTTONS ---
 function changeVolume(delta) {
   globalVolume += delta;
   if (globalVolume > 1.0) globalVolume = 1.0;
@@ -231,14 +223,12 @@ function changeVolume(delta) {
   Tone.Destination.volume.rampTo(Tone.gainToDb(globalVolume), 0.1);
   updateUI();
 }
-
 function changeSustain(delta) {
   sustainMultiplier += delta;
   if (sustainMultiplier < 0.2) sustainMultiplier = 0.2;
   if (sustainMultiplier > 2.0) sustainMultiplier = 2.0;
   updateUI();
 }
-
 function changeTranspose(side, delta) {
   if (side === 'left') {
     transposeLeft += delta;
@@ -252,13 +242,11 @@ function changeTranspose(side, delta) {
   renderBoard(); 
   updateUI();
 }
-
 function cycleLabels() {
   labelMode = (labelMode + 1) % 3;
   updateUI();
   renderBoard(); 
 }
-
 function toggleBoard() {
   const btn = document.getElementById("btn-board");
   if (boardWrapper.style.display === "none") {
@@ -267,17 +255,14 @@ function toggleBoard() {
     boardWrapper.style.display = "none"; btn.innerText = "SHOW";
   }
 }
-
 function toggleSoundMode() {
   soundMode = (soundMode + 1) % 2;
   updateUI();
 }
-
 function toggleShiftMode() {
   shiftMode = (shiftMode + 1) % 2;
   updateUI();
 }
-
 function toggleFKeys() {
   fKeyMode = (fKeyMode + 1) % 4;
   KEY_MAPS[0] = F_ROW_VARIANTS[fKeyMode];
@@ -286,6 +271,11 @@ function toggleFKeys() {
 }
 
 // --- RECORDER / PLAYBACK CONTROL ---
+let schedulerTimer = null; 
+let playbackStartTime = 0;
+let nextEventIndex = 0;
+let visualEventIndex = 0;
+let currentPlaybackEvents = [];
 
 function toggleRecording() {
   if (isPlaying) stopPlayback();
@@ -294,7 +284,7 @@ function toggleRecording() {
   } else {
     isRecording = true;
     recordedEvents = [];
-    recordingStartTime = Date.now();
+    recordingStartTime = Tone.now(); // PRECISION: Uses AudioContext time
   }
   updateUI();
 }
@@ -302,7 +292,7 @@ function toggleRecording() {
 function clearRecording() {
   recordedEvents = [];
   isRecording = false;
-  fallingNotes = [];
+  recycleAllNotes(); 
   if (isPlaying) stopPlayback();
   updateUI();
 }
@@ -317,83 +307,93 @@ function startPlayback() {
   if (recordedEvents.length === 0) return;
   isPlaying = true;
   updateUI();
-
-  // HIDE KEYS: Hide the central board during playback
   boardWrapper.style.display = "none";
   document.getElementById("btn-board").innerText = "SHOW";
-
-  // Process Events for Duration
-  let activeNotes = {};
-  let processedEvents = [];
-  recordedEvents.forEach(e => {
-    let evt = { ...e };
-    if (evt.type === 'on') {
-      activeNotes[evt.freq] = evt.time;
-      evt.duration = 500; 
-      processedEvents.push(evt);
-    } else if (evt.type === 'off') {
-      for (let i = processedEvents.length - 1; i >= 0; i--) {
-        if (processedEvents[i].freq === evt.freq && processedEvents[i].type === 'on' && !processedEvents[i].hasEnd) {
-          processedEvents[i].duration = evt.time - processedEvents[i].time;
-          processedEvents[i].hasEnd = true;
-          break;
-        }
-      }
-      processedEvents.push(evt);
-    }
-  });
-
-  // Schedule Audio & Visuals
-  processedEvents.forEach(event => {
-    // Audio (Delayed)
-    const audioTime = event.time + FALL_DURATION;
-    const audioId = setTimeout(() => {
-      if (event.type === 'on') pressNote(event.freq, true); 
-      else releaseNote(event.freq, true);
-    }, audioTime);
-    playbackTimeouts.push(audioId);
-
-    // Visuals (Immediate)
-    if (event.type === 'on') {
-      const visualId = setTimeout(() => {
-        spawnFallingNote(event.freq, event.duration);
-      }, event.time);
-      playbackTimeouts.push(visualId);
-    }
-  });
-
-  const lastEvent = recordedEvents[recordedEvents.length - 1];
-  const finishId = setTimeout(() => { stopPlayback(); }, lastEvent.time + FALL_DURATION + 1000);
-  playbackTimeouts.push(finishId);
+  currentPlaybackEvents = processRecordedEvents();
+  nextEventIndex = 0;
+  visualEventIndex = 0;
+  const now = Tone.now();
+  playbackStartTime = now + FALL_DURATION + 0.5; 
+  schedulerLoop();
 }
 
+function processRecordedEvents() {
+    let active = {};
+    let processed = [];
+    let sorted = [...recordedEvents].sort((a, b) => a.time - b.time);
+    sorted.forEach(evt => {
+        if (evt.type === 'on') {
+            active[evt.freq] = evt;
+            evt.duration = 0.5; 
+            processed.push(evt);
+        } else if (evt.type === 'off') {
+            if (active[evt.freq]) {
+                const onEvent = active[evt.freq];
+                onEvent.duration = evt.time - onEvent.time;
+                delete active[evt.freq];
+            }
+        }
+    });
+    return processed;
+}
+
+// --- AUDIO SCHEDULER (Rule: Use AudioContext) ---
+function schedulerLoop() {
+    if (!isPlaying) return;
+    const scheduleAheadTime = 0.1; 
+    const currentContextTime = Tone.now();
+    
+    while (nextEventIndex < currentPlaybackEvents.length) {
+        const event = currentPlaybackEvents[nextEventIndex];
+        const absolutePlayTime = playbackStartTime + event.time;
+
+        if (absolutePlayTime < currentContextTime + scheduleAheadTime) {
+            triggerSound(event.freq, absolutePlayTime);
+            Tone.Draw.schedule(() => { highlightKey(event.freq); }, absolutePlayTime);
+            Tone.Draw.schedule(() => { unhighlightKey(event.freq); }, absolutePlayTime + event.duration);
+            nextEventIndex++;
+        } else {
+            break; 
+        }
+    }
+    schedulerTimer = setTimeout(schedulerLoop, 25);
+    
+    if (nextEventIndex >= currentPlaybackEvents.length) {
+        const lastEvent = currentPlaybackEvents[currentPlaybackEvents.length - 1];
+        const endTime = playbackStartTime + lastEvent.time + lastEvent.duration + 2.0;
+        if (currentContextTime > endTime) stopPlayback();
+    }
+}
+
+function highlightKey(freq) {
+  const freqStr = freq.toFixed(2);
+  const keys = getCachedKeys(freqStr);
+  for (let i = 0; i < keys.length; i++) keys[i].classList.add("active");
+}
+function unhighlightKey(freq) {
+  const freqStr = freq.toFixed(2);
+  const keys = getCachedKeys(freqStr);
+  for (let i = 0; i < keys.length; i++) keys[i].classList.remove("active");
+}
 function stopPlayback() {
   isPlaying = false;
-  playbackTimeouts.forEach(id => clearTimeout(id));
-  playbackTimeouts = [];
-  fallingNotes = [];
-  
-  // RESTORE KEYS: Show board when done
+  if (schedulerTimer) clearTimeout(schedulerTimer);
+  Tone.Transport.cancel(); 
+  recycleAllNotes(); 
   boardWrapper.style.display = "flex";
   document.getElementById("btn-board").innerText = "HIDE";
-
   const activeKeys = document.querySelectorAll('.active');
   activeKeys.forEach(k => k.classList.remove('active'));
-  visualNotes.forEach(n => n.active = false);
-  
   updateUI();
 }
 
-
-// --- VISUALIZER ENGINE ---
-
+// --- VISUALIZER ENGINE (Rule: RequestAnimationFrame + Absolute Time) ---
 function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight * 0.83; 
   updateKeyCoordinates();
 }
 window.addEventListener('resize', resizeCanvas);
-
 function updateKeyCoordinates() {
   const keys = document.querySelectorAll('.p-key');
   keys.forEach(key => {
@@ -403,97 +403,138 @@ function updateKeyCoordinates() {
   });
 }
 
-function spawnFallingNote(freqStr, duration) {
+// POOLING
+function getNoteFromPool() {
+    if (notePool.length > 0) return notePool.pop();
+    return { freq: 0, x: 0, width: 0, height: 0, y: 0, color: '', targetTime: 0, active: false };
+}
+function recycleNote(note) {
+    note.active = false;
+    notePool.push(note);
+}
+function recycleAllNotes() {
+    while(fallingNotes.length > 0) recycleNote(fallingNotes.pop());
+    while(visualNotes.length > 0) recycleNote(visualNotes.pop());
+}
+
+function spawnFallingNote(freqStr, duration, targetTime) {
+  if (Object.keys(keyCoordinates).length === 0) updateKeyCoordinates();
+  const freqFixed = (typeof freqStr === 'number') ? freqStr.toFixed(2) : freqStr;
+  const coords = keyCoordinates[freqFixed];
+  if (!coords) return;
+  const pixelsPerSecond = canvas.height / FALL_DURATION;
+  const noteHeight = duration * pixelsPerSecond;
+  const note = getNoteFromPool();
+  note.freq = freqFixed;
+  note.x = coords.x;
+  note.width = coords.width;
+  note.height = noteHeight;
+  note.color = '#9b64b8ff';
+  note.targetTime = targetTime;
+  note.active = true;
+  fallingNotes.push(note);
+}
+
+function startManualVisualNote(freqStr) {
   if (Object.keys(keyCoordinates).length === 0) updateKeyCoordinates();
   const coords = keyCoordinates[freqStr];
   if (!coords) return;
-  const speed = canvas.height / FALL_DURATION;
-  const barLength = duration * speed;
-
-  fallingNotes.push({
-    freq: freqStr,
-    x: coords.x,
-    width: coords.width,
-    y: -barLength,
-    height: barLength,
-    color: '#00d2ff', // Cyan for playback
-    spawnTime: Date.now(),
-  });
+  for(let i=0; i<visualNotes.length; i++) {
+      if(visualNotes[i].freq === freqStr && visualNotes[i].active) return;
+  }
+  const note = getNoteFromPool();
+  note.freq = freqStr;
+  note.x = coords.x;
+  note.width = coords.width;
+  note.y = canvas.height;
+  note.height = 0;
+  note.color = '#9b64b8ff';
+  note.active = true;
+  visualNotes.push(note);
 }
 
-function startVisualNote(freqStr) {
-  if (Object.keys(keyCoordinates).length === 0) updateKeyCoordinates();
-  const coords = keyCoordinates[freqStr];
-  if (!coords) return;
-  const existing = visualNotes.find(n => n.freq === freqStr && n.active);
-  if (existing) return;
-
-  visualNotes.push({
-    freq: freqStr,
-    active: true,
-    x: coords.x,
-    width: coords.width,
-    y: canvas.height, 
-    height: 0,
-    color: '#888888' // Grey for manual
-  });
-}
-
-function endVisualNote(freqStr) {
-  const note = visualNotes.find(n => n.freq === freqStr && n.active);
-  if (note) note.active = false;
+function endManualVisualNote(freqStr) {
+  for(let i=0; i<visualNotes.length; i++) {
+      if(visualNotes[i].freq === freqStr && visualNotes[i].active) {
+          visualNotes[i].active = false;
+          return;
+      }
+  }
 }
 
 function startVisualizerLoop() {
   resizeCanvas(); 
+  
   function loop() {
+    // 1. Rule Check: Use requestAnimationFrame (implicit via function structure)
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const currentAudioTime = Tone.now(); // 2. Rule Check: Use AudioContext Time
 
-    // 1. FALLING NOTES (Playback)
-    fallingNotes = fallingNotes.filter(n => n.y < canvas.height);
-    fallingNotes.forEach(note => {
-      const now = Date.now();
-      const progress = (now - note.spawnTime) / FALL_DURATION;
-      const currentBottom = canvas.height * progress;
-      note.y = currentBottom - note.height;
+    if (isPlaying) {
+        while(visualEventIndex < currentPlaybackEvents.length) {
+            const evt = currentPlaybackEvents[visualEventIndex];
+            const hitTime = playbackStartTime + evt.time; 
+            const spawnTime = hitTime - FALL_DURATION;
+            if (currentAudioTime >= spawnTime) {
+                spawnFallingNote(evt.freq, evt.duration, hitTime);
+                visualEventIndex++;
+            } else {
+                break; 
+            }
+        }
+        for (let i = fallingNotes.length - 1; i >= 0; i--) {
+            const note = fallingNotes[i];
+            
+            // 3. Rule Check: Calculate position based on AudioTime
+            const timeRemaining = note.targetTime - currentAudioTime;
+            const pixelsPerSecond = canvas.height / FALL_DURATION;
+            const y = canvas.height - (timeRemaining * pixelsPerSecond);
+            const drawY = y - note.height;
 
-      // GRADIENT EFFECT (Same as rising notes)
-      const grad = ctx.createLinearGradient(note.x, note.y, note.x + note.width, note.y);
-      grad.addColorStop(0, note.color);
-      grad.addColorStop(0.5, "white"); // Shine center
-      grad.addColorStop(1, note.color);
+            if (drawY > canvas.height) {
+                recycleNote(note);
+                fallingNotes.splice(i, 1);
+                continue;
+            }
+            const grad = ctx.createLinearGradient(note.x, drawY, note.x + note.width, drawY);
+            grad.addColorStop(0, note.color);
+            grad.addColorStop(0.5, "white"); 
+            grad.addColorStop(1, note.color);
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.roundRect(note.x, drawY, note.width, note.height, 4);
+            ctx.fill();
+        }
+    } else {
+        if(fallingNotes.length > 0) recycleAllNotes();
+    }
 
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.roundRect(note.x, note.y, note.width, note.height, 4);
-      ctx.fill();
-    });
-
-    // 2. RISING NOTES (Manual)
-    visualNotes = visualNotes.filter(n => n.y + n.height > -50);
-    visualNotes.forEach(note => {
-      if (note.active) {
-        note.height += NOTE_SPEED;
-        note.y = canvas.height - note.height;
-      } else {
-        note.y -= NOTE_SPEED;
-      }
-      
-      const grad = ctx.createLinearGradient(note.x, note.y, note.x + note.width, note.y);
-      grad.addColorStop(0, note.color);
-      grad.addColorStop(0.5, "white");
-      grad.addColorStop(1, note.color);
-      
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.roundRect(note.x, note.y, note.width, note.height, 4);
-      ctx.fill();
-    });
+    for (let i = visualNotes.length - 1; i >= 0; i--) {
+        const note = visualNotes[i];
+        if (note.active) {
+            note.height += NOTE_SPEED;
+            note.y = canvas.height - note.height;
+        } else {
+            note.y -= NOTE_SPEED;
+        }
+        if (note.y + note.height < -50) {
+            recycleNote(note);
+            visualNotes.splice(i, 1);
+            continue;
+        }
+        const grad = ctx.createLinearGradient(note.x, note.y, note.x + note.width, note.y);
+        grad.addColorStop(0, note.color);
+        grad.addColorStop(0.5, "white");
+        grad.addColorStop(1, note.color);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.roundRect(note.x, note.y, note.width, note.height, 4);
+        ctx.fill();
+    }
     requestAnimationFrame(loop);
   }
-  loop();
+  requestAnimationFrame(loop);
 }
-
 
 // --- INPUT LISTENERS ---
 window.addEventListener("keydown", (e) => {
@@ -507,7 +548,6 @@ window.addEventListener("keydown", (e) => {
     else if (e.key === "ArrowDown") { changeTranspose('right', -largeStep); changeTranspose('left', -largeStep); }
     return;
   }
-
   if (e.code === "Space") {
     e.preventDefault(); 
     if (e.repeat) return;
@@ -523,11 +563,9 @@ window.addEventListener("keydown", (e) => {
     }
     return;
   }
-
   let searchKey = e.key.toLowerCase();
   if (e.code === "ShiftLeft" || e.code === "ShiftRight") searchKey = e.code.toLowerCase();
   const key = document.querySelector(`.key[data-key="${CSS.escape(searchKey)}"]`);
-
   if (key) { 
     e.preventDefault();
     if (!e.repeat) {
@@ -541,7 +579,6 @@ window.addEventListener("keyup", (e) => {
   let searchKey = e.key.toLowerCase();
   if (e.code === "ShiftLeft" || e.code === "ShiftRight") searchKey = e.code.toLowerCase();
   const key = document.querySelector(`.key[data-key="${CSS.escape(searchKey)}"]`);
-
   if (key) { 
     e.preventDefault();
     const freq = parseFloat(key.getAttribute("data-note"));

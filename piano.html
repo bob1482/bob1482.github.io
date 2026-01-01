@@ -10,17 +10,37 @@
     <style>
       body {
         display: flex;
-        /* Align content from the top now that we have a top bar */
         justify-content: flex-start; 
         align-items: center;
         min-height: 100vh;
-        background-color: #474747;
+        /* Replaced static background with transparent so motion bg shows */
+        background-color: transparent; 
         font-family: "Courier New", Courier, monospace;
         margin: 0;
         color: rgb(190, 190, 190);
         flex-direction: column;
         overflow: hidden;
         user-select: none;
+      }
+
+      /* --- NEW MOTION BACKGROUND --- */
+      #motion-background {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: -10; /* Put it behind everything */
+        /* Deep colors: Dark Grey, Midnight Blue, Deep Purple, Black */
+        background: linear-gradient(-45deg, #1e1e1e, #2c3e50, #4c2c50, #121212);
+        background-size: 400% 400%;
+        animation: gradientDrift 20s ease infinite;
+      }
+
+      @keyframes gradientDrift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
       }
 
       /* --- SYNTHESIA VISUALIZER CANVAS --- */
@@ -104,17 +124,17 @@
         box-shadow: inset 0 0 5px rgba(215, 215, 215, 0.4);
       }
 
-      /* --- CONTROL PANEL STYLING (UPDATED: TOP BAR) --- */
+      /* --- CONTROL PANEL STYLING --- */
       #controls {
-        position: relative; /* Flows with the document */
+        position: relative; 
         width: 100%;
         display: flex;
-        flex-direction: row; /* Horizontal layout */
+        flex-direction: row; 
         justify-content: center;
         align-items: center;
-        flex-wrap: wrap; /* Wrap on smaller screens */
+        flex-wrap: wrap; 
         gap: 20px;
-        background: #363636; /* Darker bar background */
+        background: #363636; 
         padding: 10px 0;
         border-bottom: 1px solid #555;
         box-shadow: 0 5px 15px rgba(0,0,0,0.3);
@@ -166,7 +186,6 @@
         background: #777;
       }
       
-      /* Specific styles for recording states */
       .control-btn.recording {
         background-color: #d9534f;
         box-shadow: 0 0 5px #d9534f;
@@ -195,7 +214,6 @@
         display: flex;
         flex-direction: row;
         gap: 0px; 
-        /* Adjust margin to center it vertically in the remaining space */
         margin-top: 5vh; 
         z-index: 10; 
         position: relative;
@@ -229,7 +247,7 @@
         margin: 0 12px;
         cursor: pointer;
         position: relative;
-        box-shadow: 0 5px 0 rgba(0,0,0,0.5); /* Semi-transparent shadow */
+        box-shadow: 0 5px 0 rgba(0,0,0,0.5); 
         transition: transform 0.05s, box-shadow 0.05s, background-color 0.1s;
         display: flex;
         justify-content: center;
@@ -240,7 +258,7 @@
         font-family: sans-serif;
         box-sizing: border-box;
         border: 2px solid transparent;
-        backdrop-filter: blur(2px); /* Blur behind the key */
+        backdrop-filter: blur(2px); 
       }
 
       .key:active,
@@ -251,32 +269,27 @@
 
       /* --- TRANSPARENT KEYS --- */
       .key.natural {
-        /* Alpha 0.4 = Transparent Grey */
-        background: rgba(170, 170, 170, 0.4); 
-        color: #000;
-        border: 2px solid rgba(170, 170, 170, 0.5);
+        background: rgba(211, 191, 191, 0.4); 
+        color: #262626;
       }
-      .key.natural:active,
       .key.natural.active {
-        background: rgba(114, 114, 114, 0.8);
-        border-color: #101010;
+        background: rgba(114, 114, 114, 0.4);
       }
 
       .key.accidental {
-        /* Alpha 0.4 = Transparent Black */
         background: rgba(31, 31, 31, 0.4);
-        color: #fff;
-        border: 2px solid rgba(85, 85, 85, 0.5);
+        color: #808080;
       }
       .key.accidental.active {
-        background: rgba(51, 51, 51, 0.8);
-        border-color: #777;
+        background: rgba(75, 75, 75, 0.4);
       }
 
     </style>
   </head>
   <body>
     
+    <div id="motion-background"></div>
+
     <div id="controls">
       <div class="control-group">
         <span class="control-label">Volume</span>
@@ -327,8 +340,6 @@
           <button class="control-btn" onclick="clearRecording()" title="Clear">✖</button>
         </div>
       </div>
-      
-      
       
       <div class="control-group">
         <div style="display: flex; gap: 10px;">
