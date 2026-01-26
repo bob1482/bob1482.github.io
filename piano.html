@@ -5,294 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Split Classical Piano (Wicki-Hayden)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎹</text></svg>">
+    
+    <link rel="stylesheet" href="piano.css">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-    <style>
-      body {
-        display: flex;
-        justify-content: flex-start; 
-        align-items: center;
-        min-height: 100vh;
-        /* Replaced static background with transparent so motion bg shows */
-        background-color: transparent; 
-        font-family: "Courier New", Courier, monospace;
-        margin: 0;
-        color: rgb(190, 190, 190);
-        flex-direction: column;
-        overflow: hidden;
-        user-select: none;
-      }
-
-      /* --- NEW MOTION BACKGROUND --- */
-      #motion-background {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        z-index: -10; /* Put it behind everything */
-        /* Deep colors: Dark Grey, Midnight Blue, Deep Purple, Black */
-        background: linear-gradient(-45deg, #1e1e1e, #2c3e50, #4c2c50, #121212);
-        background-size: 400% 400%;
-        animation: gradientDrift 20s ease infinite;
-      }
-
-      @keyframes gradientDrift {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-      }
-
-      /* --- SYNTHESIA VISUALIZER CANVAS --- */
-      #synthesia-canvas {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 83vh; 
-        z-index: 1;   
-        pointer-events: none; 
-      }
-
-      /* --- TRADITIONAL PIANO STRIP (FIXED BOTTOM) --- */
-      #piano-strip {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: 17vh; 
-        margin: 0;
-        padding: 0;
-        background: #222;
-        border-top: 4px solid #111;
-        display: block;
-        overflow: hidden; 
-        z-index: 1000;
-      }
-
-      .piano-wrapper {
-        position: relative;
-        height: 100%;
-        width: 100%;
-        margin: 0 auto; 
-      }
-
-      .p-key {
-        position: absolute;
-        box-sizing: border-box;
-        border-bottom-left-radius: 3px;
-        border-bottom-right-radius: 3px;
-        cursor: pointer;
-        transition: background-color 0.1s;
-        top: 0;
-        display: flex;
-        justify-content: center;
-        align-items: flex-end;
-        padding-bottom: 8px;
-        font-size: 10px;
-        font-weight: bold;
-        overflow: hidden;
-      }
-
-      .p-key.white {
-        background: #acacac;
-        border: 1px solid #666; 
-        border-top: none;
-        height: 100%;
-        z-index: 1;
-        color: #333;
-      }
-      .p-key.white:active,
-      .p-key.white.active {
-        background: #555555;
-        box-shadow: inset 0 0 5px rgba(0,0,0,0.4);
-      }
-
-      .p-key.black {
-        background: #111;
-        border: 1px solid #000;
-        border-top: none;
-        height: 65%; 
-        z-index: 10;
-        color: #ddd;
-        font-size: 9px;
-        padding-bottom: 5px;
-      }
-      .p-key.black:active,
-      .p-key.black.active {
-        background: #7b7b7b;
-        box-shadow: inset 0 0 5px rgba(215, 215, 215, 0.4);
-      }
-
-      /* --- CONTROL PANEL STYLING --- */
-      #controls {
-        position: relative; 
-        width: 100%;
-        display: flex;
-        flex-direction: row; 
-        justify-content: center;
-        align-items: center;
-        flex-wrap: wrap; 
-        gap: 20px;
-        background: rgba(0, 0, 0, 0.3);
-        
-        padding: 10px 0;
-        border-bottom: 1px solid #555;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-        z-index: 50;
-      }
-
-      .control-group {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-      }
-
-      .control-label {
-        font-size: 10px;
-        color: #aaa;
-        margin-bottom: 5px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-      }
-
-      .btn-row {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        background: rgba(111, 111, 111, 0.3); 
-
-        padding: 4px;
-        border-radius: 6px;
-      }
-
-      .control-btn {
-        background: rgba(111, 111, 111, 0.3); 
-
-        border: none;
-        color: white;
-        width: 25px;
-        height: 25px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-weight: bold;
-        font-size: 14px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        box-shadow: 0 2px 0 #111;
-      }
-
-      .control-btn:active {
-        transform: translateY(2px);
-        box-shadow: 0 1px 0 #111;
-        background: rgba(111, 111, 111, 0.3); 
-
-      }
-      
-      .control-btn.recording {
-        background-color: #d9534f;
-        box-shadow: 0 0 5px #d9534f;
-      }
-      
-      .control-btn.playing {
-        background-color: #5cb85c;
-        box-shadow: 0 0 5px #5cb85c;
-      }
-
-      .control-val {
-        width: 35px;
-        text-align: center;
-        font-size: 12px;
-        font-weight: bold;
-      }
-
-      .side-label {
-        color: #888;
-        font-size: 9px;
-        margin-bottom: 2px;
-      }
-
-      /* --- BOARD CONTAINER (SPLIT) --- */
-      #board-wrapper {
-        display: flex;
-        flex-direction: row;
-        gap: 0px; 
-        margin-top: 5vh; 
-        z-index: 10; 
-        position: relative;
-        left: 10px;
-        top: 20px;
-      }
-
-      /* --- WICKI BOARD STYLING --- */
-      .wicki-board {
-        position: relative;
-        display: flex;
-        flex-direction: column-reverse;
-        align-items: center;
-      }
-
-      .row {
-        display: flex;
-        margin-bottom: 15px;
-      }
-
-      .row-4 { margin-left: 0px; }
-      .row-3 { margin-left: -83px; }
-      .row-2 { margin-left: 0px; }
-      .row-1 { margin-left: -83px; }
-      .row-0 { margin-left: 0px; }
-
-      .key {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        margin: 0 12px;
-        cursor: pointer;
-        position: relative;
-        box-shadow: 0 5px 0 rgba(0,0,0,0.5); 
-        transition: transform 0.05s, box-shadow 0.05s, background-color 0.1s;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 10;
-        font-size: 16px;
-        font-weight: bold;
-        font-family: sans-serif;
-        box-sizing: border-box;
-        border: 2px solid transparent;
-        backdrop-filter: blur(2px); 
-      }
-
-      .key:active,
-      .key.active {
-        transform: translateY(5px);
-        box-shadow: 0 0 0 #000;
-      }
-
-      /* --- TRANSPARENT KEYS --- */
-      .key.natural {
-        background: rgba(211, 191, 191, 0.4); 
-        color: #262626;
-      }
-      .key.natural.active {
-        background: rgba(114, 114, 114, 0.4);
-      }
-
-      .key.accidental {
-        background: rgba(31, 31, 31, 0.4);
-        color: #808080;
-      }
-      .key.accidental.active {
-        background: rgba(75, 75, 75, 0.4);
-      }
-
-    </style>
+    <script src="https://unpkg.com/@tonejs/midi"></script>
   </head>
   <body>
     
-    <div id="motion-background"></div>
+    <canvas id="motion-background"></canvas>
+
+    <div id="drop-zone">
+      <div class="drop-text">DROP MIDI FILE HERE</div>
+    </div>
 
     <div id="controls">
       <div class="control-group">
@@ -343,6 +68,15 @@
           <button class="control-btn" id="btn-play" onclick="togglePlayback()" title="Play">▶</button>
         </div>
       </div>
+
+      <div class="control-group">
+        <span class="control-label">Metronome</span>
+        <div class="btn-row">
+          <button class="control-btn" id="btn-metro" onclick="toggleMetronome()" title="Toggle Click">M</button>
+          <input type="number" id="input-bpm" value="120" onchange="updateBPM(this.value)" 
+                 style="width: 40px; background: rgba(111,111,111,0.3); border: none; color: white; border-radius: 4px; padding: 4px; font-weight: bold; text-align: center;">
+        </div>
+      </div>
       
       <div class="control-group">
         <div style="display: flex; gap: 10px;">
@@ -365,12 +99,13 @@
         </div>
       </div>
 
-      <div class="control-group">
-        <span class="side-label" style="margin-top: 5px;">transequence</span>
-        <input type="text" id="input-sequence" 
-               value="-3 2 14" 
-               style="width: 80px; background: #222; color: white; border: 1px solid #666; border-radius: 4px; padding: 4px; font-size: 11px; text-align: center;">
-      </div>
+     <div class="control-group">
+  <span class="side-label" style="margin-top: 5px;">transequence</span>
+  <input type="text" id="input-sequence" 
+         value="-5:-5 -12:0 5:5 12:12 -17:-17 17:5" 
+         title="Format: 'L:R' (e.g., -12:0) or 'Both' (e.g., -12). Values are added to current transpose."
+         style="width: 300px; background: #222; color: white; border: 1px solid #666; border-radius: 4px; padding: 4px; font-size: 11px; text-align: center;">
+</div>
     </div>
 
     <canvas id="synthesia-canvas"></canvas>
@@ -381,9 +116,101 @@
     </div>
 
     <div id="piano-strip"></div>
+    
     <script src="piano_core.js"></script>
-<script src="piano_visualizer.js"></script> 
-<script src="piano_ui.js"></script>
+    <script src="piano_visualizer.js"></script> 
+    <script src="piano_render.js"></script> 
+    <script src="piano_interaction.js"></script>
+    <script src="piano_midi.js"></script>
 
+    <script>
+      (function() {
+        const canvas = document.getElementById('motion-background');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let particles = [];
+        
+        // Configuration
+        const particleCount = 100; // Adjust for density
+        const connectionDistance = 100; // Max distance to draw lines
+        const moveSpeed = 1; // Speed of movement
+
+        function resize() {
+          width = canvas.width = window.innerWidth;
+          height = canvas.height = window.innerHeight;
+        }
+
+        class Particle {
+          constructor() {
+            this.x = Math.random() * width;
+            this.y = Math.random() * height;
+            this.vx = (Math.random() - 0.5) * moveSpeed;
+            this.vy = (Math.random() - 0.5) * moveSpeed;
+            this.size = Math.random() * 2 + 3;
+          }
+
+          update() {
+            this.x += this.vx;
+            this.y += this.vy;
+
+            // Bounce off edges
+            if (this.x < 0 || this.x > width) this.vx *= -1;
+            if (this.y < 0 || this.y > height) this.vy *= -1;
+          }
+
+          draw() {
+            ctx.fillStyle = 'rgba(200, 200, 200, 0.3)';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        function init() {
+          particles = [];
+          for (let i = 0; i < particleCount; i++) {
+            particles.push(new Particle());
+          }
+        }
+
+        function animate() {
+          ctx.clearRect(0, 0, width, height);
+
+          // Update and Draw Particles
+          for (let i = 0; i < particles.length; i++) {
+            particles[i].update();
+            particles[i].draw();
+
+            // Draw Lines
+            for (let j = i + 1; j < particles.length; j++) {
+              const dx = particles[i].x - particles[j].x;
+              const dy = particles[i].y - particles[j].y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+
+              if (dist < connectionDistance) {
+                // Opacity based on distance (closer = more visible)
+                const opacity = 1 - (dist / connectionDistance);
+                ctx.strokeStyle = `rgba(150, 150, 150, ${opacity * 0.3})`; 
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(particles[i].x, particles[i].y);
+                ctx.lineTo(particles[j].x, particles[j].y);
+                ctx.stroke();
+              }
+            }
+          }
+          requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', () => {
+          resize();
+          init();
+        });
+
+        resize();
+        init();
+        animate();
+      })();
+    </script>
   </body>
 </html>

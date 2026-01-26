@@ -1,0 +1,307 @@
+body {
+  display: flex;
+  justify-content: flex-start; 
+  align-items: center;
+  min-height: 100vh;
+  background-color: transparent; 
+  font-family: "Courier New", Courier, monospace;
+  margin: 0;
+  color: rgb(190, 190, 190);
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* --- MOTION BACKGROUND (CANVAS) --- */
+#motion-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -10; 
+  background-color: #000000; /* Pure black base */
+}
+
+/* --- DROP ZONE OVERLAY --- */
+#drop-zone {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 2000; 
+  display: none; 
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  color: white;
+  border: 4px dashed #5cb85c;
+  box-sizing: border-box;
+}
+
+#drop-zone.active {
+  display: flex;
+}
+
+.drop-text {
+  font-size: 24px;
+  font-weight: bold;
+  pointer-events: none;
+}
+
+/* --- SYNTHESIA VISUALIZER CANVAS --- */
+#synthesia-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 83vh; 
+  z-index: 1;   
+  pointer-events: none; 
+}
+
+/* --- TRADITIONAL PIANO STRIP (FIXED BOTTOM) --- */
+#piano-strip {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 17vh; 
+  margin: 0;
+  padding: 0;
+  background: #222;
+  border-top: 4px solid #111;
+  display: block;
+  overflow: hidden; 
+  z-index: 1000;
+}
+
+.piano-wrapper {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  margin: 0 auto; 
+}
+
+.p-key {
+  position: absolute;
+  box-sizing: border-box;
+  border-bottom-left-radius: 3px;
+  border-bottom-right-radius: 3px;
+  cursor: pointer;
+  transition: background-color 0.1s;
+  top: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding-bottom: 8px;
+  font-size: 10px;
+  font-weight: bold;
+  overflow: hidden;
+}
+
+.p-key.white {
+  background: #acacac;
+  border: 1px solid #666; 
+  border-top: none;
+  height: 100%;
+  z-index: 1;
+  color: #333;
+}
+.p-key.white:active,
+.p-key.white.active {
+  background: #555555;
+  box-shadow: inset 0 0 5px rgba(0,0,0,0.4);
+}
+
+.p-key.black {
+  background: #111;
+  border: 1px solid #000;
+  border-top: none;
+  height: 65%; 
+  z-index: 10;
+  color: #ddd;
+  font-size: 9px;
+  padding-bottom: 5px;
+}
+.p-key.black:active,
+.p-key.black.active {
+  background: #7b7b7b;
+  box-shadow: inset 0 0 5px rgba(215, 215, 215, 0.4);
+}
+
+/* --- CONTROL PANEL STYLING --- */
+#controls {
+  position: relative; 
+  width: 100%;
+  display: flex;
+  flex-direction: row; 
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap; 
+  gap: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 10px 0;
+  border-bottom: 1px solid #555;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  z-index: 50;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.control-label {
+  font-size: 10px;
+  color: #aaa;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.btn-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(111, 111, 111, 0.3); 
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.control-btn {
+  background: rgba(111, 111, 111, 0.3); 
+  border: none;
+  color: white;
+  width: 25px;
+  height: 25px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 14px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 2px 0 #111;
+}
+
+.control-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #111;
+  background: rgba(111, 111, 111, 0.3); 
+}
+
+.control-btn.recording {
+  background-color: #d9534f;
+  box-shadow: 0 0 5px #d9534f;
+}
+
+.control-btn.playing {
+  background-color: #5cb85c;
+  box-shadow: 0 0 5px #5cb85c;
+}
+
+.control-val {
+  width: 35px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.side-label {
+  color: #888;
+  font-size: 9px;
+  margin-bottom: 2px;
+}
+
+/* --- BOARD CONTAINER (SPLIT) --- */
+#board-wrapper {
+  display: flex;
+  flex-direction: row;
+  gap: 0px; 
+  margin-top: 5vh; 
+  z-index: 10; 
+  position: relative;
+  right: 10px;
+  top: 20px;
+  
+  /* PERFORMANCE FIX: FORCE GPU LAYER */
+  transform: translateZ(0);
+  contain: layout paint;
+  pointer-events: none; /* Passes clicks through the wrapper gap */
+}
+
+/* Enable clicks on the actual boards */
+#board-left, #board-right {
+  pointer-events: auto;
+}
+
+/* --- WICKI BOARD STYLING --- */
+.wicki-board {
+  position: relative;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+}
+
+.row {
+  display: flex;
+  margin-bottom: 15px;
+}
+
+.row-4 { margin-left: 83px; }
+.row-3 { margin-left: 0px; }
+.row-2 { margin-left: 83px; }
+.row-1 { margin-left: 0px; }
+.row-0 { margin-left: 83px; }
+
+/* --- OPTIMIZED KEY STYLING (CIRCLES) --- */
+.key {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%; /* CIRCLE SHAPE KEPT */
+  margin: 0 12px;
+  cursor: pointer;
+  position: relative;
+  
+  /* PERFORMANCE OPTIMIZATIONS */
+  box-shadow: 0 5px 0 rgba(0,0,0,0.5); 
+  will-change: transform, background-color; /* Hint to browser */
+  transition: transform 0.05s, background-color 0.1s; 
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+  font-size: 16px;
+  font-weight: bold;
+  font-family: sans-serif;
+  box-sizing: border-box;
+  border: 2px solid transparent;
+}
+
+.key:active,
+.key.active {
+  transform: translateY(5px);
+  box-shadow: 0 0 0 #000;
+  transition: none; /* Snap instant for responsiveness */
+}
+
+.key.natural {
+  background: rgba(254, 254, 254, 0.4); 
+  color: #000000;
+}
+.key.natural.active {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.key.accidental {
+  background: rgba(104, 104, 104, 0.4);
+  color: #c1c1c1;
+}
+.key.accidental.active {
+  background: rgba(75, 75, 75, 0.2);
+}

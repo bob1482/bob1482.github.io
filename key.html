@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Key Event Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .key-card {
+            transition: all 0.1s ease;
+        }
+        
+        .key-card.active {
+            transform: scale(0.95);
+            background-color: #3b82f6; /* blue-500 */
+            border-color: #60a5fa;
+        }
+
+        /* Custom scrollbar for history */
+        .history-scroll::-webkit-scrollbar {
+            width: 8px;
+        }
+        .history-scroll::-webkit-scrollbar-track {
+            background: #1e293b; 
+        }
+        .history-scroll::-webkit-scrollbar-thumb {
+            background: #475569; 
+            border-radius: 4px;
+        }
+        .history-scroll::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+
+        .fade-in {
+            animation: fadeIn 0.2s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-200 min-h-screen flex flex-col items-center p-6">
+
+    <!-- Header -->
+    <header class="w-full max-w-4xl flex justify-between items-center mb-8 border-b border-slate-700 pb-4">
+        <div>
+            <h1 class="text-2xl font-bold text-blue-400">Key Event Visualizer</h1>
+            <p class="text-slate-500 text-sm mt-1">Press any key to view its JavaScript event data</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <label class="flex items-center cursor-pointer text-sm select-none">
+                <input type="checkbox" id="preventDefaultToggle" class="mr-2 accent-blue-500" checked>
+                Prevent Default
+            </label>
+            <button onclick="clearHistory()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs border border-slate-700 transition">
+                Clear History
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Display -->
+    <main class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <!-- Large Key Display -->
+        <div class="md:col-span-3 bg-slate-800 rounded-xl p-12 flex flex-col items-center justify-center border-2 border-slate-700 min-h-[250px] relative overflow-hidden group">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            
+            <p class="text-slate-500 font-bold mb-4 uppercase tracking-widest text-xs">event.key</p>
+            <h2 id="mainKey" class="text-8xl md:text-9xl font-bold text-white mb-2 text-center transition-all duration-75">
+                <span class="text-slate-600 text-6xl">Press Key</span>
+            </h2>
+            <p id="mainCode" class="text-blue-400 text-xl font-mono mt-4 opacity-0 transition-opacity duration-300">code: -</p>
+        </div>
+
+        <!-- Detail Cards -->
+        <div class="bg-slate-800 p-6 rounded-lg border border-slate-700 flex flex-col items-center justify-center hover:border-blue-500/50 transition">
+            <small class="text-slate-500 text-xs uppercase font-bold mb-2">event.keyCode</small>
+            <span id="detailKeyCode" class="text-4xl font-bold text-green-400">-</span>
+            <small class="text-slate-600 text-[10px] mt-1">(Deprecated)</small>
+        </div>
+
+        <div class="bg-slate-800 p-6 rounded-lg border border-slate-700 flex flex-col items-center justify-center hover:border-blue-500/50 transition">
+            <small class="text-slate-500 text-xs uppercase font-bold mb-2">event.code</small>
+            <span id="detailCode" class="text-2xl font-bold text-yellow-400 text-center break-all">-</span>
+            <small class="text-slate-600 text-[10px] mt-1">(Physical Key)</small>
+        </div>
+
+        <div class="bg-slate-800 p-6 rounded-lg border border-slate-700 flex flex-col items-center justify-center hover:border-blue-500/50 transition">
+            <small class="text-slate-500 text-xs uppercase font-bold mb-2">event.location</small>
+            <span id="detailLocation" class="text-4xl font-bold text-purple-400">-</span>
+            <small id="detailLocationText" class="text-slate-600 text-[10px] mt-1">Standard</small>
+        </div>
+
+        <!-- Modifiers -->
+        <div class="md:col-span-3 bg-slate-800 p-4 rounded-lg border border-slate-700 flex flex-wrap justify-center gap-4">
+            <div id="modShift" class="px-4 py-2 rounded bg-slate-900 border border-slate-700 text-slate-500 font-bold transition-colors">Shift</div>
+            <div id="modCtrl" class="px-4 py-2 rounded bg-slate-900 border border-slate-700 text-slate-500 font-bold transition-colors">Control</div>
+            <div id="modAlt" class="px-4 py-2 rounded bg-slate-900 border border-slate-700 text-slate-500 font-bold transition-colors">Alt</div>
+            <div id="modMeta" class="px-4 py-2 rounded bg-slate-900 border border-slate-700 text-slate-500 font-bold transition-colors">Meta</div>
+        </div>
+
+    </main>
+
+    <!-- History Log -->
+    <section class="w-full max-w-4xl mt-8">
+        <h3 class="text-slate-400 text-sm font-bold uppercase mb-3 px-2">Event History</h3>
+        <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+            <div class="grid grid-cols-5 bg-slate-900/50 p-3 text-xs text-slate-500 font-bold uppercase border-b border-slate-700">
+                <div class="col-span-1">Key</div>
+                <div class="col-span-2">Code</div>
+                <div class="col-span-1">KeyCode</div>
+                <div class="col-span-1 text-right">Time</div>
+            </div>
+            <div id="historyList" class="history-scroll max-h-60 overflow-y-auto p-0">
+                <!-- History items will appear here -->
+                <div class="p-4 text-center text-slate-600 italic text-sm">No events yet...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Info Footer -->
+    <footer class="mt-12 text-center text-slate-600 text-xs max-w-2xl">
+        <p class="mb-2"><strong>Location Codes:</strong> 0 = Standard, 1 = Left, 2 = Right, 3 = Numpad</p>
+        <p>Values like <code>keyCode</code> are deprecated but shown for legacy support. Modern apps should use <code>event.key</code> or <code>event.code</code>.</p>
+    </footer>
+
+    <script>
+        const mainKey = document.getElementById('mainKey');
+        const mainCode = document.getElementById('mainCode');
+        const detailKeyCode = document.getElementById('detailKeyCode');
+        const detailCode = document.getElementById('detailCode');
+        const detailLocation = document.getElementById('detailLocation');
+        const detailLocationText = document.getElementById('detailLocationText');
+        const historyList = document.getElementById('historyList');
+        const preventDefaultToggle = document.getElementById('preventDefaultToggle');
+
+        const mods = {
+            Shift: document.getElementById('modShift'),
+            Control: document.getElementById('modCtrl'),
+            Alt: document.getElementById('modAlt'),
+            Meta: document.getElementById('modMeta')
+        };
+
+        const locationMap = {
+            0: 'Standard',
+            1: 'Left',
+            2: 'Right',
+            3: 'Numpad'
+        };
+
+        let isFirstKey = true;
+
+        document.addEventListener('keydown', (e) => {
+            // Prevent default browser actions if toggle is checked
+            // We allow F12 (DevTools) and F5 (Refresh) usually, but for a raw visualizer, 
+            // blocking everything except reload gives a "pure" read.
+            // We will let F5 and F12 pass through for usability.
+            if (preventDefaultToggle.checked && e.key !== 'F12' && e.key !== 'F5') {
+                e.preventDefault();
+            }
+
+            // Visual 'Active' State
+            mainKey.parentElement.classList.add('border-blue-500');
+            setTimeout(() => mainKey.parentElement.classList.remove('border-blue-500'), 150);
+
+            // Update Main Display
+            const displayKey = e.key === ' ' ? '(Space)' : e.key;
+            mainKey.textContent = displayKey;
+            
+            // Adjust font size for long key names (like 'AudioVolumeDown')
+            if (displayKey.length > 8) {
+                mainKey.classList.replace('text-8xl', 'text-4xl');
+                mainKey.classList.replace('md:text-9xl', 'md:text-5xl');
+            } else if (displayKey.length > 2) {
+                mainKey.classList.replace('text-8xl', 'text-6xl');
+                mainKey.classList.replace('md:text-9xl', 'md:text-7xl');
+            } else {
+                // Reset to huge
+                mainKey.className = "text-8xl md:text-9xl font-bold text-white mb-2 text-center transition-all duration-75";
+            }
+
+            mainCode.textContent = `code: ${e.code}`;
+            mainCode.classList.remove('opacity-0');
+
+            // Update Details
+            detailKeyCode.textContent = e.keyCode;
+            detailCode.textContent = e.code;
+            detailLocation.textContent = e.location;
+            detailLocationText.textContent = locationMap[e.location] || 'Unknown';
+
+            // Update Modifiers
+            updateModifier('Shift', e.shiftKey);
+            updateModifier('Control', e.ctrlKey);
+            updateModifier('Alt', e.altKey);
+            updateModifier('Meta', e.metaKey);
+
+            // Add to History
+            addToHistory(e);
+
+            // Play a subtle sound? (Optional, skipping for simplicity)
+        });
+
+        document.addEventListener('keyup', (e) => {
+             updateModifier('Shift', e.shiftKey);
+             updateModifier('Control', e.ctrlKey);
+             updateModifier('Alt', e.altKey);
+             updateModifier('Meta', e.metaKey);
+        });
+
+        function updateModifier(name, isActive) {
+            const el = mods[name];
+            if (isActive) {
+                el.classList.add('bg-blue-500', 'text-white', 'border-blue-400');
+                el.classList.remove('bg-slate-900', 'text-slate-500', 'border-slate-700');
+            } else {
+                el.classList.remove('bg-blue-500', 'text-white', 'border-blue-400');
+                el.classList.add('bg-slate-900', 'text-slate-500', 'border-slate-700');
+            }
+        }
+
+        function addToHistory(e) {
+            if (isFirstKey) {
+                historyList.innerHTML = ''; // Clear "No events yet" msg
+                isFirstKey = false;
+            }
+
+            const row = document.createElement('div');
+            row.className = 'grid grid-cols-5 p-3 border-b border-slate-700/50 hover:bg-slate-700/30 transition fade-in';
+            
+            const displayKey = e.key === ' ' ? '(Space)' : e.key;
+            
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: "numeric", minute: "numeric", second: "numeric" });
+
+            row.innerHTML = `
+                <div class="col-span-1 font-bold text-white truncate">${displayKey}</div>
+                <div class="col-span-2 font-mono text-xs text-yellow-500 truncate">${e.code}</div>
+                <div class="col-span-1 font-mono text-xs text-green-500">${e.keyCode}</div>
+                <div class="col-span-1 text-right text-xs text-slate-500">${time}</div>
+            `;
+
+            historyList.prepend(row);
+        }
+
+        function clearHistory() {
+            historyList.innerHTML = '<div class="p-4 text-center text-slate-600 italic text-sm">No events yet...</div>';
+            isFirstKey = true;
+        }
+    </script>
+</body>
+</html>

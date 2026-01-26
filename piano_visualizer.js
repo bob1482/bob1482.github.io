@@ -11,12 +11,13 @@ let keyCoordinates = {};
 let notePool = [];      
 let visualNotes = [];   // Manual rising notes
 let fallingNotes = [];  // Playback falling notes
+let particles = [];     // NEW: Explosion particles
 
 // SETTINGS
-const VISUAL_SPEED = 4;      
+const VISUAL_SPEED = 1.5;      
 const FALL_DURATION = 2.0; 
 
-// --- PLAYBACK STATE (Moved from UI) ---
+// --- PLAYBACK STATE ---
 let schedulerTimer = null; 
 let playbackStartTime = 0;
 let nextEventIndex = 0;
@@ -24,7 +25,6 @@ let visualEventIndex = 0;
 let currentPlaybackEvents = [];
 
 // --- INITIALIZATION ---
-// We export this to be called when samples load
 function initVisualizer() {
     resizeCanvas();
     startVisualizerLoop();
@@ -38,7 +38,6 @@ function resizeCanvas() {
   updateKeyCoordinates();
 }
 
-// Reads the DOM elements created by piano_ui.js to map X positions
 function updateKeyCoordinates() {
   const keys = document.querySelectorAll('.p-key');
   keys.forEach(key => {
@@ -48,7 +47,7 @@ function updateKeyCoordinates() {
   });
 }
 
-// --- OBJECT POOLING (Performance) ---
+// --- OBJECT POOLING ---
 function getNoteFromPool() {
     if (notePool.length > 0) return notePool.pop();
     return { freq: 0, x: 0, width: 0, height: 0, y: 0, color: '', targetTime: 0, active: false };
@@ -62,6 +61,21 @@ function recycleNote(note) {
 function recycleAllNotes() {
     while(fallingNotes.length > 0) recycleNote(fallingNotes.pop());
     while(visualNotes.length > 0) recycleNote(visualNotes.pop());
+    particles = [];
+}
+
+// --- NEW: PARTICLE SYSTEM ---
+function createParticles(x, y, color) {
+    for (let i = 0; i < 8; i++) {
+        particles.push({
+            x: x + (Math.random() * 40 - 20),
+            y: y,
+            vx: (Math.random() - 0.5) * 4,
+            vy: (Math.random() - 0.5) * 4 - 2,
+            life: 1.0,
+            color: color
+        });
+    }
 }
 
 // --- VISUALIZER FUNCTIONS ---
@@ -87,7 +101,10 @@ function spawnFallingNote(freqStr, duration, targetTime) {
   fallingNotes.push(note);
 }
 
-function startManualVisualNote(freqStr) {
+// [piano_visualizer.js]
+// Replace the existing startManualVisualNote function with this:
+
+function startManualVisualNote(freqStr, color = '#9b64b8ff') { // Added 'color' param with default
   if (Object.keys(keyCoordinates).length === 0) updateKeyCoordinates();
   const coords = keyCoordinates[freqStr];
   if (!coords) return;
@@ -96,13 +113,16 @@ function startManualVisualNote(freqStr) {
       if(visualNotes[i].freq === freqStr && visualNotes[i].active) return;
   }
 
+  // Use the specific color for particles too
+  createParticles(coords.x + coords.width / 2, canvas.height, color);
+
   const note = getNoteFromPool();
   note.freq = freqStr;
   note.x = coords.x;
   note.width = coords.width;
   note.y = canvas.height;
   note.height = 0;
-  note.color = '#9b64b8ff';
+  note.color = color; // Use the passed color
   note.active = true;
 
   visualNotes.push(note);
@@ -138,7 +158,6 @@ function startVisualizerLoop() {
             }
         }
 
-        // Render Falling Notes (Absolute Time)
         for (let i = fallingNotes.length - 1; i >= 0; i--) {
             const note = fallingNotes[i];
             const timeRemaining = note.targetTime - currentAudioTime;
@@ -192,18 +211,35 @@ function startVisualizerLoop() {
         ctx.fill();
     }
     
+    // 3. NEW: RENDER PARTICLES
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.02;
+
+        if (p.life <= 0) {
+            particles.splice(i, 1);
+        } else {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        }
+    }
+
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
 }
 
-// --- PLAYBACK ENGINE (Controller Layer) ---
+// --- PLAYBACK ENGINE ---
 
 function startPlayback() {
   if (recordedEvents.length === 0) return;
   isPlaying = true;
-  
-  // Call UI updates (defined in piano_ui.js)
   updateUI();
   hideBoard(); 
 
@@ -214,19 +250,24 @@ function startPlayback() {
   const now = Tone.now();
   playbackStartTime = now + FALL_DURATION + 0.5; 
   
+  // Start metronome if it was enabled
+  if(isMetronomeOn) {
+      Tone.Transport.start();
+      metroLoop.start(playbackStartTime); // Sync metro with playback start
+  }
+  
   schedulerLoop();
 }
 
 function stopPlayback() {
   isPlaying = false;
   if (schedulerTimer) clearTimeout(schedulerTimer);
-  Tone.Transport.cancel(); 
+  Tone.Transport.stop(); 
+  metroLoop.stop();
   
   recycleAllNotes(); 
-  showBoard(); // defined in piano_ui.js
-  
-  // Clear visual highlights
-  clearAllHighlights(); // defined in piano_ui.js
+  showBoard(); 
+  clearAllHighlights(); 
   updateUI();
 }
 
@@ -251,7 +292,6 @@ function processRecordedEvents() {
     return processed;
 }
 
-// The Heart of the Rhythm Game: Lookahead Scheduler
 function schedulerLoop() {
     if (!isPlaying) return;
 
@@ -266,9 +306,14 @@ function schedulerLoop() {
             // 1. Audio
             triggerSound(event.freq, absolutePlayTime);
 
-            // 2. UI Highlight (Calls function in piano_ui.js)
+            // 2. UI Highlight & Particles
             Tone.Draw.schedule(() => {
                 highlightKey(event.freq);
+                // NEW: Trigger particles on playback note hit
+                if(keyCoordinates[event.freq.toFixed(2)]) {
+                    const k = keyCoordinates[event.freq.toFixed(2)];
+                    createParticles(k.x + k.width/2, canvas.height, '#00ffff');
+                }
             }, absolutePlayTime);
 
             Tone.Draw.schedule(() => {

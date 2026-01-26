@@ -8,12 +8,19 @@ const BASE_NOTE_FREQ = 130.81; // Approx C3
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 // --- GLOBAL SETTINGS STATE ---
-let transposeLeft = 3;
-let transposeRight = 3;
+let transposeLeft = 2;
+let transposeRight = 2;
 let globalVolume = 0.5;
 let sustainMultiplier = 1.0;
 let isLoaded = false; 
 let sequenceIndex = 0;
+let bpm = 120; 
+let isMetronomeOn = false; 
+
+// --- NEW: PHYSICAL KEY TRACKING ---
+// Maps physical key codes (e.g., "keyq", "keyw") to the frequency they triggered.
+// This ensures that even if you transpose while holding, we release the correct sound.
+let activePhysicalKeys = {}; 
 
 // --- MODES ---
 let soundMode = 0; // 0 = Piano, 1 = Wave
@@ -27,7 +34,7 @@ const LABEL_MODES = ["NOTES", "KEYS", "NONE"];
 
 let fKeyMode = 0; 
 const F_ROW_VARIANTS = [
-  ["F2","F3","F4","F5","F6","F7","F9","F10","F11","F12"], 
+  ["F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12","PrintScreen"], 
   ["F1","F2","F3","F4","","F5","F6","F7","F8","F9","F10","F11"], 
   ["","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11"], 
   ["F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12"] 
@@ -52,7 +59,6 @@ let recordedEvents = [];
 let recordingStartTime = 0;
 
 // --- AUDIO ENGINE (TONE.JS) ---
-// Lookahead allows the system to schedule audio slightly in the future for perfect timing
 Tone.context.lookAhead = 0.05; 
 
 const MAX_POLYPHONY = 64; 
@@ -86,11 +92,24 @@ const sampler = new Tone.Sampler({
 
 Tone.Destination.volume.value = Tone.gainToDb(globalVolume);
 
+// --- NEW: METRONOME SYNTH ---
+const metroSynth = new Tone.MembraneSynth({
+    pitchDecay: 0.008,
+    octaves: 2,
+    envelope: { attack: 0.001, decay: 0.2, sustain: 0 }
+}).toDestination();
+metroSynth.volume.value = -10;
+
+const metroLoop = new Tone.Loop((time) => {
+    metroSynth.triggerAttackRelease("C5", "32n", time);
+}, "4n");
+
+Tone.Transport.bpm.value = bpm;
+
 // --- AUDIO FUNCTIONS ---
 
 // UPDATED: Accepts 'when' (AudioContext Time) for precise scheduling
 function triggerSound(frequency, when = 0) {
-  // If no time provided, use current AudioContext time
   if (when === 0) when = Tone.now();
 
   let duration;
@@ -100,7 +119,6 @@ function triggerSound(frequency, when = 0) {
     let baseDuration = 2;
     duration = Math.min(baseDuration * sustainMultiplier, 4);
 
-    // Clean up old voices based on scheduled time
     const voiceEndTime = when + duration;
     activeVoices = activeVoices.filter(v => v.endTime > when);
 
@@ -116,7 +134,6 @@ function triggerSound(frequency, when = 0) {
       endTime: voiceEndTime
     });
 
-    // Precise attack
     sampler.triggerAttackRelease(frequency, duration, when);
   } 
   
@@ -137,7 +154,6 @@ function playWaveSound(frequency, duration, when) {
   const noteGain = ctx.createGain();
   Tone.connect(noteGain, Tone.Destination);
 
-  // Use 'when' for all automations
   noteGain.gain.setValueAtTime(0, when);
   noteGain.gain.linearRampToValueAtTime(volume, when + 0.05);
   noteGain.gain.exponentialRampToValueAtTime(volume * 0.6, when + 0.2 * sustainMultiplier);
@@ -163,11 +179,15 @@ function playWaveSound(frequency, duration, when) {
   osc1.start(when);
   osc1.stop(when + duration + 0.1);
 
-  // Cleanup relative to AudioContext time
   const timeUntilCleanup = (when + duration + 0.2 - Tone.now()) * 1000;
   if (timeUntilCleanup > 0) {
       setTimeout(() => { noteGain.disconnect(); }, timeUntilCleanup);
   } else {
       noteGain.disconnect();
   }
+}
+
+// --- NEW: MIDI HELPER ---
+function midiToFreq(midiNote) {
+    return 440 * Math.pow(2, (midiNote - 69) / 12);
 }
