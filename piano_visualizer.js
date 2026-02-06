@@ -18,12 +18,17 @@ const FALL_DURATION = 2.0;
 const MANUAL_RISE_SPEED_PPS = 100; 
 const PARTICLE_DECAY_RATE = 1; 
 
-// --- PLAYBACK STATE ---
+// --- PLAYBACK ENGINE STATE ---
 let schedulerTimer = null; 
 let playbackStartTime = 0;
+let playbackTotalDuration = 0;
 let nextEventIndex = 0;
 let visualEventIndex = 0;
 let currentPlaybackEvents = [];
+
+// PAUSE STATE TRACKING
+let pauseStartTimestamp = 0;
+let totalPausedTime = 0;
 
 // --- INITIALIZATION ---
 function initVisualizer() {
@@ -31,7 +36,6 @@ function initVisualizer() {
     startVisualizerLoop();
 }
 
-// OPTIMIZATION: Debounce Resize to prevent layout thrashing
 let resizeTimeout;
 window.addEventListener('resize', () => {
     clearTimeout(resizeTimeout);
@@ -49,7 +53,6 @@ function updateKeyCoordinates() {
   keys.forEach(key => {
     const freq = key.getAttribute('data-note');
     const rect = key.getBoundingClientRect();
-    // OPTIMIZATION: Store as integers immediately
     keyCoordinates[freq] = { x: rect.left | 0, width: rect.width | 0 };
   });
 }
@@ -73,7 +76,6 @@ function recycleAllNotes() {
 
 // --- PARTICLE SYSTEM ---
 function createParticles(x, y, color) {
-    // Limit particle count for performance
     for (let i = 0; i < 6; i++) {
         particles.push({
             x: x + (Math.random() * 40 - 20) | 0,
@@ -87,7 +89,6 @@ function createParticles(x, y, color) {
 }
 
 // --- VISUALIZER FUNCTIONS ---
-
 function spawnFallingNote(freqStr, duration, targetTime) {
   if (Object.keys(keyCoordinates).length === 0) updateKeyCoordinates();
   const freqFixed = (typeof freqStr === 'number') ? freqStr.toFixed(2) : freqStr;
@@ -102,7 +103,7 @@ function spawnFallingNote(freqStr, duration, targetTime) {
   note.x = coords.x;
   note.width = coords.width;
   note.height = noteHeight;
-  note.color = 'rgb(93, 0, 150)'; // Common color for batching
+  note.color = 'rgb(93, 0, 150)'; 
   note.targetTime = targetTime;
   note.active = true;
 
@@ -150,42 +151,36 @@ function startVisualizerLoop() {
     const dt = (currentTime - lastFrameTime) / 1000;
     lastFrameTime = currentTime;
 
-    // Safety check for tab switching (large dt)
     if (dt > 0.1) {
         requestAnimationFrame(loop);
         return;
     }
 
-    // 1. UPDATE STATE (Math)
+    // Only update physics if not paused
+    // Particles and Manual notes still animate, but playback logic halts
     updatePhysics(dt);
 
-    // 2. RENDER (Art)
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Common styles
     ctx.strokeStyle = borderStyle;
     ctx.lineWidth = 2;
 
     // A. Render Falling Notes
     if (fallingNotes.length > 0) {
-        // Optimization: Set color once for all falling notes (purple)
         ctx.fillStyle = 'rgb(93, 0, 150)'; 
-        
-        ctx.beginPath(); // Batch path for stroke optimization if they don't overlap
+        ctx.beginPath(); 
         for (let i = 0; i < fallingNotes.length; i++) {
             const note = fallingNotes[i];
-            // OPTIMIZATION: Bitwise OR 0 for integer coords
             ctx.roundRect(note.x | 0, (note.drawY | 0), note.width | 0, note.height | 0, 4);
         }
         ctx.fill();
         ctx.stroke(); 
     }
 
-    // B. Render Manual Notes (Rising)
-    // These might have different colors (Left/Right hand), so we group by color or draw individually
+    // B. Render Manual Notes
     for (let i = 0; i < visualNotes.length; i++) {
         const note = visualNotes[i];
-        ctx.fillStyle = note.color; // State change required per note here
+        ctx.fillStyle = note.color; 
         ctx.beginPath();
         ctx.roundRect(note.x | 0, note.y | 0, note.width | 0, note.height | 0, 7);
         ctx.fill();
@@ -209,15 +204,33 @@ function startVisualizerLoop() {
 }
 
 function updatePhysics(dt) {
+    // If paused, we freeze playback logic, but we still render current positions
+    // Actually, for "falling" effect to pause, we must stop updating Y
+    
+    if (isPaused) {
+        // Just animate particles if paused
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.life -= PARTICLE_DECAY_RATE * dt;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+        return; 
+    }
+
     const currentAudioTime = Tone.now(); 
+    const effectiveTime = currentAudioTime - totalPausedTime; // Compensate for pauses
+    
     const pixelsPerSecond = canvas.height / FALL_DURATION;
 
     // 1. PLAYBACK LOGIC
     if (isPlaying) {
-        // Spawn
+        // Spawn Visuals
         while(visualEventIndex < currentPlaybackEvents.length) {
             const evt = currentPlaybackEvents[visualEventIndex];
-            const hitTime = playbackStartTime + evt.time; 
+            // Hit time adjusted by start time
+            const hitTime = playbackStartTime + evt.time + totalPausedTime; 
             const spawnTime = hitTime - FALL_DURATION;
             
             if (currentAudioTime >= spawnTime) {
@@ -228,12 +241,15 @@ function updatePhysics(dt) {
             }
         }
 
-        // Move & Cull
+        // Move & Cull Falling Notes
         for (let i = fallingNotes.length - 1; i >= 0; i--) {
             const note = fallingNotes[i];
-            const timeRemaining = note.targetTime - currentAudioTime;
+            // effective target time vs current time
+            const timeRemaining = note.targetTime - (currentAudioTime);
             
-            // Calculate Y based on time
+            // If paused, note.targetTime needs to "move" away, or we freeze time.
+            // Since we use strict time diff:
+            
             const y = canvas.height - (timeRemaining * pixelsPerSecond);
             note.drawY = y - note.height;
 
@@ -242,21 +258,29 @@ function updatePhysics(dt) {
                 fallingNotes.splice(i, 1);
             }
         }
+        
+        // Update Progress Bar
+        const elapsed = (effectiveTime - playbackStartTime);
+        if (playbackTotalDuration > 0) {
+            const pct = (elapsed / playbackTotalDuration) * 100;
+            const bar = document.getElementById('progress-bar');
+            if (bar) bar.value = Math.min(pct, 100);
+        }
+
     } else {
         if(fallingNotes.length > 0) recycleAllNotes();
     }
 
-    // 2. MANUAL NOTES LOGIC
+    // 2. MANUAL NOTES LOGIC (Always animates even if playback paused?)
+    // Usually manual playing works while paused
     for (let i = visualNotes.length - 1; i >= 0; i--) {
         const note = visualNotes[i];
-        
         if (note.active) {
             note.height += MANUAL_RISE_SPEED_PPS * dt;
             note.y = canvas.height - note.height;
         } else {
             note.y -= MANUAL_RISE_SPEED_PPS * dt;
         }
-
         if (note.y + note.height < -50) {
             recycleNote(note);
             visualNotes.splice(i, 1);
@@ -273,31 +297,105 @@ function updatePhysics(dt) {
     }
 }
 
-// --- PLAYBACK ENGINE ---
+// --- PLAYBACK CONTROLLER ---
 
 function startPlayback() {
   if (recordedEvents.length === 0) return;
   isPlaying = true;
-  updateUI();
+  isPaused = false;
+  totalPausedTime = 0;
+  
   hideBoard(); 
 
   currentPlaybackEvents = processRecordedEvents();
+  
+  // Calculate total duration for progress bar
+  playbackTotalDuration = 0;
+  if(currentPlaybackEvents.length > 0) {
+      const last = currentPlaybackEvents[currentPlaybackEvents.length-1];
+      playbackTotalDuration = last.time + last.duration;
+  }
+  
   nextEventIndex = 0;
   visualEventIndex = 0;
   
   const now = Tone.now();
-  playbackStartTime = now + FALL_DURATION + 0.5; 
+  // Start playing immediately (visuals fall from top, so they spawn 'in past' virtually or strictly)
+  // To make visuals appear at top and fall to hit line:
+  // Playback start is "Now" + FallDuration. Audio waits.
+  playbackStartTime = now + FALL_DURATION; 
   
   if(isMetronomeOn) {
       Tone.Transport.start();
-      metroLoop.start(playbackStartTime); 
+      metroLoop.start(0); 
   }
   
+  updateUI();
   schedulerLoop();
+}
+
+function setVisualizerPause(paused) {
+    if (paused) {
+        pauseStartTimestamp = Tone.now();
+        if(schedulerTimer) clearTimeout(schedulerTimer);
+        Tone.Transport.pause();
+    } else {
+        const now = Tone.now();
+        const diff = now - pauseStartTimestamp;
+        totalPausedTime += diff; // Accumulate pause duration
+        
+        // Shift falling note targets so they don't jump
+        fallingNotes.forEach(n => {
+            n.targetTime += diff;
+        });
+
+        if(isMetronomeOn) Tone.Transport.start();
+        schedulerLoop();
+    }
+}
+
+function seekToTime(percent) {
+    if (!isPlaying) return;
+    
+    // 1. Calculate new time
+    const targetSeconds = (percent / 100) * playbackTotalDuration;
+    
+    // 2. Reset visualizer state
+    recycleAllNotes();
+    
+    // 3. Reset Time Base
+    const now = Tone.now();
+    // Logic: (now - totalPausedTime - playbackStartTime) should equal targetSeconds
+    // So: playbackStartTime = now - totalPausedTime - targetSeconds
+    
+    // However, to simplify, we can just reset pausedTime to 0 and recalculate start
+    totalPausedTime = 0; 
+    playbackStartTime = now - targetSeconds + FALL_DURATION; // +FallDuration to keep sync
+
+    // 4. Find Index in Events
+    nextEventIndex = 0;
+    visualEventIndex = 0;
+    
+    // Audio Events
+    for(let i=0; i<currentPlaybackEvents.length; i++) {
+        if (currentPlaybackEvents[i].time >= targetSeconds) {
+            nextEventIndex = i;
+            break;
+        }
+    }
+    
+    // Visual Events (need to spawn things that haven't hit the bar yet)
+    // Actually, we need to spawn things that are currently FALLING (in the window)
+    // Complex, but simplest is to just reset visual index to same as audio
+    visualEventIndex = nextEventIndex;
+
+    // Optional: Pre-warm visualizer?
+    // For now, keys will just start appearing from top.
 }
 
 function stopPlayback() {
   isPlaying = false;
+  isPaused = false;
   if (schedulerTimer) clearTimeout(schedulerTimer);
   Tone.Transport.stop(); 
   metroLoop.stop();
@@ -305,6 +403,11 @@ function stopPlayback() {
   recycleAllNotes(); 
   showBoard(); 
   clearAllHighlights(); 
+  
+  // Reset Progress Bar
+  const bar = document.getElementById('progress-bar');
+  if(bar) bar.value = 0;
+  
   updateUI();
 }
 
@@ -316,7 +419,7 @@ function processRecordedEvents() {
     sorted.forEach(evt => {
         if (evt.type === 'on') {
             active[evt.freq] = evt;
-            evt.duration = 0.5; 
+            evt.duration = 0.5; // default
             processed.push(evt);
         } else if (evt.type === 'off') {
             if (active[evt.freq]) {
@@ -330,18 +433,31 @@ function processRecordedEvents() {
 }
 
 function schedulerLoop() {
-    if (!isPlaying) return;
+    if (!isPlaying || isPaused) return;
 
     const scheduleAheadTime = 0.1; 
     const currentContextTime = Tone.now();
+    const effectiveTime = currentContextTime - totalPausedTime;
     
     while (nextEventIndex < currentPlaybackEvents.length) {
         const event = currentPlaybackEvents[nextEventIndex];
-        const absolutePlayTime = playbackStartTime + event.time;
+        const absolutePlayTime = playbackStartTime + event.time; // This moves with pause compensation?
+        // No. absolutePlayTime is fixed relative to Start. 
+        // We compare against (effectiveTime)
+        
+        // Wait, if playbackStartTime was set using Tone.now(), it is fixed in reality.
+        // effectiveTime is currentNow - totalPaused.
+        // If we paused for 5 sec, effectiveTime is 5 sec less than Now.
+        // logic: if (effectiveTime >= startTime + eventTime) -> Play.
+        
+        // Let's refine:
+        // PlayTime = playbackStartTime + event.time + totalPausedTime
+        const triggerTime = playbackStartTime + event.time + totalPausedTime;
 
-        if (absolutePlayTime < currentContextTime + scheduleAheadTime) {
+        if (triggerTime < currentContextTime + scheduleAheadTime) {
+            
             // 1. Audio
-            triggerSound(event.freq, absolutePlayTime);
+            triggerSound(event.freq, triggerTime);
 
             // 2. UI Highlight & Particles
             Tone.Draw.schedule(() => {
@@ -350,11 +466,11 @@ function schedulerLoop() {
                     const k = keyCoordinates[event.freq.toFixed(2)];
                     createParticles(k.x + k.width/2, canvas.height, '#4a0094');
                 }
-            }, absolutePlayTime);
+            }, triggerTime);
 
             Tone.Draw.schedule(() => {
                 unhighlightKey(event.freq);
-            }, absolutePlayTime + event.duration);
+            }, triggerTime + event.duration);
 
             nextEventIndex++;
         } else {
@@ -365,8 +481,9 @@ function schedulerLoop() {
     schedulerTimer = setTimeout(schedulerLoop, 25);
     
     if (nextEventIndex >= currentPlaybackEvents.length) {
+        // Check for end of song
         const lastEvent = currentPlaybackEvents[currentPlaybackEvents.length - 1];
-        const endTime = playbackStartTime + lastEvent.time + lastEvent.duration + 2.0;
+        const endTime = playbackStartTime + lastEvent.time + lastEvent.duration + 2.0 + totalPausedTime;
         if (currentContextTime > endTime) stopPlayback();
     }
 }

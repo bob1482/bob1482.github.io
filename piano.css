@@ -12,6 +12,37 @@ body {
   user-select: none;
 }
 
+/* --- SETTINGS TOGGLE BUTTON (NEW) --- */
+#settings-toggle {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2500; /* Above drop zone, below loading overlay */
+  background: rgba(0, 0, 0, 0.5);
+  color: #00d2ff;
+  border: 1px solid #00d2ff;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(4px);
+}
+
+#settings-toggle:hover {
+  background: rgba(0, 210, 255, 0.2);
+  transform: rotate(90deg);
+}
+
+#settings-toggle.active {
+  background: #00d2ff;
+  color: #000;
+  transform: rotate(180deg);
+}
 
 /* --- LOADING OVERLAY --- */
 #loading-overlay {
@@ -171,9 +202,11 @@ body {
   box-shadow: inset 0 0 5px rgba(215, 215, 215, 0.4);
 }
 
-/* --- CONTROL PANEL STYLING --- */
+/* --- CONTROL PANEL STYLING (MODIFIED) --- */
 #controls {
-  position: relative; 
+  position: fixed; /* Changed from relative */
+  top: 0;
+  left: 0;
   width: 100%;
   display: flex;
   flex-direction: row; 
@@ -181,10 +214,21 @@ body {
   align-items: center;
   flex-wrap: wrap; 
   gap: 20px;
-  background: rgba(0, 0, 0, 0.3);
-  padding: 10px 0;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-  z-index: 50;
+  
+  /* Initial hidden state */
+  transform: translateY(-100%);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  
+  background: rgba(0, 0, 0, 0.9); /* More opaque for readability */
+  backdrop-filter: blur(10px);
+  padding: 20px 0;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+  z-index: 2400; /* Just below the toggle button */
+  border-bottom: 1px solid #333;
+}
+
+#controls.visible {
+  transform: translateY(0);
 }
 
 .control-group {
@@ -235,11 +279,30 @@ body {
 .control-btn.recording {
   background-color: #d9534f;
   box-shadow: 0 0 5px #d9534f;
+  animation: pulse-red 1s infinite;
 }
 
 .control-btn.playing {
   background-color: #5cb85c;
   box-shadow: 0 0 5px #5cb85c;
+}
+
+.control-btn.paused {
+  background-color: #f0ad4e;
+  box-shadow: 0 0 5px #f0ad4e;
+  animation: pulse-yellow 1s infinite;
+}
+
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0 rgba(217, 83, 79, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(217, 83, 79, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(217, 83, 79, 0); }
+}
+
+@keyframes pulse-yellow {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
 }
 
 .control-val {
@@ -255,24 +318,72 @@ body {
   margin-bottom: 2px;
 }
 
+/* --- PLAYBACK CONTROLS --- */
+.playback-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+}
+
+#record-select {
+  background: rgba(0,0,0,0.5);
+  color: white;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 2px;
+  font-family: inherit;
+  font-size: 10px;
+  max-width: 120px;
+}
+
+#progress-container {
+  width: 150px;
+  display: flex;
+  align-items: center;
+}
+
+#progress-bar {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  background: #444;
+  outline: none;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+#progress-bar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #00d2ff;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+#progress-bar::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
 /* --- BOARD CONTAINER (SPLIT) --- */
 #board-wrapper {
   display: flex;
   flex-direction: row;
   gap: 0px; 
-  margin-top: 5vh; 
+  /* Adjusted margin since controls are now fixed overlay */
+  margin-top: 10vh; 
   z-index: 10; 
   position: relative;
   right: 10px;
-  top: 20px;
-  
-  /* PERFORMANCE FIX: FORCE GPU LAYER */
+  top: 0;
   transform: translateZ(0);
   contain: layout paint;
-  pointer-events: none; /* Passes clicks through the wrapper gap */
+  pointer-events: none; 
 }
 
-/* Enable clicks on the actual boards */
 #board-left, #board-right {
   pointer-events: auto;
 }
@@ -296,20 +407,17 @@ body {
 .row-1 { margin-left: 0px; }
 .row-0 { margin-left: 83px; }
 
-/* --- OPTIMIZED KEY STYLING (CIRCLES) --- */
+/* --- KEY STYLING --- */
 .key {
   width: 60px;
   height: 60px;
-  border-radius: 50%; /* CIRCLE SHAPE KEPT */
+  border-radius: 50%; 
   margin: 0 12px;
   cursor: pointer;
   position: relative;
-  
-  /* PERFORMANCE OPTIMIZATIONS */
   box-shadow: 0 5px 0 rgba(0,0,0,0.5); 
-  will-change: transform, background-color; /* Hint to browser */
+  will-change: transform, background-color; 
   transition: transform 0.05s, background-color 0.1s; 
-
   display: flex;
   justify-content: center;
   align-items: center;
@@ -325,7 +433,7 @@ body {
 .key.active {
   transform: translateY(5px);
   box-shadow: 0 0 0 #000;
-  transition: none; /* Snap instant for responsiveness */
+  transition: none;
 }
 
 .key.natural {

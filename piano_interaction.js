@@ -8,26 +8,22 @@ async function pressNote(freq, isAutomated = false, side = 'right') {
   if (Tone.context.state !== 'running') await Tone.start();
   if (!isLoaded && soundMode === 0) return; 
 
-  // RECORDING
   if (isRecording && !isAutomated) {
     recordedEvents.push({ type: 'on', freq: freq, time: Tone.now() - recordingStartTime });
   }
 
   const freqStr = freq.toFixed(2);
 
-  // DOM HIGHLIGHTING
   if (typeof getCachedKeys === 'function') {
       const keys = getCachedKeys(freqStr);
       for (let i = 0; i < keys.length; i++) keys[i].classList.add("active");
   }
   
-  // VISUALS
   if(!isAutomated && typeof startManualVisualNote === 'function') {
       const color = (side === 'left') ? COLOR_LEFT : COLOR_RIGHT;
       startManualVisualNote(freqStr, color); 
   }
 
-  // AUDIO
   if(!isAutomated) triggerSound(freq, 0); 
 }
 
@@ -43,45 +39,35 @@ function releaseNote(freq, isAutomated = false) {
       for (let i = 0; i < keys.length; i++) keys[i].classList.remove("active");
   }
   
-  // VISUALS
   if(!isAutomated && typeof endManualVisualNote === 'function') {
       endManualVisualNote(freqStr); 
   }
 }
 
-// --- HELPER: RELEASE STUCK NOTES ---
 function releaseAllStuckNotes() {
     for (const [keyIdentifier, freq] of Object.entries(activePhysicalKeys)) {
         releaseNote(freq);
     }
     activePhysicalKeys = {};
-    
-    // Also clear touch notes
     for (const [id, freq] of Object.entries(activeTouches)) {
         releaseNote(freq);
     }
     activeTouches = {};
 }
 
-// --- TOUCH ENGINE (NEW) ---
-// We track which note is currently being held by which finger ID.
-let activeTouches = {}; // { touchId: frequency }
+// --- TOUCH ENGINE ---
+let activeTouches = {}; 
 
 function handleTouchStart(e) {
-    e.preventDefault(); // Stop mouse emulation
+    e.preventDefault(); 
     const touches = e.changedTouches;
-    
     for (let i = 0; i < touches.length; i++) {
         const touch = touches[i];
         const target = document.elementFromPoint(touch.clientX, touch.clientY);
-        
         if (target && target.classList.contains('key')) {
             const freq = parseFloat(target.getAttribute('data-note'));
-            
-            // Determine side based on parent container
             const parent = target.closest('.wicki-board');
             const side = (parent && parent.id === 'board-left') ? 'left' : 'right';
-            
             pressNote(freq, false, side);
             activeTouches[touch.identifier] = freq;
         }
@@ -91,31 +77,20 @@ function handleTouchStart(e) {
 function handleTouchMove(e) {
     e.preventDefault();
     const touches = e.changedTouches;
-
     for (let i = 0; i < touches.length; i++) {
         const touch = touches[i];
         const target = document.elementFromPoint(touch.clientX, touch.clientY);
-        
-        // Check if we moved to a NEW key
         if (target && target.classList.contains('key')) {
             const newFreq = parseFloat(target.getAttribute('data-note'));
             const oldFreq = activeTouches[touch.identifier];
-
-            // If we slid to a different note
             if (newFreq !== oldFreq) {
-                // Release old note if exists
                 if (oldFreq !== undefined) releaseNote(oldFreq);
-                
-                // Play new note
                 const parent = target.closest('.wicki-board');
                 const side = (parent && parent.id === 'board-left') ? 'left' : 'right';
                 pressNote(newFreq, false, side);
-                
-                // Update tracker
                 activeTouches[touch.identifier] = newFreq;
             }
         } else {
-            // Finger slid off ANY key -> release current note
             const oldFreq = activeTouches[touch.identifier];
             if (oldFreq !== undefined) {
                 releaseNote(oldFreq);
@@ -128,11 +103,9 @@ function handleTouchMove(e) {
 function handleTouchEnd(e) {
     e.preventDefault();
     const touches = e.changedTouches;
-    
     for (let i = 0; i < touches.length; i++) {
         const touch = touches[i];
         const freq = activeTouches[touch.identifier];
-        
         if (freq !== undefined) {
             releaseNote(freq);
             delete activeTouches[touch.identifier];
@@ -140,8 +113,6 @@ function handleTouchEnd(e) {
     }
 }
 
-// Attach Touch Listeners Globally
-// We attach to the board wrapper to catch all drags
 const boardContainer = document.getElementById('board-wrapper');
 if (boardContainer) {
     boardContainer.addEventListener('touchstart', handleTouchStart, {passive: false});
@@ -150,32 +121,131 @@ if (boardContainer) {
     boardContainer.addEventListener('touchcancel', handleTouchEnd);
 }
 
-// --- BUTTON HANDLERS (UNCHANGED) ---
+// --- SETTINGS TOGGLE (NEW) ---
+function toggleSettings() {
+    const controls = document.getElementById("controls");
+    const btn = document.getElementById("settings-toggle");
+    
+    controls.classList.toggle("visible");
+    btn.classList.toggle("active");
+}
+
+// --- RECORDER / PLAYBACK BUTTONS ---
 
 function toggleRecording() {
     if (isPlaying) stopPlayback();
+
     if (isRecording) {
+        // Stop
         isRecording = false;
+        
+        if (recordedEvents.length > 0) {
+            const duration = recordedEvents[recordedEvents.length - 1].time;
+            const newRecord = {
+                name: `Rec ${recordingsList.length + 1} (${Math.round(duration)}s)`,
+                events: [...recordedEvents],
+                duration: duration
+            };
+            recordingsList.push(newRecord);
+            currentRecordingIndex = recordingsList.length - 1;
+            updateRecordSelectUI();
+        }
+
     } else {
+        // Start
         isRecording = true;
         recordedEvents = [];
         recordingStartTime = Tone.now(); 
+        currentRecordingIndex = -1; 
     }
     updateUI();
+}
+
+function updateRecordSelectUI() {
+    const select = document.getElementById('record-select');
+    select.innerHTML = "";
+    
+    if (recordingsList.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = -1;
+        opt.innerText = "No Records";
+        select.appendChild(opt);
+        return;
+    }
+
+    recordingsList.forEach((rec, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.innerText = rec.name;
+        if (idx === currentRecordingIndex) opt.selected = true;
+        select.appendChild(opt);
+    });
+}
+
+function changeRecording(val) {
+    const idx = parseInt(val);
+    if (idx >= 0 && idx < recordingsList.length) {
+        stopPlayback(); 
+        currentRecordingIndex = idx;
+        recordedEvents = [...recordingsList[idx].events]; 
+        console.log(`Loaded ${recordingsList[idx].name}`);
+    }
+}
+
+function togglePlayback() {
+    if (isRecording) toggleRecording(); 
+
+    if (isPlaying) {
+        if (isPaused) {
+            resumePlayback();
+        } else {
+            stopPlayback(); 
+        }
+    } else {
+        startPlayback(); 
+    }
+}
+
+function pausePlayback() {
+    if (isPlaying && !isPaused) {
+        isPaused = true;
+        if (typeof setVisualizerPause === 'function') setVisualizerPause(true);
+        updateUI();
+    } else if (isPlaying && isPaused) {
+        resumePlayback();
+    }
+}
+
+function resumePlayback() {
+    if (isPlaying && isPaused) {
+        isPaused = false;
+        if (typeof setVisualizerPause === 'function') setVisualizerPause(false);
+        updateUI();
+    }
+}
+
+function scrubProgress(val) {
+    if (recordingsList.length === 0 && recordedEvents.length === 0) return;
+    if (isRecording) return;
+
+    if (!isPlaying) {
+        startPlayback();
+        if (typeof seekToTime === 'function') seekToTime(val);
+        pausePlayback();
+    } else {
+        if (typeof seekToTime === 'function') seekToTime(val);
+    }
 }
 
 function clearRecording() {
     recordedEvents = [];
     isRecording = false;
+    recordingsList = [];
+    currentRecordingIndex = -1;
+    updateRecordSelectUI();
     if(typeof recycleAllNotes === 'function') recycleAllNotes();
     if (isPlaying) stopPlayback();
     updateUI();
-}
-
-function togglePlayback() {
-    if (isRecording) toggleRecording();
-    if (isPlaying) stopPlayback();
-    else startPlayback(); 
 }
 
 function changeVolume(delta) {
@@ -264,7 +334,7 @@ function updateBPM(val) {
     Tone.Transport.bpm.value = bpm;
 }
 
-// --- KEYBOARD LISTENERS (UNCHANGED) ---
+// --- KEYBOARD LISTENERS ---
 
 window.addEventListener("keydown", (e) => {
   if (e.code.startsWith("Arrow")) {
@@ -337,7 +407,6 @@ window.addEventListener("keyup", (e) => {
   }
 });
 
-// Audio Context Starter
 window.addEventListener('click', async () => {
   if (Tone.context.state !== 'running') await Tone.start();
 }, { once: true });
@@ -345,12 +414,10 @@ window.addEventListener('touchstart', async () => {
   if (Tone.context.state !== 'running') await Tone.start();
 }, { once: true });
 
-// --- INITIALIZATION CALLS ---
 window.addEventListener('samplesLoaded', () => {
     updateUI();
     if (typeof initVisualizer === 'function') initVisualizer();
 });
 
-// Re-attach touch listener on render if needed, but the board-wrapper one persists.
 renderBoard();
 updateUI();

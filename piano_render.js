@@ -252,6 +252,7 @@ function getLabelText(semitoneOffset, keyCode) {
   return NOTE_NAMES[noteIndex] + octave;
 }
 
+
 function updateUI() {
   document.getElementById("disp-vol").innerText = Math.round(globalVolume * 10);
   document.getElementById("disp-sus").innerText = sustainMultiplier.toFixed(2) * 5;
@@ -264,18 +265,44 @@ function updateUI() {
   
   const btnRecord = document.getElementById("btn-record");
   const btnPlay = document.getElementById("btn-play");
+  const btnPause = document.getElementById("btn-pause");
   
-  if (isRecording) btnRecord.classList.add("recording");
-  else btnRecord.classList.remove("recording");
+  // Recording State
+  if (isRecording) {
+      btnRecord.classList.add("recording");
+      btnPlay.disabled = true;
+      btnPause.disabled = true;
+      document.getElementById('progress-bar').disabled = true;
+      document.getElementById('record-select').disabled = true;
+  } else {
+      btnRecord.classList.remove("recording");
+      btnPlay.disabled = false;
+      document.getElementById('progress-bar').disabled = false;
+      document.getElementById('record-select').disabled = false;
+  }
   
+  // Playback State
   if (isPlaying) {
     btnPlay.innerText = "■"; 
     btnPlay.classList.add("playing");
+    btnPause.disabled = false;
+    
+    if (isPaused) {
+        btnPause.innerText = "▶";
+        btnPause.classList.add("paused");
+    } else {
+        btnPause.innerText = "II";
+        btnPause.classList.remove("paused");
+    }
   } else {
     btnPlay.innerText = "▶"; 
     btnPlay.classList.remove("playing");
+    btnPause.innerText = "II";
+    btnPause.disabled = true;
+    btnPause.classList.remove("paused");
   }
 }
+
 
 // --- INITIALIZATION ---
 // Show loading immediately

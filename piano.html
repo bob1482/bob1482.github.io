@@ -18,6 +18,8 @@
     <div id="drop-zone">
       <div class="drop-text">DROP MIDI FILE HERE</div>
     </div>
+    
+    <button id="settings-toggle" onclick="toggleSettings()" title="Settings">⚙</button>
 
     <div id="controls">
       <div class="control-group">
@@ -66,7 +68,17 @@
         <div class="btn-row">
           <button class="control-btn" id="btn-record" onclick="toggleRecording()" title="Record">●</button>
           <button class="control-btn" id="btn-play" onclick="togglePlayback()" title="Play">▶</button>
+          <button class="control-btn" id="btn-pause" onclick="pausePlayback()" title="Pause" disabled>II</button>
         </div>
+      </div>
+
+      <div class="control-group playback-controls">
+         <select id="record-select" onchange="changeRecording(this.value)">
+           <option value="-1">No Records</option>
+         </select>
+         <div id="progress-container">
+            <input type="range" id="progress-bar" min="0" max="100" value="0" oninput="scrubProgress(this.value)">
+         </div>
       </div>
 
       <div class="control-group">
@@ -103,7 +115,6 @@
       <span class="side-label" style="margin-top: 5px;">transequence</span>
       <input type="text" id="input-sequence" 
              value="-5:-5 -12:0 5:5 12:12 -17:-17 17:5" 
-             title="Format: 'L:R' (e.g., -12:0) or 'Both' (e.g., -12). Values are added to current transpose."
              style="width: 300px; background: #222; color: white; border: 1px solid #666; border-radius: 4px; padding: 4px; font-size: 11px; text-align: center;">
     </div>
     </div>
@@ -129,11 +140,9 @@
         const ctx = canvas.getContext('2d');
         let width, height;
         let particles = [];
-        
-        // Configuration
-        const particleCount = 50; // Adjust for density
-        const connectionDistance = 100; // Max distance to draw lines
-        const moveSpeed = 1; // Speed of movement
+        const particleCount = 0; 
+        const connectionDistance = 100; 
+        const moveSpeed = 1; 
 
         function resize() {
           width = canvas.width = window.innerWidth;
@@ -148,16 +157,12 @@
             this.vy = (Math.random() - 0.5) * moveSpeed;
             this.size = Math.random() * 2 + 3;
           }
-
           update() {
             this.x += this.vx;
             this.y += this.vy;
-
-            // Bounce off edges
             if (this.x < 0 || this.x > width) this.vx *= -1;
             if (this.y < 0 || this.y > height) this.vy *= -1;
           }
-
           draw() {
             ctx.fillStyle = 'rgba(200, 200, 200, 0.3)';
             ctx.beginPath();
@@ -165,30 +170,22 @@
             ctx.fill();
           }
         }
-
         function init() {
           particles = [];
           for (let i = 0; i < particleCount; i++) {
             particles.push(new Particle());
           }
         }
-
         function animate() {
           ctx.clearRect(0, 0, width, height);
-
-          // Update and Draw Particles
           for (let i = 0; i < particles.length; i++) {
             particles[i].update();
             particles[i].draw();
-
-            // Draw Lines
             for (let j = i + 1; j < particles.length; j++) {
               const dx = particles[i].x - particles[j].x;
               const dy = particles[i].y - particles[j].y;
               const dist = Math.sqrt(dx * dx + dy * dy);
-
               if (dist < connectionDistance) {
-                // Opacity based on distance (closer = more visible)
                 const opacity = 1 - (dist / connectionDistance);
                 ctx.strokeStyle = `rgba(150, 150, 150, ${opacity * 0.3})`; 
                 ctx.lineWidth = 3;
@@ -201,15 +198,8 @@
           }
           requestAnimationFrame(animate);
         }
-
-        window.addEventListener('resize', () => {
-          resize();
-          init();
-        });
-
-        resize();
-        init();
-        animate();
+        window.addEventListener('resize', () => { resize(); init(); });
+        resize(); init(); animate();
       })();
     </script>
   </body>

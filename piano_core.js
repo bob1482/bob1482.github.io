@@ -50,11 +50,16 @@ const KEY_MAPS = [
   ["ShiftLeft","KeyZ","KeyX","KeyC","KeyV","KeyB","KeyN","KeyM","Comma","Period","Slash","ShiftRight"]
 ];
 
-// --- RECORDER STATE ---
+// --- RECORDER & PLAYBACK STATE ---
 let isRecording = false;
 let isPlaying = false;
-let recordedEvents = [];
+let isPaused = false;
+let recordedEvents = []; // The current buffer (either being recorded or played)
 let recordingStartTime = 0;
+
+// MULTI-RECORDING STORAGE
+let recordingsList = []; // Array of objects: { name, events, duration }
+let currentRecordingIndex = -1; // -1 means using raw buffer (recordedEvents)
 
 // --- AUDIO ENGINE (TONE.JS) ---
 Tone.context.lookAhead = 0.05; 
@@ -113,22 +118,15 @@ function triggerSound(frequency, when = 0) {
   // Mode 0: Sampler (Piano)
   if (soundMode === 0) {
     let baseDuration = 2;
-    // Cap duration to prevent extremely long tail calculations
     let duration = Math.min(baseDuration * sustainMultiplier, 5);
 
-    // OPTIMIZATION: FIFO Voice Stealing
-    // We don't filter the array (expensive O(N)). 
-    // We just remove the oldest voice if we hit the limit.
     if (activeVoices.length >= MAX_POLYPHONY) {
-      const stolenVoice = activeVoices.shift(); // Remove oldest (first)
-      // Only release if it's still potentially ringing. 
-      // It's cheaper to just fire release than to check time.
+      const stolenVoice = activeVoices.shift(); 
       sampler.triggerRelease(stolenVoice.freq, when);
     }
 
     activeVoices.push({
       freq: frequency,
-      // We don't track endTime strictly for removal anymore, only for logic if needed
       startTime: when 
     });
 
@@ -144,7 +142,6 @@ function triggerSound(frequency, when = 0) {
 }
 
 function playWaveSound(frequency, duration, when) {
-  // OPTIMIZATION: Use raw context but handle cleanup via Events, not setTimeout
   const ctx = Tone.context.rawContext; 
   
   let volume = 75 / frequency; 
@@ -181,11 +178,8 @@ function playWaveSound(frequency, duration, when) {
   osc1.start(when);
   osc1.stop(when + duration + 0.1);
 
-  // OPTIMIZATION: Native cleanup
-  // 'onended' fires exactly when audio stops, no JS timer drift
   osc1.onended = () => {
       noteGain.disconnect();
-      // filter and osc are garbage collected automatically once disconnected
   };
 }
 
