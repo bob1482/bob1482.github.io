@@ -17,8 +17,7 @@ let sequenceIndex = 0;
 let bpm = 120; 
 let isMetronomeOn = false; 
 
-// --- NEW: PHYSICAL KEY TRACKING ---
-// Maps physical key codes (e.g., "KeyQ", "Digit1") to the frequency they triggered.
+// --- PHYSICAL KEY TRACKING ---
 let activePhysicalKeys = {}; 
 
 // --- MODES ---
@@ -40,7 +39,7 @@ const F_ROW_VARIANTS = [
 ];
 const F_KEY_LABELS = ["laptop","100r","100s","1-1"];
 
-// --- DATA MAPS (UPDATED TO event.code) ---
+// --- DATA MAPS ---
 let freqToKeyMap = {};
 
 const KEY_MAPS = [
@@ -60,8 +59,9 @@ let recordingStartTime = 0;
 // --- AUDIO ENGINE (TONE.JS) ---
 Tone.context.lookAhead = 0.05; 
 
-const MAX_POLYPHONY = 64; 
-let activeVoices = []; 
+// OPTIMIZATION: Reduced Polyphony Cap to prevent CPU stutter
+const MAX_POLYPHONY = 48; 
+let activeVoices = []; // Now treated as a simple ring buffer
 
 const reverb = new Tone.Reverb({
     decay: 2.5,
@@ -91,7 +91,7 @@ const sampler = new Tone.Sampler({
 
 Tone.Destination.volume.value = Tone.gainToDb(globalVolume);
 
-// --- METRONOME SYNTH ---
+// --- METRONOME ---
 const metroSynth = new Tone.MembraneSynth({
     pitchDecay: 0.008,
     octaves: 2,
@@ -110,37 +110,41 @@ Tone.Transport.bpm.value = bpm;
 function triggerSound(frequency, when = 0) {
   if (when === 0) when = Tone.now();
 
-  let duration;
-
+  // Mode 0: Sampler (Piano)
   if (soundMode === 0) {
     let baseDuration = 2;
-    duration = Math.min(baseDuration * sustainMultiplier, 4);
+    // Cap duration to prevent extremely long tail calculations
+    let duration = Math.min(baseDuration * sustainMultiplier, 5);
 
-    const voiceEndTime = when + duration;
-    activeVoices = activeVoices.filter(v => v.endTime > when);
-
+    // OPTIMIZATION: FIFO Voice Stealing
+    // We don't filter the array (expensive O(N)). 
+    // We just remove the oldest voice if we hit the limit.
     if (activeVoices.length >= MAX_POLYPHONY) {
-      const stolenVoice = activeVoices.shift();
-      if (stolenVoice) {
-         sampler.triggerRelease(stolenVoice.freq, when);
-      }
+      const stolenVoice = activeVoices.shift(); // Remove oldest (first)
+      // Only release if it's still potentially ringing. 
+      // It's cheaper to just fire release than to check time.
+      sampler.triggerRelease(stolenVoice.freq, when);
     }
 
     activeVoices.push({
       freq: frequency,
-      endTime: voiceEndTime
+      // We don't track endTime strictly for removal anymore, only for logic if needed
+      startTime: when 
     });
 
     sampler.triggerAttackRelease(frequency, duration, when);
   } 
+  
+  // Mode 1: Wave (Synthesizer)
   else {
     let baseDuration = 1 + 2000 / frequency;
-    duration = Math.min(baseDuration * sustainMultiplier, 4); 
+    let duration = Math.min(baseDuration * sustainMultiplier, 4); 
     playWaveSound(frequency, duration, when);
   }
 }
 
 function playWaveSound(frequency, duration, when) {
+  // OPTIMIZATION: Use raw context but handle cleanup via Events, not setTimeout
   const ctx = Tone.context.rawContext; 
   
   let volume = 75 / frequency; 
@@ -149,11 +153,13 @@ function playWaveSound(frequency, duration, when) {
   const noteGain = ctx.createGain();
   Tone.connect(noteGain, Tone.Destination);
 
+  // Envelope
   noteGain.gain.setValueAtTime(0, when);
   noteGain.gain.linearRampToValueAtTime(volume, when + 0.05);
   noteGain.gain.exponentialRampToValueAtTime(volume * 0.6, when + 0.2 * sustainMultiplier);
   noteGain.gain.exponentialRampToValueAtTime(0.0001, when + duration);
 
+  // Filter
   const filter = ctx.createBiquadFilter();
   filter.type = "lowpass";
   filter.Q.value = 0;
@@ -166,6 +172,7 @@ function playWaveSound(frequency, duration, when) {
   filter.frequency.exponentialRampToValueAtTime(sustainBrightness, when + 0.5 * sustainMultiplier);
   filter.frequency.linearRampToValueAtTime(frequency, when + duration);
 
+  // Oscillator
   const osc1 = ctx.createOscillator();
   osc1.type = "sine";
   osc1.frequency.value = frequency;
@@ -174,12 +181,12 @@ function playWaveSound(frequency, duration, when) {
   osc1.start(when);
   osc1.stop(when + duration + 0.1);
 
-  const timeUntilCleanup = (when + duration + 0.2 - Tone.now()) * 1000;
-  if (timeUntilCleanup > 0) {
-      setTimeout(() => { noteGain.disconnect(); }, timeUntilCleanup);
-  } else {
+  // OPTIMIZATION: Native cleanup
+  // 'onended' fires exactly when audio stops, no JS timer drift
+  osc1.onended = () => {
       noteGain.disconnect();
-  }
+      // filter and osc are garbage collected automatically once disconnected
+  };
 }
 
 function midiToFreq(midiNote) {

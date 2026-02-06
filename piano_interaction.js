@@ -55,9 +55,102 @@ function releaseAllStuckNotes() {
         releaseNote(freq);
     }
     activePhysicalKeys = {};
+    
+    // Also clear touch notes
+    for (const [id, freq] of Object.entries(activeTouches)) {
+        releaseNote(freq);
+    }
+    activeTouches = {};
 }
 
-// --- BUTTON HANDLERS ---
+// --- TOUCH ENGINE (NEW) ---
+// We track which note is currently being held by which finger ID.
+let activeTouches = {}; // { touchId: frequency }
+
+function handleTouchStart(e) {
+    e.preventDefault(); // Stop mouse emulation
+    const touches = e.changedTouches;
+    
+    for (let i = 0; i < touches.length; i++) {
+        const touch = touches[i];
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        
+        if (target && target.classList.contains('key')) {
+            const freq = parseFloat(target.getAttribute('data-note'));
+            
+            // Determine side based on parent container
+            const parent = target.closest('.wicki-board');
+            const side = (parent && parent.id === 'board-left') ? 'left' : 'right';
+            
+            pressNote(freq, false, side);
+            activeTouches[touch.identifier] = freq;
+        }
+    }
+}
+
+function handleTouchMove(e) {
+    e.preventDefault();
+    const touches = e.changedTouches;
+
+    for (let i = 0; i < touches.length; i++) {
+        const touch = touches[i];
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        
+        // Check if we moved to a NEW key
+        if (target && target.classList.contains('key')) {
+            const newFreq = parseFloat(target.getAttribute('data-note'));
+            const oldFreq = activeTouches[touch.identifier];
+
+            // If we slid to a different note
+            if (newFreq !== oldFreq) {
+                // Release old note if exists
+                if (oldFreq !== undefined) releaseNote(oldFreq);
+                
+                // Play new note
+                const parent = target.closest('.wicki-board');
+                const side = (parent && parent.id === 'board-left') ? 'left' : 'right';
+                pressNote(newFreq, false, side);
+                
+                // Update tracker
+                activeTouches[touch.identifier] = newFreq;
+            }
+        } else {
+            // Finger slid off ANY key -> release current note
+            const oldFreq = activeTouches[touch.identifier];
+            if (oldFreq !== undefined) {
+                releaseNote(oldFreq);
+                delete activeTouches[touch.identifier];
+            }
+        }
+    }
+}
+
+function handleTouchEnd(e) {
+    e.preventDefault();
+    const touches = e.changedTouches;
+    
+    for (let i = 0; i < touches.length; i++) {
+        const touch = touches[i];
+        const freq = activeTouches[touch.identifier];
+        
+        if (freq !== undefined) {
+            releaseNote(freq);
+            delete activeTouches[touch.identifier];
+        }
+    }
+}
+
+// Attach Touch Listeners Globally
+// We attach to the board wrapper to catch all drags
+const boardContainer = document.getElementById('board-wrapper');
+if (boardContainer) {
+    boardContainer.addEventListener('touchstart', handleTouchStart, {passive: false});
+    boardContainer.addEventListener('touchmove', handleTouchMove, {passive: false});
+    boardContainer.addEventListener('touchend', handleTouchEnd);
+    boardContainer.addEventListener('touchcancel', handleTouchEnd);
+}
+
+// --- BUTTON HANDLERS (UNCHANGED) ---
 
 function toggleRecording() {
     if (isPlaying) stopPlayback();
@@ -171,10 +264,9 @@ function updateBPM(val) {
     Tone.Transport.bpm.value = bpm;
 }
 
-// --- INPUT LISTENERS ---
+// --- KEYBOARD LISTENERS (UNCHANGED) ---
 
 window.addEventListener("keydown", (e) => {
-  // Arrow Keys (Transpose) - "Code" is usually same as "Key" here, e.g. "ArrowUp"
   if (e.code.startsWith("Arrow")) {
     if (e.repeat) return;
     const smallStep = shiftMode === 0 ? 5 : 1;
@@ -186,11 +278,9 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   
-  // Space Key (Sequence)
   if (e.code === "Space") {
     e.preventDefault(); 
     if (e.repeat) return;
-    
     releaseAllStuckNotes();
 
     const input = document.getElementById("input-sequence").value;
@@ -213,7 +303,6 @@ window.addEventListener("keydown", (e) => {
 
       transposeLeft += deltaLeft;
       transposeRight += deltaRight;
-
       if (transposeLeft < -30) transposeLeft = -30;
       if (transposeLeft > 24) transposeLeft = 24;
       if (transposeRight < -30) transposeRight = -30;
@@ -226,43 +315,33 @@ window.addEventListener("keydown", (e) => {
     return;
   }
 
-  // Piano Keys - UPDATED TO USE e.code
   if (e.repeat) return;
 
   const key = document.querySelector(`.key[data-key="${CSS.escape(e.code)}"]`);
   if (key) { 
     e.preventDefault();
-    
     const freq = parseFloat(key.getAttribute("data-note"));
     const parentBoard = key.closest('.wicki-board');
     const side = (parentBoard && parentBoard.id === 'board-left') ? 'left' : 'right';
-    
     activePhysicalKeys[e.code] = freq;
-
     pressNote(freq, false, side);
   }
 });
 
 window.addEventListener("keyup", (e) => {
-  // Check if we have a stored frequency for this PHYSICAL key press
   if (activePhysicalKeys[e.code]) {
       const freq = activePhysicalKeys[e.code];
       releaseNote(freq);
       delete activePhysicalKeys[e.code];
       return;
   }
-
-  // Fallback
-  const key = document.querySelector(`.key[data-key="${CSS.escape(e.code)}"]`);
-  if (key) { 
-    e.preventDefault();
-    const freq = parseFloat(key.getAttribute("data-note"));
-    releaseNote(freq);
-  }
 });
 
 // Audio Context Starter
 window.addEventListener('click', async () => {
+  if (Tone.context.state !== 'running') await Tone.start();
+}, { once: true });
+window.addEventListener('touchstart', async () => {
   if (Tone.context.state !== 'running') await Tone.start();
 }, { once: true });
 
@@ -272,5 +351,6 @@ window.addEventListener('samplesLoaded', () => {
     if (typeof initVisualizer === 'function') initVisualizer();
 });
 
+// Re-attach touch listener on render if needed, but the board-wrapper one persists.
 renderBoard();
 updateUI();

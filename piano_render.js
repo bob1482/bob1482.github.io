@@ -8,8 +8,8 @@ const boardRight = document.getElementById("board-right");
 const boardWrapper = document.getElementById("board-wrapper"); 
 
 // --- VISUAL SETTINGS ---
-const COLOR_LEFT = '#00d2ff';  // Cyan
-const COLOR_RIGHT = '#c87ad1'; // Purple
+const COLOR_LEFT = '#00d2ff'; 
+const COLOR_RIGHT = '#c87ad1';
 
 // --- CACHE ---
 let domKeyCache = {};   
@@ -20,6 +20,29 @@ function getCachedKeys(freqStr) {
         domKeyCache[freqStr] = document.querySelectorAll(`[data-note="${freqStr}"]`);
     }
     return domKeyCache[freqStr];
+}
+
+// --- LOADING SCREEN ---
+function showLoading() {
+    let overlay = document.getElementById('loading-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'loading-overlay';
+        overlay.innerHTML = `
+            <div class="loader-spinner"></div>
+            <div>LOADING SAMPLES...</div>
+        `;
+        document.body.appendChild(overlay);
+    }
+    overlay.classList.remove('fade-out');
+}
+
+function hideLoading() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+        overlay.classList.add('fade-out');
+        setTimeout(() => overlay.remove(), 500); // Remove from DOM after fade
+    }
 }
 
 // --- VISUAL HELPERS ---
@@ -89,7 +112,7 @@ function renderBoard() {
       const key = document.createElement("div");
       key.className = `key ${isNatural ? "natural" : "accidental"}`;
       key.setAttribute("data-note", freqStr);
-      if (keyCode) key.setAttribute("data-key", keyCode); // Now stores 'KeyQ', 'Digit1', etc.
+      if (keyCode) key.setAttribute("data-key", keyCode); 
 
       key.innerText = getLabelText(semitoneOffset, keyCode);
 
@@ -97,6 +120,7 @@ function renderBoard() {
       const isLeft = c < SPLIT_COL;
       const side = isLeft ? 'left' : 'right';
 
+      // Mouse Events
       key.addEventListener("mousedown", () => {
           if(typeof pressNote === 'function') pressNote(freq, false, side);
       });
@@ -104,6 +128,17 @@ function renderBoard() {
           if(typeof releaseNote === 'function') releaseNote(freq);
       });
       key.addEventListener("mouseleave", () => {
+          if(typeof releaseNote === 'function') releaseNote(freq);
+      });
+
+      // ADDED: Touch Events for Mobile Performance
+      key.addEventListener("touchstart", (e) => {
+          if(e.cancelable) e.preventDefault(); // Prevent scroll/zoom
+          if(typeof pressNote === 'function') pressNote(freq, false, side);
+      }, {passive: false});
+
+      key.addEventListener("touchend", (e) => {
+          if(e.cancelable) e.preventDefault();
           if(typeof releaseNote === 'function') releaseNote(freq);
       });
 
@@ -155,6 +190,7 @@ function renderTraditionalPiano() {
           key.style.left = ((whiteKeyCount * whiteKeyWidthPercent) - (blackKeyWidthPercent / 2)) + "%";
       }
 
+      // Mouse
       key.addEventListener("mousedown", () => {
          if(typeof pressNote === 'function') pressNote(freq, false, 'right');
       });
@@ -164,6 +200,17 @@ function renderTraditionalPiano() {
       key.addEventListener("mouseleave", () => {
          if(typeof releaseNote === 'function') releaseNote(freq);
       });
+
+      // Touch
+      key.addEventListener("touchstart", (e) => {
+          e.preventDefault();
+          if(typeof pressNote === 'function') pressNote(freq, false, 'right');
+      }, {passive: false});
+      key.addEventListener("touchend", (e) => {
+          e.preventDefault();
+          if(typeof releaseNote === 'function') releaseNote(freq);
+      });
+
       wrapper.appendChild(key);
   }
 }
@@ -177,7 +224,7 @@ function getLabelText(semitoneOffset, keyCode) {
     // Convert DOM 'code' to user-friendly text
     if (keyCode.startsWith("Key")) return keyCode.replace("Key", "");
     if (keyCode.startsWith("Digit")) return keyCode.replace("Digit", "");
-    if (keyCode.startsWith("F") && keyCode.length <= 3) return keyCode; // F1, F2...
+    if (keyCode.startsWith("F") && keyCode.length <= 3) return keyCode; 
     
     switch(keyCode) {
         case "Minus": return "-";
@@ -229,3 +276,14 @@ function updateUI() {
     btnPlay.classList.remove("playing");
   }
 }
+
+// --- INITIALIZATION ---
+// Show loading immediately
+showLoading();
+
+// Hide when 'samplesLoaded' event fires
+window.addEventListener('samplesLoaded', () => {
+    updateUI();
+    hideLoading();
+    if (typeof initVisualizer === 'function') initVisualizer();
+});
