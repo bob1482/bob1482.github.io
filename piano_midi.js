@@ -2,16 +2,31 @@
 // PIANO MIDI: Devices & Files
 // ==========================================
 
-// --- WEB MIDI API ---
-if (navigator.requestMIDIAccess) {
-    navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
+let midiInitialized = false;
+
+// --- WEB MIDI API (ON DEMAND) ---
+function initMidiAccess() {
+    if (midiInitialized) return; // Prevent multiple requests
+    
+    if (navigator.requestMIDIAccess) {
+        navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
+    }
 }
 
 function onMIDISuccess(midiAccess) {
+    midiInitialized = true;
     const inputs = midiAccess.inputs.values();
     for (let input of inputs) {
         input.onmidimessage = getMIDIMessage;
     }
+    
+    // Listen for new devices plugging in after init
+    midiAccess.onstatechange = (e) => {
+        if (e.port.type === "input" && e.port.state === "connected") {
+            e.port.onmidimessage = getMIDIMessage;
+        }
+    };
+    
     console.log("MIDI Devices Connected");
 }
 
@@ -62,6 +77,11 @@ if (dropZone) {
     window.addEventListener('drop', (e) => {
         e.preventDefault();
         dropZone.classList.remove('active');
+
+        // --- NEW: Request MIDI Permission only on drop ---
+        // This stops the browser from nagging the user on page load
+        initMidiAccess(); 
+
         const files = e.dataTransfer.files;
         if (files.length > 0) {
             const file = files[0];
@@ -88,7 +108,6 @@ function convertMidiToEvents(midiData) {
     if (typeof stopPlayback === 'function' && isPlaying) stopPlayback();
     
     // We modify the global recordedEvents array
-    // Note: recordedEvents is a global variable from piano_core.js
     recordedEvents.length = 0; // Clear array
     isRecording = false;
 

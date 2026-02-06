@@ -15,7 +15,7 @@ async function pressNote(freq, isAutomated = false, side = 'right') {
 
   const freqStr = freq.toFixed(2);
 
-  // DOM HIGHLIGHTING (Defined in render)
+  // DOM HIGHLIGHTING
   if (typeof getCachedKeys === 'function') {
       const keys = getCachedKeys(freqStr);
       for (let i = 0; i < keys.length; i++) keys[i].classList.add("active");
@@ -23,7 +23,6 @@ async function pressNote(freq, isAutomated = false, side = 'right') {
   
   // VISUALS
   if(!isAutomated && typeof startManualVisualNote === 'function') {
-      // Use render constants for colors
       const color = (side === 'left') ? COLOR_LEFT : COLOR_RIGHT;
       startManualVisualNote(freqStr, color); 
   }
@@ -51,12 +50,10 @@ function releaseNote(freq, isAutomated = false) {
 }
 
 // --- HELPER: RELEASE STUCK NOTES ---
-// Called before major layout changes (transpose/shift) to prevent hanging notes
 function releaseAllStuckNotes() {
     for (const [keyIdentifier, freq] of Object.entries(activePhysicalKeys)) {
         releaseNote(freq);
     }
-    // Clear the map
     activePhysicalKeys = {};
 }
 
@@ -104,8 +101,7 @@ function changeSustain(delta) {
 }
 
 function changeTranspose(side, delta) {
-  releaseAllStuckNotes(); // Safety release
-
+  releaseAllStuckNotes(); 
   if (side === 'left') {
     transposeLeft += delta;
     if (transposeLeft < -30) transposeLeft = -30;
@@ -140,13 +136,13 @@ function toggleSoundMode() {
 }
 
 function toggleShiftMode() {
-  releaseAllStuckNotes(); // Safety release
+  releaseAllStuckNotes(); 
   shiftMode = (shiftMode + 1) % 2;
   updateUI();
 }
 
 function toggleFKeys() {
-  releaseAllStuckNotes(); // Safety release
+  releaseAllStuckNotes(); 
   fKeyMode = (fKeyMode + 1) % 4;
   KEY_MAPS[0] = F_ROW_VARIANTS[fKeyMode];
   renderBoard();
@@ -178,15 +174,15 @@ function updateBPM(val) {
 // --- INPUT LISTENERS ---
 
 window.addEventListener("keydown", (e) => {
-  // Arrow Keys (Transpose)
-  if (e.key.startsWith("Arrow")) {
+  // Arrow Keys (Transpose) - "Code" is usually same as "Key" here, e.g. "ArrowUp"
+  if (e.code.startsWith("Arrow")) {
     if (e.repeat) return;
     const smallStep = shiftMode === 0 ? 5 : 1;
     const largeStep = shiftMode === 0 ? 12 : 2;
-    if (e.key === "ArrowRight") { changeTranspose('right', smallStep); changeTranspose('left', smallStep); }
-    else if (e.key === "ArrowLeft") { changeTranspose('right', -smallStep); changeTranspose('left', -smallStep); }
-    else if (e.key === "ArrowUp") { changeTranspose('right', largeStep); changeTranspose('left', largeStep); }
-    else if (e.key === "ArrowDown") { changeTranspose('right', -largeStep); changeTranspose('left', -largeStep); }
+    if (e.code === "ArrowRight") { changeTranspose('right', smallStep); changeTranspose('left', smallStep); }
+    else if (e.code === "ArrowLeft") { changeTranspose('right', -smallStep); changeTranspose('left', -smallStep); }
+    else if (e.code === "ArrowUp") { changeTranspose('right', largeStep); changeTranspose('left', largeStep); }
+    else if (e.code === "ArrowDown") { changeTranspose('right', -largeStep); changeTranspose('left', -largeStep); }
     return;
   }
   
@@ -195,7 +191,6 @@ window.addEventListener("keydown", (e) => {
     e.preventDefault(); 
     if (e.repeat) return;
     
-    // FIX: Release any held notes before shifting layout
     releaseAllStuckNotes();
 
     const input = document.getElementById("input-sequence").value;
@@ -231,14 +226,10 @@ window.addEventListener("keydown", (e) => {
     return;
   }
 
-  // Piano Keys
-  let searchKey = e.key.toLowerCase();
-  if (e.code === "ShiftLeft" || e.code === "ShiftRight") searchKey = e.code.toLowerCase();
-  
-  // Prevent repeat triggering
+  // Piano Keys - UPDATED TO USE e.code
   if (e.repeat) return;
 
-  const key = document.querySelector(`.key[data-key="${CSS.escape(searchKey)}"]`);
+  const key = document.querySelector(`.key[data-key="${CSS.escape(e.code)}"]`);
   if (key) { 
     e.preventDefault();
     
@@ -246,7 +237,6 @@ window.addEventListener("keydown", (e) => {
     const parentBoard = key.closest('.wicki-board');
     const side = (parentBoard && parentBoard.id === 'board-left') ? 'left' : 'right';
     
-    // FIX: Store the frequency for this physical key
     activePhysicalKeys[e.code] = freq;
 
     pressNote(freq, false, side);
@@ -254,10 +244,7 @@ window.addEventListener("keydown", (e) => {
 });
 
 window.addEventListener("keyup", (e) => {
-  let searchKey = e.key.toLowerCase();
-  if (e.code === "ShiftLeft" || e.code === "ShiftRight") searchKey = e.code.toLowerCase();
-  
-  // FIX: First check if we have a stored frequency for this key press
+  // Check if we have a stored frequency for this PHYSICAL key press
   if (activePhysicalKeys[e.code]) {
       const freq = activePhysicalKeys[e.code];
       releaseNote(freq);
@@ -265,8 +252,8 @@ window.addEventListener("keyup", (e) => {
       return;
   }
 
-  // Fallback (mostly for Mouse clicks that don't go through activePhysicalKeys)
-  const key = document.querySelector(`.key[data-key="${CSS.escape(searchKey)}"]`);
+  // Fallback
+  const key = document.querySelector(`.key[data-key="${CSS.escape(e.code)}"]`);
   if (key) { 
     e.preventDefault();
     const freq = parseFloat(key.getAttribute("data-note"));
@@ -280,7 +267,6 @@ window.addEventListener('click', async () => {
 }, { once: true });
 
 // --- INITIALIZATION CALLS ---
-// Initialize the board and UI after defining all interaction functions
 window.addEventListener('samplesLoaded', () => {
     updateUI();
     if (typeof initVisualizer === 'function') initVisualizer();

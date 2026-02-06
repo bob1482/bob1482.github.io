@@ -9,7 +9,7 @@ const boardWrapper = document.getElementById("board-wrapper");
 
 // --- VISUAL SETTINGS ---
 const COLOR_LEFT = '#00d2ff';  // Cyan
-const COLOR_RIGHT = '#9b64b8'; // Purple
+const COLOR_RIGHT = '#c87ad1'; // Purple
 
 // --- CACHE ---
 let domKeyCache = {};   
@@ -66,9 +66,9 @@ function renderBoard() {
 
     for (let c = 0; c < COLS; c++) {
       const mapRowIndex = ROWS - 1 - r;
-      let keyMapChar = "";
+      let keyCode = "";
       if (KEY_MAPS[mapRowIndex] && KEY_MAPS[mapRowIndex][c]) {
-        keyMapChar = KEY_MAPS[mapRowIndex][c];
+        keyCode = KEY_MAPS[mapRowIndex][c];
       }
 
       let rowManualShift = 0;
@@ -84,20 +84,19 @@ function renderBoard() {
       let isNatural = [0, 2, 4, 5, 7, 9, 11].includes(noteIndex);
 
       const freqStr = freq.toFixed(2);
-      if (keyMapChar) freqToKeyMap[freqStr] = keyMapChar;
+      if (keyCode) freqToKeyMap[freqStr] = keyCode;
 
       const key = document.createElement("div");
       key.className = `key ${isNatural ? "natural" : "accidental"}`;
       key.setAttribute("data-note", freqStr);
-      if (keyMapChar) key.setAttribute("data-key", keyMapChar.toLowerCase());
+      if (keyCode) key.setAttribute("data-key", keyCode); // Now stores 'KeyQ', 'Digit1', etc.
 
-      key.innerText = getLabelText(semitoneOffset, keyMapChar);
+      key.innerText = getLabelText(semitoneOffset, keyCode);
 
       // Determine Side for Event Listeners
       const isLeft = c < SPLIT_COL;
       const side = isLeft ? 'left' : 'right';
 
-      // Check if interaction functions exist before attaching
       key.addEventListener("mousedown", () => {
           if(typeof pressNote === 'function') pressNote(freq, false, side);
       });
@@ -116,7 +115,6 @@ function renderBoard() {
   }
   
   renderTraditionalPiano();
-  // Update visualizer coordinates if that module is loaded
   if(typeof updateKeyCoordinates === 'function') updateKeyCoordinates();
 }
 
@@ -170,16 +168,37 @@ function renderTraditionalPiano() {
   }
 }
 
-function getLabelText(semitoneOffset, keyChar) {
+function getLabelText(semitoneOffset, keyCode) {
   if (labelMode === 2) return ""; 
-  if (labelMode === 1) { 
-    if (!keyChar) return "";
-    if (keyChar === "ShiftRight") return "SL";
-    if (keyChar === "CapsLock") return "CL";
-    if (keyChar === "ShiftLeft") return "SR";
-    if (keyChar === "PrintScreen") return "PS";
-    return keyChar.toUpperCase();
+  
+  if (labelMode === 1) { // KEYS MODE
+    if (!keyCode) return "";
+    
+    // Convert DOM 'code' to user-friendly text
+    if (keyCode.startsWith("Key")) return keyCode.replace("Key", "");
+    if (keyCode.startsWith("Digit")) return keyCode.replace("Digit", "");
+    if (keyCode.startsWith("F") && keyCode.length <= 3) return keyCode; // F1, F2...
+    
+    switch(keyCode) {
+        case "Minus": return "-";
+        case "Equal": return "=";
+        case "BracketLeft": return "[";
+        case "BracketRight": return "]";
+        case "Semicolon": return ";";
+        case "Quote": return "'";
+        case "Comma": return ",";
+        case "Period": return ".";
+        case "Slash": return "/";
+        case "Backslash": return "\\";
+        case "ShiftLeft": return "SL";
+        case "ShiftRight": return "SR";
+        case "CapsLock": return "CL";
+        case "PrintScreen": return "PS";
+        default: return keyCode.slice(0, 2); 
+    }
   }
+  
+  // NOTES MODE
   const totalSteps = semitoneOffset;
   const noteIndex = ((totalSteps % 12) + 12) % 12; 
   const octave = Math.floor(totalSteps / 12) + 3; 

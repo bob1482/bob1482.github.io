@@ -11,11 +11,12 @@ let keyCoordinates = {};
 let notePool = [];      
 let visualNotes = [];   // Manual rising notes
 let fallingNotes = [];  // Playback falling notes
-let particles = [];     // NEW: Explosion particles
+let particles = [];     // Explosion particles
 
-// SETTINGS
-const VISUAL_SPEED = 1.5;      
-const FALL_DURATION = 2.0; 
+// --- SETTINGS (TIME-BASED) ---
+const FALL_DURATION = 2.0;       // Seconds for falling notes to reach bottom
+const MANUAL_RISE_SPEED_PPS = 250; // Pixels Per Second (Manual notes rising speed)
+const PARTICLE_DECAY_RATE = 1.5; // Life lost per second (1.0 = 1 second life)
 
 // --- PLAYBACK STATE ---
 let schedulerTimer = null; 
@@ -64,14 +65,14 @@ function recycleAllNotes() {
     particles = [];
 }
 
-// --- NEW: PARTICLE SYSTEM ---
+// --- PARTICLE SYSTEM ---
 function createParticles(x, y, color) {
     for (let i = 0; i < 8; i++) {
         particles.push({
             x: x + (Math.random() * 40 - 20),
             y: y,
-            vx: (Math.random() - 0.5) * 4,
-            vy: (Math.random() - 0.5) * 4 - 2,
+            vx: (Math.random() - 0.5) * 150, // Velocity in pixels per second
+            vy: ((Math.random() - 0.5) * 150) - 80, 
             life: 1.0,
             color: color
         });
@@ -94,17 +95,14 @@ function spawnFallingNote(freqStr, duration, targetTime) {
   note.x = coords.x;
   note.width = coords.width;
   note.height = noteHeight;
-  note.color = '#9b64b8ff';
+  note.color = 'rgb(93, 0, 150)';
   note.targetTime = targetTime;
   note.active = true;
 
   fallingNotes.push(note);
 }
 
-// [piano_visualizer.js]
-// Replace the existing startManualVisualNote function with this:
-
-function startManualVisualNote(freqStr, color = '#9b64b8ff') { // Added 'color' param with default
+function startManualVisualNote(freqStr, color = 'rgb(61, 182, 67)') { 
   if (Object.keys(keyCoordinates).length === 0) updateKeyCoordinates();
   const coords = keyCoordinates[freqStr];
   if (!coords) return;
@@ -113,7 +111,6 @@ function startManualVisualNote(freqStr, color = '#9b64b8ff') { // Added 'color' 
       if(visualNotes[i].freq === freqStr && visualNotes[i].active) return;
   }
 
-  // Use the specific color for particles too
   createParticles(coords.x + coords.width / 2, canvas.height, color);
 
   const note = getNoteFromPool();
@@ -122,7 +119,7 @@ function startManualVisualNote(freqStr, color = '#9b64b8ff') { // Added 'color' 
   note.width = coords.width;
   note.y = canvas.height;
   note.height = 0;
-  note.color = color; // Use the passed color
+  note.color = color;
   note.active = true;
 
   visualNotes.push(note);
@@ -139,8 +136,28 @@ function endManualVisualNote(freqStr) {
 
 // --- THE VISUAL LOOP (View Layer) ---
 function startVisualizerLoop() {
-  function loop() {
+  let lastFrameTime = performance.now();
+
+  // Pre-define border style to save string parsing in loop (optional, but good practice)
+  const borderStyle = "rgba(255, 255, 255, 0.7)"; 
+
+  function loop(currentTime) {
+    // 0. Calculate Delta Time (Seconds passed since last frame)
+    const dt = (currentTime - lastFrameTime) / 1000;
+    lastFrameTime = currentTime;
+
+    // Safety check for huge delta (e.g., user switched tabs)
+    if (dt > 0.1) {
+        requestAnimationFrame(loop);
+        return;
+    }
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Set common styles for this frame to minimize state changes
+    ctx.strokeStyle = borderStyle;
+    ctx.lineWidth = 2;
+
     const currentAudioTime = Tone.now(); 
 
     // 1. PLAYBACK: Spawn Falling Notes
@@ -162,6 +179,8 @@ function startVisualizerLoop() {
             const note = fallingNotes[i];
             const timeRemaining = note.targetTime - currentAudioTime;
             const pixelsPerSecond = canvas.height / FALL_DURATION;
+            
+            // Calculate Y based on time, not frame steps
             const y = canvas.height - (timeRemaining * pixelsPerSecond);
             const drawY = y - note.height;
 
@@ -171,14 +190,12 @@ function startVisualizerLoop() {
                 continue;
             }
 
-            const grad = ctx.createLinearGradient(note.x, drawY, note.x + note.width, drawY);
-            grad.addColorStop(0, note.color);
-            grad.addColorStop(0.5, "white"); 
-            grad.addColorStop(1, note.color);
-            ctx.fillStyle = grad;
+            // --- OPTIMIZED DRAWING: NO GRADIENT ---
+            ctx.fillStyle = note.color;
             ctx.beginPath();
             ctx.roundRect(note.x, drawY, note.width, note.height, 4);
             ctx.fill();
+            ctx.stroke(); // Draws the bright border
         }
     } else {
         if(fallingNotes.length > 0) recycleAllNotes();
@@ -187,11 +204,13 @@ function startVisualizerLoop() {
     // 2. MANUAL: Render Rising Notes
     for (let i = visualNotes.length - 1; i >= 0; i--) {
         const note = visualNotes[i];
+        
+        // Use dt to ensure speed is pixels per second, not per frame
         if (note.active) {
-            note.height += VISUAL_SPEED;
+            note.height += MANUAL_RISE_SPEED_PPS * dt;
             note.y = canvas.height - note.height;
         } else {
-            note.y -= VISUAL_SPEED;
+            note.y -= MANUAL_RISE_SPEED_PPS * dt;
         }
 
         if (note.y + note.height < -50) {
@@ -200,23 +219,21 @@ function startVisualizerLoop() {
             continue;
         }
         
-        const grad = ctx.createLinearGradient(note.x, note.y, note.x + note.width, note.y);
-        grad.addColorStop(0, note.color);
-        grad.addColorStop(0.5, "white");
-        grad.addColorStop(1, note.color);
-        
-        ctx.fillStyle = grad;
+        // --- OPTIMIZED DRAWING: NO GRADIENT ---
+        ctx.fillStyle = note.color;
         ctx.beginPath();
-        ctx.roundRect(note.x, note.y, note.width, note.height, 4);
+        ctx.roundRect(note.x, note.y, note.width, note.height, 7);
         ctx.fill();
+        ctx.stroke(); // Draws the bright border
     }
     
-    // 3. NEW: RENDER PARTICLES
+    // 3. RENDER PARTICLES
     for (let i = particles.length - 1; i >= 0; i--) {
         let p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life -= 0.02;
+        
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.life -= PARTICLE_DECAY_RATE * dt;
 
         if (p.life <= 0) {
             particles.splice(i, 1);
@@ -250,10 +267,9 @@ function startPlayback() {
   const now = Tone.now();
   playbackStartTime = now + FALL_DURATION + 0.5; 
   
-  // Start metronome if it was enabled
   if(isMetronomeOn) {
       Tone.Transport.start();
-      metroLoop.start(playbackStartTime); // Sync metro with playback start
+      metroLoop.start(playbackStartTime); 
   }
   
   schedulerLoop();
@@ -309,10 +325,9 @@ function schedulerLoop() {
             // 2. UI Highlight & Particles
             Tone.Draw.schedule(() => {
                 highlightKey(event.freq);
-                // NEW: Trigger particles on playback note hit
                 if(keyCoordinates[event.freq.toFixed(2)]) {
                     const k = keyCoordinates[event.freq.toFixed(2)];
-                    createParticles(k.x + k.width/2, canvas.height, '#00ffff');
+                    createParticles(k.x + k.width/2, canvas.height, '#4a0094');
                 }
             }, absolutePlayTime);
 

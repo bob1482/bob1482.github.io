@@ -18,8 +18,7 @@ let bpm = 120;
 let isMetronomeOn = false; 
 
 // --- NEW: PHYSICAL KEY TRACKING ---
-// Maps physical key codes (e.g., "keyq", "keyw") to the frequency they triggered.
-// This ensures that even if you transpose while holding, we release the correct sound.
+// Maps physical key codes (e.g., "KeyQ", "Digit1") to the frequency they triggered.
 let activePhysicalKeys = {}; 
 
 // --- MODES ---
@@ -41,15 +40,15 @@ const F_ROW_VARIANTS = [
 ];
 const F_KEY_LABELS = ["laptop","100r","100s","1-1"];
 
-// --- DATA MAPS ---
+// --- DATA MAPS (UPDATED TO event.code) ---
 let freqToKeyMap = {};
 
 const KEY_MAPS = [
   F_ROW_VARIANTS[0], 
-  ["1","2","3","4","5","6","7","8","9","0","-","="],
-  ["q","w","e","r","t","y","u","i","o","p","[","]"],
-  ["CapsLock","a","s","d","f","g","h","j","k","l",";","'"],
-  ["ShiftLeft","z","x","c","v","b","n","m",",",".","/","ShiftRight"]
+  ["Digit1","Digit2","Digit3","Digit4","Digit5","Digit6","Digit7","Digit8","Digit9","Digit0","Minus","Equal"],
+  ["KeyQ","KeyW","KeyE","KeyR","KeyT","KeyY","KeyU","KeyI","KeyO","KeyP","BracketLeft","BracketRight"],
+  ["CapsLock","KeyA","KeyS","KeyD","KeyF","KeyG","KeyH","KeyJ","KeyK","KeyL","Semicolon","Quote"],
+  ["ShiftLeft","KeyZ","KeyX","KeyC","KeyV","KeyB","KeyN","KeyM","Comma","Period","Slash","ShiftRight"]
 ];
 
 // --- RECORDER STATE ---
@@ -92,7 +91,7 @@ const sampler = new Tone.Sampler({
 
 Tone.Destination.volume.value = Tone.gainToDb(globalVolume);
 
-// --- NEW: METRONOME SYNTH ---
+// --- METRONOME SYNTH ---
 const metroSynth = new Tone.MembraneSynth({
     pitchDecay: 0.008,
     octaves: 2,
@@ -108,13 +107,11 @@ Tone.Transport.bpm.value = bpm;
 
 // --- AUDIO FUNCTIONS ---
 
-// UPDATED: Accepts 'when' (AudioContext Time) for precise scheduling
 function triggerSound(frequency, when = 0) {
   if (when === 0) when = Tone.now();
 
   let duration;
 
-  // Mode 0: Sampler (Piano)
   if (soundMode === 0) {
     let baseDuration = 2;
     duration = Math.min(baseDuration * sustainMultiplier, 4);
@@ -136,8 +133,6 @@ function triggerSound(frequency, when = 0) {
 
     sampler.triggerAttackRelease(frequency, duration, when);
   } 
-  
-  // Mode 1: Wave (Synthesizer)
   else {
     let baseDuration = 1 + 2000 / frequency;
     duration = Math.min(baseDuration * sustainMultiplier, 4); 
@@ -187,7 +182,6 @@ function playWaveSound(frequency, duration, when) {
   }
 }
 
-// --- NEW: MIDI HELPER ---
 function midiToFreq(midiNote) {
     return 440 * Math.pow(2, (midiNote - 69) / 12);
 }

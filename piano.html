@@ -99,13 +99,13 @@
         </div>
       </div>
 
-     <div class="control-group">
-  <span class="side-label" style="margin-top: 5px;">transequence</span>
-  <input type="text" id="input-sequence" 
-         value="-5:-5 -12:0 5:5 12:12 -17:-17 17:5" 
-         title="Format: 'L:R' (e.g., -12:0) or 'Both' (e.g., -12). Values are added to current transpose."
-         style="width: 300px; background: #222; color: white; border: 1px solid #666; border-radius: 4px; padding: 4px; font-size: 11px; text-align: center;">
-</div>
+     <div class="control-group" style="display: none;">
+      <span class="side-label" style="margin-top: 5px;">transequence</span>
+      <input type="text" id="input-sequence" 
+             value="-5:-5 -12:0 5:5 12:12 -17:-17 17:5" 
+             title="Format: 'L:R' (e.g., -12:0) or 'Both' (e.g., -12). Values are added to current transpose."
+             style="width: 300px; background: #222; color: white; border: 1px solid #666; border-radius: 4px; padding: 4px; font-size: 11px; text-align: center;">
+    </div>
     </div>
 
     <canvas id="synthesia-canvas"></canvas>
@@ -131,7 +131,7 @@
         let particles = [];
         
         // Configuration
-        const particleCount = 100; // Adjust for density
+        const particleCount = 50; // Adjust for density
         const connectionDistance = 100; // Max distance to draw lines
         const moveSpeed = 1; // Speed of movement
 
