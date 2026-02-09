@@ -13,49 +13,19 @@
   </head>
   <body>
     
-    <canvas id="motion-background"></canvas>
-
     <div id="drop-zone">
       <div class="drop-text">DROP MIDI FILE HERE</div>
     </div>
     
-    <button id="settings-toggle" onclick="toggleSettings()" title="Settings">⚙</button>
-
     <div id="controls">
-      <div class="control-group">
-        <span class="control-label">Volume</span>
-        <div class="btn-row">
-          <button class="control-btn" onclick="changeVolume(-0.1)">-</button>
-          <span class="control-val" id="disp-vol">50%</span>
-          <button class="control-btn" onclick="changeVolume(0.1)">+</button>
-        </div>
-      </div>
-      <div class="control-group">
-        <span class="control-label">Sustain</span>
-        <div class="btn-row">
-          <button class="control-btn" onclick="changeSustain(-0.2)">-</button>
-          <span class="control-val" id="disp-sus">1.0x</span>
-          <button class="control-btn" onclick="changeSustain(0.2)">+</button>
-        </div>
-      </div>
       <div class="control-group">
         <span class="control-label">Labels</span>
         <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="cycleLabels()" id="btn-labels">NOTES</button>
       </div>
       
       <div class="control-group">
-        <span class="control-label">Sound</span>
-        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleSoundMode()" id="btn-sound">PIANO</button>
-      </div>
-      
-      <div class="control-group">
         <span class="control-label">Board</span>
         <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleBoard()" id="btn-board">HIDE</button>
-      </div>
-      
-      <div class="control-group">
-        <span class="control-label">Shift</span>
-        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleShiftMode()" id="btn-shift">1 / 12</button>
       </div>
       
       <div class="control-group">
@@ -117,6 +87,11 @@
              value="-5:-5 -12:0 5:5 12:12 -17:-17 17:5" 
              style="width: 300px; background: #222; color: white; border: 1px solid #666; border-radius: 4px; padding: 4px; font-size: 11px; text-align: center;">
     </div>
+
+    <div class="control-group">
+        <span class="control-label">Visuals</span>
+        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleVisuals()" id="btn-visuals">ON</button>
+      </div>
     </div>
 
     <canvas id="synthesia-canvas"></canvas>
@@ -129,78 +104,11 @@
     <div id="piano-strip"></div>
     
     <script src="piano_core.js"></script>
-    <script src="piano_visualizer.js"></script> 
+    <script src="visual_state.js"></script>
+    <script src="visual_render.js"></script>
+    <script src="playback_engine.js"></script>
     <script src="piano_render.js"></script> 
     <script src="piano_interaction.js"></script>
     <script src="piano_midi.js"></script>
-
-    <script>
-      (function() {
-        const canvas = document.getElementById('motion-background');
-        const ctx = canvas.getContext('2d');
-        let width, height;
-        let particles = [];
-        const particleCount = 0; 
-        const connectionDistance = 100; 
-        const moveSpeed = 1; 
-
-        function resize() {
-          width = canvas.width = window.innerWidth;
-          height = canvas.height = window.innerHeight;
-        }
-
-        class Particle {
-          constructor() {
-            this.x = Math.random() * width;
-            this.y = Math.random() * height;
-            this.vx = (Math.random() - 0.5) * moveSpeed;
-            this.vy = (Math.random() - 0.5) * moveSpeed;
-            this.size = Math.random() * 2 + 3;
-          }
-          update() {
-            this.x += this.vx;
-            this.y += this.vy;
-            if (this.x < 0 || this.x > width) this.vx *= -1;
-            if (this.y < 0 || this.y > height) this.vy *= -1;
-          }
-          draw() {
-            ctx.fillStyle = 'rgba(200, 200, 200, 0.3)';
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
-        function init() {
-          particles = [];
-          for (let i = 0; i < particleCount; i++) {
-            particles.push(new Particle());
-          }
-        }
-        function animate() {
-          ctx.clearRect(0, 0, width, height);
-          for (let i = 0; i < particles.length; i++) {
-            particles[i].update();
-            particles[i].draw();
-            for (let j = i + 1; j < particles.length; j++) {
-              const dx = particles[i].x - particles[j].x;
-              const dy = particles[i].y - particles[j].y;
-              const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist < connectionDistance) {
-                const opacity = 1 - (dist / connectionDistance);
-                ctx.strokeStyle = `rgba(150, 150, 150, ${opacity * 0.3})`; 
-                ctx.lineWidth = 3;
-                ctx.beginPath();
-                ctx.moveTo(particles[i].x, particles[i].y);
-                ctx.lineTo(particles[j].x, particles[j].y);
-                ctx.stroke();
-              }
-            }
-          }
-          requestAnimationFrame(animate);
-        }
-        window.addEventListener('resize', () => { resize(); init(); });
-        resize(); init(); animate();
-      })();
-    </script>
   </body>
 </html>

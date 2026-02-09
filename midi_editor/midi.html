@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI File Editor & Player</title>
+    <script src="https://unpkg.com/tone"></script>
+    <script src="https://unpkg.com/@tonejs/midi"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #222;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        .controls {
+            margin-bottom: 20px;
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        canvas {
+            background: #111;
+            border: 1px solid #555;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        button {
+            padding: 8px 16px;
+            cursor: pointer;
+            background: #00d4ff;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            color: #000;
+        }
+        button:hover { background: #00b8d4; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        .info { font-size: 0.8em; color: #aaa; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <h1>🎹 MIDI Editor & Player</h1>
+
+    <div class="controls">
+        <input type="file" id="fileInput" accept=".mid,.midi">
+        <button id="playBtn" disabled>Play</button>
+        <button id="stopBtn" disabled>Stop</button>
+    </div>
+
+    <canvas id="pianoRoll" width="800" height="400"></canvas>
+    <div class="info">Click a note (blue block) to shift its pitch up!</div>
+
+    <script>
+        // --- Variables ---
+        let currentMidi = null;
+        let synth = null;
+        const canvas = document.getElementById('pianoRoll');
+        const ctx = canvas.getContext('2d');
+        
+        // Visualizer Settings
+        const PITCH_HEIGHT = 10; // Height of one note row in pixels
+        const TIME_SCALE = 100;  // Pixels per second of time
+        let minPitch = 127;
+        let maxPitch = 0;
+
+        // --- 1. File Loading ---
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const arrayBuffer = await file.arrayBuffer();
+            
+            // Parse MIDI using @tonejs/midi
+            currentMidi = new Midi(arrayBuffer);
+            
+            // Prepare the view
+            analyzeRange();
+            draw();
+            setupSynth();
+            
+            document.getElementById('playBtn').disabled = false;
+        });
+
+        // --- 2. Playback Logic ---
+        document.getElementById('playBtn').addEventListener('click', async () => {
+            if (!currentMidi) return;
+            
+            await Tone.start(); // Required by browsers
+            Tone.Transport.stop();
+            Tone.Transport.cancel(); // Clear previous scheduled events
+
+            const now = Tone.now() + 0.5;
+
+            // Schedule every note in the MIDI data
+            currentMidi.tracks.forEach(track => {
+                track.notes.forEach(note => {
+                    synth.triggerAttackRelease(
+                        note.name, 
+                        note.duration, 
+                        now + note.time, 
+                        note.velocity
+                    );
+                });
+            });
+
+            Tone.Transport.start();
+            document.getElementById('stopBtn').disabled = false;
+        });
+
+        document.getElementById('stopBtn').addEventListener('click', () => {
+            // Tone.Transport.stop(); // Stops the timeline
+            // In this simple implementation, we actually just silence the synth
+            // because Tone.Transport doesn't stop already triggered notes easily without Parts.
+            // For a robust player, we would use Tone.Part, but that's complex.
+            // A simple "Panic" button approach:
+            synth.releaseAll();
+            Tone.Transport.cancel();
+        });
+
+        function setupSynth() {
+            // Create a PolySynth (can play multiple notes at once)
+            if(synth) synth.dispose();
+            synth = new Tone.PolySynth(Tone.Synth, {
+                envelope: { attack: 0.02, decay: 0.1, sustain: 0.3, release: 1 }
+            }).toDestination();
+        }
+
+        // --- 3. Visualization & Interaction ---
+
+        // Determine lowest and highest note to fit them on screen
+        function analyzeRange() {
+            minPitch = 127;
+            maxPitch = 0;
+            currentMidi.tracks.forEach(track => {
+                track.notes.forEach(note => {
+                    if (note.midi < minPitch) minPitch = note.midi;
+                    if (note.midi > maxPitch) maxPitch = note.midi;
+                });
+            });
+            // Add some padding
+            minPitch = Math.max(0, minPitch - 2);
+            maxPitch = Math.min(127, maxPitch + 2);
+        }
+
+        function draw() {
+            // Clear Canvas
+            ctx.fillStyle = "#111";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (!currentMidi) {
+                ctx.fillStyle = "#555";
+                ctx.fillText("Upload a MIDI file to start", 320, 200);
+                return;
+            }
+
+            // Draw Grid Lines (simplified)
+            ctx.strokeStyle = "#333";
+            ctx.beginPath();
+            for(let i=0; i<canvas.width; i+=TIME_SCALE) { // Every 1 second roughly
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+            }
+            ctx.stroke();
+
+            // Draw Notes
+            currentMidi.tracks.forEach(track => {
+                track.notes.forEach(note => {
+                    const x = note.time * TIME_SCALE;
+                    const w = note.duration * TIME_SCALE;
+                    
+                    // Invert Y because canvas 0 is at top
+                    // We map the MIDI pitch range to the canvas height
+                    const totalSemis = maxPitch - minPitch;
+                    const normalizedPitch = note.midi - minPitch;
+                    const y = canvas.height - (normalizedPitch * PITCH_HEIGHT) - PITCH_HEIGHT;
+                    
+                    // Store coordinates for clicking later
+                    note._rect = { x, y, w, h: PITCH_HEIGHT - 1 };
+
+                    ctx.fillStyle = "#00d4ff";
+                    ctx.fillRect(note._rect.x, note._rect.y, note._rect.w, note._rect.h);
+                });
+            });
+        }
+
+        // --- 4. Editing Logic ---
+        canvas.addEventListener('mousedown', (e) => {
+            if (!currentMidi) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            let redrawNeeded = false;
+
+            // Check if we clicked a note
+            currentMidi.tracks.forEach(track => {
+                track.notes.forEach(note => {
+                    if (
+                        mouseX >= note._rect.x && 
+                        mouseX <= note._rect.x + note._rect.w &&
+                        mouseY >= note._rect.y && 
+                        mouseY <= note._rect.y + note._rect.h
+                    ) {
+                        // EDIT ACTION: Shift Pitch Up
+                        console.log(`Editing note: ${note.name}`);
+                        note.midi += 1; // Increase pitch int
+                        note.name = Tone.Frequency(note.midi, "midi").toNote(); // Update name string
+                        
+                        // Play a preview beep
+                        const previewSynth = new Tone.Synth().toDestination();
+                        previewSynth.triggerAttackRelease(note.name, "8n");
+                        
+                        redrawNeeded = true;
+                    }
+                });
+            });
+
+            if (redrawNeeded) draw();
+        });
+
+    </script>
+</body>
+</html>

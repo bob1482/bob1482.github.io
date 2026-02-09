@@ -6,7 +6,8 @@
 
 async function pressNote(freq, isAutomated = false, side = 'right') {
   if (Tone.context.state !== 'running') await Tone.start();
-  if (!isLoaded && soundMode === 0) return; 
+  // Always check loading since we only have Sample mode now
+  if (!isLoaded) return; 
 
   if (isRecording && !isAutomated) {
     recordedEvents.push({ type: 'on', freq: freq, time: Tone.now() - recordingStartTime });
@@ -121,14 +122,7 @@ if (boardContainer) {
     boardContainer.addEventListener('touchcancel', handleTouchEnd);
 }
 
-// --- SETTINGS TOGGLE (NEW) ---
-function toggleSettings() {
-    const controls = document.getElementById("controls");
-    const btn = document.getElementById("settings-toggle");
-    
-    controls.classList.toggle("visible");
-    btn.classList.toggle("active");
-}
+// Settings toggle removed
 
 // --- RECORDER / PLAYBACK BUTTONS ---
 
@@ -248,21 +242,6 @@ function clearRecording() {
     updateUI();
 }
 
-function changeVolume(delta) {
-  globalVolume += delta;
-  if (globalVolume > 1.0) globalVolume = 1.0;
-  if (globalVolume < 0.1) globalVolume = 0.1;
-  Tone.Destination.volume.rampTo(Tone.gainToDb(globalVolume), 0.1);
-  updateUI();
-}
-
-function changeSustain(delta) {
-  sustainMultiplier += delta;
-  if (sustainMultiplier < 0.2) sustainMultiplier = 0.2;
-  if (sustainMultiplier > 2.0) sustainMultiplier = 2.0;
-  updateUI();
-}
-
 function changeTranspose(side, delta) {
   releaseAllStuckNotes(); 
   if (side === 'left') {
@@ -291,17 +270,6 @@ function toggleBoard() {
   } else {
     hideBoard();
   }
-}
-
-function toggleSoundMode() {
-  soundMode = (soundMode + 1) % 2;
-  updateUI();
-}
-
-function toggleShiftMode() {
-  releaseAllStuckNotes(); 
-  shiftMode = (shiftMode + 1) % 2;
-  updateUI();
 }
 
 function toggleFKeys() {
@@ -334,13 +302,28 @@ function updateBPM(val) {
     Tone.Transport.bpm.value = bpm;
 }
 
+// --- VISUALS TOGGLE ---
+
+function toggleVisuals() {
+  // Toggle the visualizer state
+  isVisualizerOn = !isVisualizerOn;
+  
+  // Update button UI
+  const btn = document.getElementById("btn-visuals");
+  if (btn) {
+    btn.innerText = isVisualizerOn ? "ON" : "OFF";
+    btn.style.color = isVisualizerOn ? "white" : "#888";
+  }
+}
+
 // --- KEYBOARD LISTENERS ---
 
 window.addEventListener("keydown", (e) => {
   if (e.code.startsWith("Arrow")) {
     if (e.repeat) return;
-    const smallStep = shiftMode === 0 ? 5 : 1;
-    const largeStep = shiftMode === 0 ? 12 : 2;
+    const smallStep = 1;  
+    const largeStep = 12; 
+    
     if (e.code === "ArrowRight") { changeTranspose('right', smallStep); changeTranspose('left', smallStep); }
     else if (e.code === "ArrowLeft") { changeTranspose('right', -smallStep); changeTranspose('left', -smallStep); }
     else if (e.code === "ArrowUp") { changeTranspose('right', largeStep); changeTranspose('left', largeStep); }
@@ -421,3 +404,49 @@ window.addEventListener('samplesLoaded', () => {
 
 renderBoard();
 updateUI();
+
+function updateUI() {
+  document.getElementById("disp-trans-l").innerText = transposeLeft;
+  document.getElementById("disp-trans-r").innerText = transposeRight;
+  document.getElementById("btn-labels").innerText = LABEL_MODES[labelMode];
+  document.getElementById("btn-fkeys").innerText = F_KEY_LABELS[fKeyMode];
+  
+  const btnRecord = document.getElementById("btn-record");
+  const btnPlay = document.getElementById("btn-play");
+  const btnPause = document.getElementById("btn-pause");
+  
+  // Recording State
+  if (isRecording) {
+      btnRecord.classList.add("recording");
+      btnPlay.disabled = true;
+      btnPause.disabled = true;
+      document.getElementById('progress-bar').disabled = true;
+      document.getElementById('record-select').disabled = true;
+  } else {
+      btnRecord.classList.remove("recording");
+      btnPlay.disabled = false;
+      document.getElementById('progress-bar').disabled = false;
+      document.getElementById('record-select').disabled = false;
+  }
+  
+  // Playback State
+  if (isPlaying) {
+    btnPlay.innerText = "■"; 
+    btnPlay.classList.add("playing");
+    btnPause.disabled = false;
+    
+    if (isPaused) {
+        btnPause.innerText = "▶";
+        btnPause.classList.add("paused");
+    } else {
+        btnPause.innerText = "II";
+        btnPause.classList.remove("paused");
+    }
+  } else {
+    btnPlay.innerText = "▶"; 
+    btnPlay.classList.remove("playing");
+    btnPause.innerText = "II";
+    btnPause.disabled = true;
+    btnPause.classList.remove("paused");
+  }
+}

@@ -259,8 +259,6 @@ function updateUI() {
   document.getElementById("disp-trans-l").innerText = transposeLeft;
   document.getElementById("disp-trans-r").innerText = transposeRight;
   document.getElementById("btn-labels").innerText = LABEL_MODES[labelMode];
-  document.getElementById("btn-sound").innerText = SOUND_MODES[soundMode];
-  document.getElementById("btn-shift").innerText = SHIFT_MODES[shiftMode];
   document.getElementById("btn-fkeys").innerText = F_KEY_LABELS[fKeyMode];
   
   const btnRecord = document.getElementById("btn-record");

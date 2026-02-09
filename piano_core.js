@@ -20,13 +20,6 @@ let isMetronomeOn = false;
 // --- PHYSICAL KEY TRACKING ---
 let activePhysicalKeys = {}; 
 
-// --- MODES ---
-let soundMode = 0; // 0 = Piano, 1 = Wave
-const SOUND_MODES = ["PIANO", "WAVE"];
-
-let shiftMode = 1; // 0 = 1/12, 1 = 2/5
-const SHIFT_MODES = ["5 / 12", "1 / 2"];
-
 let labelMode = 1; // 0 = Notes, 1 = Keys, 2 = None
 const LABEL_MODES = ["NOTES", "KEYS", "NONE"];
 
@@ -115,72 +108,20 @@ Tone.Transport.bpm.value = bpm;
 function triggerSound(frequency, when = 0) {
   if (when === 0) when = Tone.now();
 
-  // Mode 0: Sampler (Piano)
-  if (soundMode === 0) {
-    let baseDuration = 2;
-    let duration = Math.min(baseDuration * sustainMultiplier, 5);
+  let baseDuration = 2;
+  let duration = Math.min(baseDuration * sustainMultiplier, 5);
 
-    if (activeVoices.length >= MAX_POLYPHONY) {
-      const stolenVoice = activeVoices.shift(); 
-      sampler.triggerRelease(stolenVoice.freq, when);
-    }
-
-    activeVoices.push({
-      freq: frequency,
-      startTime: when 
-    });
-
-    sampler.triggerAttackRelease(frequency, duration, when);
-  } 
-  
-  // Mode 1: Wave (Synthesizer)
-  else {
-    let baseDuration = 1 + 2000 / frequency;
-    let duration = Math.min(baseDuration * sustainMultiplier, 4); 
-    playWaveSound(frequency, duration, when);
+  if (activeVoices.length >= MAX_POLYPHONY) {
+    const stolenVoice = activeVoices.shift(); 
+    sampler.triggerRelease(stolenVoice.freq, when);
   }
-}
 
-function playWaveSound(frequency, duration, when) {
-  const ctx = Tone.context.rawContext; 
-  
-  let volume = 75 / frequency; 
-  if(volume > 1) volume = 1;
+  activeVoices.push({
+    freq: frequency,
+    startTime: when 
+  });
 
-  const noteGain = ctx.createGain();
-  Tone.connect(noteGain, Tone.Destination);
-
-  // Envelope
-  noteGain.gain.setValueAtTime(0, when);
-  noteGain.gain.linearRampToValueAtTime(volume, when + 0.05);
-  noteGain.gain.exponentialRampToValueAtTime(volume * 0.6, when + 0.2 * sustainMultiplier);
-  noteGain.gain.exponentialRampToValueAtTime(0.0001, when + duration);
-
-  // Filter
-  const filter = ctx.createBiquadFilter();
-  filter.type = "lowpass";
-  filter.Q.value = 0;
-  filter.connect(noteGain);
-
-  const attackBrightness = Math.max(frequency * 8, 800);
-  const sustainBrightness = frequency * 3;
-  
-  filter.frequency.setValueAtTime(attackBrightness, when);
-  filter.frequency.exponentialRampToValueAtTime(sustainBrightness, when + 0.5 * sustainMultiplier);
-  filter.frequency.linearRampToValueAtTime(frequency, when + duration);
-
-  // Oscillator
-  const osc1 = ctx.createOscillator();
-  osc1.type = "sine";
-  osc1.frequency.value = frequency;
-  osc1.connect(filter);
-  
-  osc1.start(when);
-  osc1.stop(when + duration + 0.1);
-
-  osc1.onended = () => {
-      noteGain.disconnect();
-  };
+  sampler.triggerAttackRelease(frequency, duration, when);
 }
 
 function midiToFreq(midiNote) {

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Rhythm Game Engine</title>
+    <style>
+        body { margin: 0; background: #222; color: white; font-family: sans-serif; overflow: hidden; }
+        canvas { display: block; margin: 0 auto; background: #333; }
+        #ui { position: absolute; top: 10px; left: 10px; z-index: 10; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <button id="startBtn">Start Game</button>
+    <h2 id="score">Score: 0</h2>
+    <div id="message"></div>
+</div>
+
+<canvas id="gameCanvas" width="400" height="600"></canvas>
+
+<script>
+/* -------------------------------------------------------------------------- */
+/* CONFIG & STATE                             */
+/* -------------------------------------------------------------------------- */
+const KEYS = ['d', 'f', 'j', 'k']; // The keys for the 4 lanes
+const LANE_WIDTH = 100;
+const HIT_Y = 500; // The Y position where you should hit the note
+const NOTE_SPEED = 300; // Pixels per second
+const TOLERANCE = 0.1; // Seconds (window for a "hit")
+
+let audioCtx = null;
+let startTime = 0;
+let score = 0;
+let isPlaying = false;
+
+// The "Chart": A list of notes. 
+// { time: 2.0, lane: 0 } means a note in lane 0 at 2.0 seconds.
+const chart = [];
+
+// Generate a random beat for testing
+for (let i = 1; i < 50; i++) {
+    // Add a note every 0.5 seconds (120 BPM)
+    chart.push({ time: i * 0.5, lane: Math.floor(Math.random() * 4), hit: false });
+}
+
+/* -------------------------------------------------------------------------- */
+/* AUDIO ENGINE                                 */
+/* -------------------------------------------------------------------------- */
+// We use a beep because loading MP3s requires a server or user upload.
+// In a real game, you would use an <audio> element or decodeAudioData.
+function playSound(time) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    osc.frequency.value = 440; 
+    gain.gain.setValueAtTime(0.1, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+    
+    osc.start(time);
+    osc.stop(time + 0.1);
+}
+
+// Schedule the music (beeps) ahead of time
+function scheduleMusic() {
+    chart.forEach(note => {
+        playSound(startTime + note.time);
+    });
+}
+
+/* -------------------------------------------------------------------------- */
+/* GAME LOGIC                                  */
+/* -------------------------------------------------------------------------- */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function startGame() {
+    if (isPlaying) return;
+    
+    // 1. Init Audio Context (must be done after user interaction)
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // 2. Set Start Time (give a 1-second delay buffer)
+    startTime = audioCtx.currentTime + 1.0;
+    
+    // 3. Schedule the audio
+    scheduleMusic();
+    
+    // 4. Start Loop
+    isPlaying = true;
+    document.getElementById('startBtn').style.display = 'none';
+    requestAnimationFrame(gameLoop);
+}
+
+function gameLoop() {
+    if (!isPlaying) return;
+
+    // A. Clear Screen
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // B. Draw Lanes & Hit Line
+    ctx.strokeStyle = 'white';
+    ctx.beginPath();
+    ctx.moveTo(0, HIT_Y);
+    ctx.lineTo(400, HIT_Y);
+    ctx.stroke();
+
+    for(let i=1; i<4; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * 100, 0);
+        ctx.lineTo(i * 100, 600);
+        ctx.strokeStyle = '#555';
+        ctx.stroke();
+    }
+
+    // C. Get Current Audio Time
+    const currentTime = audioCtx.currentTime - startTime;
+
+    // D. Draw Notes
+    chart.forEach(note => {
+        if (note.hit) return; // Don't draw hit notes
+
+        // Calculate Y based on time difference
+        // If currentTime is 2.0 and note.time is 2.5, diff is -0.5. 
+        // We want it above the line.
+        const timeDiff = note.time - currentTime;
+        const y = HIT_Y - (timeDiff * NOTE_SPEED);
+
+        // Draw if visible
+        if (y > -50 && y < 650) {
+            ctx.fillStyle = '#00d4ff';
+            ctx.beginPath();
+            ctx.arc(note.lane * LANE_WIDTH + LANE_WIDTH/2, y, 30, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Miss Logic: If note passed line by too much
+        if (timeDiff < -TOLERANCE && !note.hit) {
+             // Mark as processed so we don't count it as a miss again
+             // In a real game, reset combo here
+             note.hit = true; 
+             showFeedback("Miss", "red");
+        }
+    });
+
+    requestAnimationFrame(gameLoop);
+}
+
+/* -------------------------------------------------------------------------- */
+/* INPUT HANDLING                              */
+/* -------------------------------------------------------------------------- */
+window.addEventListener('keydown', e => {
+    if (!isPlaying) return;
+    
+    const lane = KEYS.indexOf(e.key.toLowerCase());
+    if (lane === -1) return; // Not a game key
+
+    const currentTime = audioCtx.currentTime - startTime;
+
+    // Find the closest unhit note in this lane
+    // We filter for notes that are within the tolerance window
+    const hitNote = chart.find(note => 
+        note.lane === lane && 
+        !note.hit && 
+        Math.abs(currentTime - note.time) <= TOLERANCE
+    );
+
+    if (hitNote) {
+        hitNote.hit = true;
+        score += 100;
+        document.getElementById('score').innerText = `Score: ${score}`;
+        showFeedback("Perfect!", "lime");
+    } else {
+        // Punish mashers (optional)
+        score -= 10;
+        document.getElementById('score').innerText = `Score: ${score}`;
+    }
+});
+
+function showFeedback(text, color) {
+    const msg = document.getElementById('message');
+    msg.innerText = text;
+    msg.style.color = color;
+    msg.style.opacity = 1;
+    // Simple fade out effect
+    setTimeout(() => msg.style.opacity = 0, 500);
+}
+
+document.getElementById('startBtn').addEventListener('click', startGame);
+
+</script>
+</body>
+</html>
