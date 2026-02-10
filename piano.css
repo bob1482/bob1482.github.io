@@ -124,12 +124,37 @@ body {
   transition: background-color 0.1s;
   top: 0;
   display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  padding-bottom: 8px;
+  flex-direction: column; /* Stack labels vertically */
+  justify-content: flex-end; /* Align to bottom */
+  align-items: center;
+  padding-bottom: 2px;
+  gap: 1px; /* Small space between dual labels */
   font-size: 10px;
   font-weight: bold;
   overflow: hidden;
+}
+
+/* Common Label Style */
+.key-label {
+  font-size: 9px;
+  font-weight: bold;
+  line-height: 9px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+/* Left Board Label (Cyan) */
+.key-label.lbl-left {
+  color: #00d2ff;
+}
+
+/* Right Board Label (Pink) */
+.key-label.lbl-right {
+  color: #c87ad1;
+}
+
+/* Adjust Black Key text size slightly */
+.p-key.black .key-label {
+  font-size: 8px;
 }
 
 .p-key.white {
@@ -143,7 +168,7 @@ body {
 .p-key.white:active,
 .p-key.white.active {
   background: #555555;
-  box-shadow: inset 0 0 5px rgba(0,0,0,0.4);
+  transform: translateY(1px); /* GPU accelerated movement */
 }
 
 .p-key.black {
@@ -159,7 +184,7 @@ body {
 .p-key.black:active,
 .p-key.black.active {
   background: #7b7b7b;
-  box-shadow: inset 0 0 5px rgba(215, 215, 215, 0.4);
+  transform: translateY(1px); /* GPU accelerated movement */
 }
 
 /* --- CONTROL PANEL STYLING (ALWAYS VISIBLE) --- */
@@ -175,15 +200,21 @@ body {
   flex-wrap: wrap; 
   gap: 20px;
   
-  /* Removed hidden state transforms */
+  /* Optimized for performance */
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease;
   transform: translateY(0);
   
-  background: rgba(0, 0, 0, 0.9); 
-  backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.95); /* Nearly opaque, no blur needed */
   padding: 20px 0;
-  box-shadow: 0 5px 20px rgba(0,0,0,0.5);
   z-index: 2400; 
   border-bottom: 1px solid #333;
+}
+
+/* Update 2: Add this new class for the hidden state */
+#controls.hidden {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none; /* Prevents clicking while hidden */
 }
 
 .control-group {
@@ -222,36 +253,32 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 2px 0 #111;
+  /* Box shadow removed for performance */
 }
 
 .control-btn:active {
   transform: translateY(2px);
-  box-shadow: 0 1px 0 #111;
   background: rgba(111, 111, 111, 0.3); 
 }
 
 .control-btn.recording {
   background-color: #d9534f;
-  box-shadow: 0 0 5px #d9534f;
   animation: pulse-red 1s infinite;
 }
 
 .control-btn.playing {
   background-color: #5cb85c;
-  box-shadow: 0 0 5px #5cb85c;
 }
 
 .control-btn.paused {
   background-color: #f0ad4e;
-  box-shadow: 0 0 5px #f0ad4e;
   animation: pulse-yellow 1s infinite;
 }
 
 @keyframes pulse-red {
-  0% { box-shadow: 0 0 0 0 rgba(217, 83, 79, 0.7); }
-  70% { box-shadow: 0 0 0 10px rgba(217, 83, 79, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(217, 83, 79, 0); }
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
 }
 
 @keyframes pulse-yellow {
@@ -374,7 +401,6 @@ body {
   margin: 0 12px;
   cursor: pointer;
   position: relative;
-  box-shadow: 0 5px 0 rgba(0,0,0,0.5); 
   will-change: transform, background-color; 
   transition: transform 0.05s, background-color 0.1s; 
   display: flex;

@@ -175,3 +175,4 @@ function updatePhysics(dt) {
 
     // Particle update loop removed
 }
+

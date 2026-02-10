@@ -450,3 +450,30 @@ function updateUI() {
     btnPause.classList.remove("paused");
   }
 }
+
+// ==========================================
+// AUTO-HIDE CONTROLS LOGIC
+// ==========================================
+
+const controlsPanel = document.getElementById('controls');
+const HOVER_THRESHOLD = 200; // Pixels from top where controls stay visible
+
+if (controlsPanel) {
+    window.addEventListener('mousemove', (e) => {
+        // 1. Safety Check: Don't hide if the user is interacting with an input
+        // (e.g. typing in the sequencer or dragging the progress bar)
+        const active = document.activeElement;
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'SELECT') && controlsPanel.contains(active)) {
+            return;
+        }
+
+        // 2. Position Check
+        if (e.clientY < HOVER_THRESHOLD) {
+            // Mouse is near the top -> Show
+            controlsPanel.classList.remove('hidden');
+        } else {
+            // Mouse is far away -> Hide
+            controlsPanel.classList.add('hidden');
+        }
+    });
+}

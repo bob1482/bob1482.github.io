@@ -74,11 +74,21 @@ function showBoard() {
 }
 
 // --- CORE RENDERERS ---
+// ==========================================
+// GLOBALS FOR MAPPING (Window Scope)
+// ==========================================
+window.freqToKeyMapLeft = {};
+window.freqToKeyMapRight = {};
+
 function renderBoard() {
   boardLeft.innerHTML = "";
   boardRight.innerHTML = "";
+  
+  // Clear Maps
+  window.freqToKeyMapLeft = {}; 
+  window.freqToKeyMapRight = {};
+  
   domKeyCache = {}; 
-  freqToKeyMap = {}; 
   const SPLIT_COL = 6; 
 
   for (let r = 0; r < ROWS; r++) {
@@ -94,6 +104,7 @@ function renderBoard() {
         keyCode = KEY_MAPS[mapRowIndex][c];
       }
 
+      // Calculate Pitch
       let rowManualShift = 0;
       if (r === 4) rowManualShift = 4; 
       else if (r === 3) rowManualShift = 2; 
@@ -107,7 +118,15 @@ function renderBoard() {
       let isNatural = [0, 2, 4, 5, 7, 9, 11].includes(noteIndex);
 
       const freqStr = freq.toFixed(2);
-      if (keyCode) freqToKeyMap[freqStr] = keyCode;
+      
+      // --- MAP KEYCODE TO SPECIFIC SIDE ---
+      if (keyCode) {
+          if (c < SPLIT_COL) {
+              window.freqToKeyMapLeft[freqStr] = keyCode;
+          } else {
+              window.freqToKeyMapRight[freqStr] = keyCode;
+          }
+      }
 
       const key = document.createElement("div");
       key.className = `key ${isNatural ? "natural" : "accidental"}`;
@@ -131,9 +150,9 @@ function renderBoard() {
           if(typeof releaseNote === 'function') releaseNote(freq);
       });
 
-      // ADDED: Touch Events for Mobile Performance
+      // Touch Events
       key.addEventListener("touchstart", (e) => {
-          if(e.cancelable) e.preventDefault(); // Prevent scroll/zoom
+          if(e.cancelable) e.preventDefault(); 
           if(typeof pressNote === 'function') pressNote(freq, false, side);
       }, {passive: false});
 
@@ -157,9 +176,11 @@ function renderTraditionalPiano() {
   const strip = document.getElementById("piano-strip");
   strip.innerHTML = ""; 
   keyCoordinates = {}; 
+  
   const wrapper = document.createElement("div");
   wrapper.className = "piano-wrapper";
   strip.appendChild(wrapper);
+  
   const totalNotes = 88;
   const startOffset = -27; 
   const totalWhiteKeys = 52; 
@@ -176,8 +197,34 @@ function renderTraditionalPiano() {
 
       const key = document.createElement("div");
       key.setAttribute("data-note", freqStr);
-      const mappedKey = freqToKeyMap[freqStr];
-      key.innerText = getLabelText(currentSemitone, mappedKey);
+      
+      // --- DUAL LABEL LOGIC ---
+      const leftCode = window.freqToKeyMapLeft[freqStr];
+      const rightCode = window.freqToKeyMapRight[freqStr];
+      
+      // Create Label Elements
+      if (leftCode && labelMode === 1) { // Mode 1 = KEYS
+          const lbl = document.createElement("div");
+          lbl.className = "key-label lbl-left";
+          lbl.innerText = getFriendlyKeyName(leftCode);
+          key.appendChild(lbl);
+      }
+      
+      if (rightCode && labelMode === 1) {
+          const lbl = document.createElement("div");
+          lbl.className = "key-label lbl-right";
+          lbl.innerText = getFriendlyKeyName(rightCode);
+          key.appendChild(lbl);
+      }
+      
+      // Fallback for Note Names mode
+      if (labelMode === 0) {
+           const lbl = document.createElement("div");
+           lbl.className = "key-label";
+           lbl.style.color = "#555";
+           lbl.innerText = NOTE_NAMES[noteIndex];
+           key.appendChild(lbl);
+      }
 
       if (isWhite) {
           key.className = "p-key white";
@@ -190,29 +237,31 @@ function renderTraditionalPiano() {
           key.style.left = ((whiteKeyCount * whiteKeyWidthPercent) - (blackKeyWidthPercent / 2)) + "%";
       }
 
-      // Mouse
-      key.addEventListener("mousedown", () => {
-         if(typeof pressNote === 'function') pressNote(freq, false, 'right');
-      });
-      key.addEventListener("mouseup", () => {
-         if(typeof releaseNote === 'function') releaseNote(freq);
-      });
-      key.addEventListener("mouseleave", () => {
-         if(typeof releaseNote === 'function') releaseNote(freq);
-      });
-
-      // Touch
-      key.addEventListener("touchstart", (e) => {
-          e.preventDefault();
-          if(typeof pressNote === 'function') pressNote(freq, false, 'right');
-      }, {passive: false});
-      key.addEventListener("touchend", (e) => {
-          e.preventDefault();
-          if(typeof releaseNote === 'function') releaseNote(freq);
-      });
+      // Add Interaction Listeners (Same as before)
+      key.addEventListener("mousedown", () => pressNote(freq, false, 'right'));
+      key.addEventListener("mouseup", () => releaseNote(freq));
+      key.addEventListener("mouseleave", () => releaseNote(freq));
+      key.addEventListener("touchstart", (e) => { e.preventDefault(); pressNote(freq, false, 'right'); }, {passive: false});
+      key.addEventListener("touchend", (e) => { e.preventDefault(); releaseNote(freq); });
 
       wrapper.appendChild(key);
   }
+}
+
+// Helper to clean up key names (extracted from previous getLabelText)
+function getFriendlyKeyName(keyCode) {
+    if (!keyCode) return "";
+    if (keyCode.startsWith("Key")) return keyCode.replace("Key", "");
+    if (keyCode.startsWith("Digit")) return keyCode.replace("Digit", "");
+    if (keyCode.startsWith("F") && keyCode.length <= 3) return keyCode;
+    
+    const specialMap = {
+        "Minus": "-", "Equal": "=", "BracketLeft": "[", "BracketRight": "]",
+        "Semicolon": ";", "Quote": "'", "Comma": ",", "Period": ".", 
+        "Slash": "/", "Backslash": "\\", "ShiftLeft": "SL", "ShiftRight": "SR",
+        "CapsLock": "CL", "PrintScreen": "PS"
+    };
+    return specialMap[keyCode] || keyCode.slice(0, 2);
 }
 
 function getLabelText(semitoneOffset, keyCode) {
