@@ -127,3 +127,63 @@ function triggerSound(frequency, when = 0) {
 function midiToFreq(midiNote) {
     return 440 * Math.pow(2, (midiNote - 69) / 12);
 }
+
+// ==========================================
+// SETTINGS PERSISTENCE (LOCAL STORAGE)
+// ==========================================
+
+function saveSettings() {
+    const settings = {
+        transposeLeft: transposeLeft,
+        transposeRight: transposeRight,
+        globalVolume: globalVolume,
+        sustainMultiplier: sustainMultiplier,
+        bpm: bpm,
+        labelMode: labelMode,
+        fKeyMode: fKeyMode,
+        isVisualizerOn: typeof isVisualizerOn !== 'undefined' ? isVisualizerOn : true,
+    };
+    
+    localStorage.setItem('wickiPianoSettings', JSON.stringify(settings));
+    console.log("Settings Saved:", settings);
+}
+
+function loadSettings() {
+    const saved = localStorage.getItem('wickiPianoSettings');
+    if (!saved) return; // No settings found, keep defaults
+
+    try {
+        const settings = JSON.parse(saved);
+        
+        // Restore values (with fallback to current defaults if undefined)
+        if (settings.transposeLeft !== undefined) transposeLeft = settings.transposeLeft;
+        if (settings.transposeRight !== undefined) transposeRight = settings.transposeRight;
+        if (settings.globalVolume !== undefined) globalVolume = settings.globalVolume;
+        if (settings.sustainMultiplier !== undefined) sustainMultiplier = settings.sustainMultiplier;
+        if (settings.bpm !== undefined) bpm = settings.bpm;
+        if (settings.labelMode !== undefined) labelMode = settings.labelMode;
+        if (settings.fKeyMode !== undefined) fKeyMode = settings.fKeyMode;
+        if (settings.isVisualizerOn !== undefined && typeof isVisualizerOn !== 'undefined') {
+            isVisualizerOn = settings.isVisualizerOn;
+        }
+        
+        // Apply complex settings
+        Tone.Destination.volume.value = Tone.gainToDb(globalVolume);
+        Tone.Transport.bpm.value = bpm;
+        
+        // Update Mappings if F-Keys changed
+        if (typeof KEY_MAPS !== 'undefined' && typeof F_ROW_VARIANTS !== 'undefined') {
+             KEY_MAPS[0] = F_ROW_VARIANTS[fKeyMode];
+        }
+
+        console.log("Settings Loaded");
+        
+    } catch (e) {
+        console.error("Failed to load settings:", e);
+    }
+}
+
+function resetSettings() {
+    localStorage.removeItem('wickiPianoSettings');
+    location.reload();
+}

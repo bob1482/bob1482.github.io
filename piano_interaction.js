@@ -255,12 +255,14 @@ function changeTranspose(side, delta) {
   }
   renderBoard(); 
   updateUI();
+  saveSettings();
 }
 
 function cycleLabels() {
   labelMode = (labelMode + 1) % 3;
   updateUI();
-  renderBoard(); 
+  renderBoard();
+  saveSettings();
 }
 
 function toggleBoard() {
@@ -278,6 +280,7 @@ function toggleFKeys() {
   KEY_MAPS[0] = F_ROW_VARIANTS[fKeyMode];
   renderBoard();
   updateUI();
+  saveSettings();
 }
 
 function toggleMetronome() {
@@ -300,6 +303,7 @@ function toggleMetronome() {
 function updateBPM(val) {
     bpm = parseInt(val);
     Tone.Transport.bpm.value = bpm;
+    saveSettings();
 }
 
 // --- VISUALS TOGGLE ---
@@ -314,6 +318,8 @@ function toggleVisuals() {
     btn.innerText = isVisualizerOn ? "ON" : "OFF";
     btn.style.color = isVisualizerOn ? "white" : "#888";
   }
+  
+  saveSettings();
 }
 
 // --- KEYBOARD LISTENERS ---

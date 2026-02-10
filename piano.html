@@ -46,9 +46,6 @@
          <select id="record-select" onchange="changeRecording(this.value)">
            <option value="-1">No Records</option>
          </select>
-         <div id="progress-container">
-            <input type="range" id="progress-bar" min="0" max="100" value="0" oninput="scrubProgress(this.value)">
-         </div>
       </div>
 
       <div class="control-group">
@@ -102,6 +99,10 @@
     </div>
 
     <div id="piano-strip"></div>
+
+    <div id="progress-container">
+      <input type="range" id="progress-bar" min="0" max="100" value="0" oninput="scrubProgress(this.value)">
+    </div>
     
     <script src="piano_core.js"></script>
     <script src="visual_state.js"></script>
@@ -110,5 +111,17 @@
     <script src="piano_render.js"></script> 
     <script src="piano_interaction.js"></script>
     <script src="piano_midi.js"></script>
+    
+    <script>
+      // Wait for scripts to load, then initialize
+      window.addEventListener('DOMContentLoaded', () => {
+          // 1. Load saved settings immediately
+          if (typeof loadSettings === 'function') loadSettings();
+          
+          // 2. Render board with loaded settings
+          if (typeof renderBoard === 'function') renderBoard();
+          if (typeof updateUI === 'function') updateUI();
+      });
+    </script>
   </body>
 </html>

@@ -319,35 +319,71 @@ body {
   max-width: 120px;
 }
 
+/* --- VERTICAL PROGRESS BAR (RIGHT SIDE) --- */
 #progress-container {
-  width: 150px;
+  position: fixed;
+  right: 0;
+  top: 0;
+  height: 100vh;     /* Span full height */
+  width: 50px;       /* Clickable area width */
+  z-index: 2500;     /* Above other overlays */
   display: flex;
   align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.0); /* Transparent but captures hover if needed */
+  pointer-events: auto;
 }
 
 #progress-bar {
   -webkit-appearance: none;
-  width: 100%;
-  height: 4px;
-  background: #444;
+  appearance: none;
+  /* Rotate -90deg: Bottom is 0 (Start), Top is 100 (End) */
+  transform: rotate(-90deg); 
+  
+  /* NOTE: Because it's rotated, 'width' becomes the visual height */
+  width: 90vh; 
+  height: 8px; /* Thickness of the bar */
+  
+  background: rgba(80, 80, 80, 0.6);
   outline: none;
-  border-radius: 2px;
+  border-radius: 4px;
   cursor: pointer;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  transition: background 0.2s, height 0.2s;
 }
 
+#progress-bar:hover {
+  background: rgba(100, 100, 100, 0.9);
+  height: 12px; /* Thicken on hover */
+}
+
+/* Chrome/Safari Thumb */
 #progress-bar::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: #00d2ff;
   cursor: pointer;
+  box-shadow: 0 0 5px rgba(0, 210, 255, 0.8);
   transition: transform 0.1s;
 }
 
 #progress-bar::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
+  transform: scale(1.3);
+  background: #fff;
+}
+
+/* Firefox Thumb */
+#progress-bar::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: #00d2ff;
+  cursor: pointer;
+  box-shadow: 0 0 5px rgba(0, 210, 255, 0.8);
 }
 
 /* --- BOARD CONTAINER (CENTERED & LAYERED UNDER) --- */

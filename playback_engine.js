@@ -13,12 +13,14 @@ let currentPlaybackEvents = [];
 // PAUSE STATE TRACKING
 let pauseStartTimestamp = 0;
 let totalPausedTime = 0;
+let seekedWhilePaused = false;
 
 function startPlayback() {
   if (recordedEvents.length === 0) return;
   isPlaying = true;
   isPaused = false;
   totalPausedTime = 0;
+  seekedWhilePaused = false; // Reset flag on fresh playback
   
   if (typeof hideBoard === 'function') hideBoard(); 
 
@@ -68,17 +70,24 @@ function stopPlayback() {
 function setVisualizerPause(paused) {
     if (paused) {
         pauseStartTimestamp = Tone.now();
+        seekedWhilePaused = false; // Reset the flag when pausing
         if(schedulerTimer) clearTimeout(schedulerTimer);
         Tone.Transport.pause();
     } else {
         const now = Tone.now();
         const diff = now - pauseStartTimestamp;
-        totalPausedTime += diff; // Accumulate pause duration
         
-        // Shift falling note targets so they don't jump
-        fallingNotes.forEach(n => {
-            n.targetTime += diff;
-        });
+        // Only shift notes and accumulate pause time if we didn't seek while paused
+        if (!seekedWhilePaused) {
+            totalPausedTime += diff; // Accumulate pause duration
+            
+            // Shift falling note targets so they don't jump
+            fallingNotes.forEach(n => {
+                n.targetTime += diff;
+            });
+        }
+        
+        seekedWhilePaused = false; // Reset flag after unpausing
 
         if(isMetronomeOn) Tone.Transport.start();
         schedulerLoop();
@@ -88,31 +97,62 @@ function setVisualizerPause(paused) {
 function seekToTime(percent) {
     if (!isPlaying) return;
     
-    // 1. Calculate new time
+    // 1. Calculate new time target in seconds
     const targetSeconds = (percent / 100) * playbackTotalDuration;
     
-    // 2. Reset visualizer state
+    // 2. Clear existing visuals
     if (typeof recycleAllNotes === 'function') recycleAllNotes();
     
     // 3. Reset Time Base
+    // We adjust playbackStartTime so that 'now' corresponds to 'targetSeconds'
     const now = Tone.now();
     totalPausedTime = 0; 
-    playbackStartTime = now - targetSeconds + FALL_DURATION;
-
-    // 4. Find Index in Events
-    nextEventIndex = 0;
-    visualEventIndex = 0;
+    playbackStartTime = now - targetSeconds;
     
-    // Audio Events
-    for(let i=0; i<currentPlaybackEvents.length; i++) {
-        if (currentPlaybackEvents[i].time >= targetSeconds) {
-            nextEventIndex = i;
-            break;
-        }
+    // If we're paused, update the pause timestamp so unpause timing is correct
+    if (isPaused) {
+        pauseStartTimestamp = now;
+        seekedWhilePaused = true; // Mark that we seeked during pause
+    }
+
+    // 4. Find Audio Index (Next event to play sound)
+    nextEventIndex = 0;
+    // Fast-forward audio index to targetSeconds
+    while(nextEventIndex < currentPlaybackEvents.length && currentPlaybackEvents[nextEventIndex].time < targetSeconds) {
+        nextEventIndex++;
     }
     
-    // Sync visual index
-    visualEventIndex = nextEventIndex;
+    // 5. Visuals: Backfill Logic
+    // We need to populate 'fallingNotes' with notes that are currently "mid-fall".
+    // A note is mid-fall if it spawned in the past (time - FALL_DURATION < targetSeconds)
+    // BUT hits in the future (time > targetSeconds).
+    
+    visualEventIndex = 0;
+    
+    for (let i = 0; i < currentPlaybackEvents.length; i++) {
+        const evt = currentPlaybackEvents[i];
+        const spawnTimeRel = evt.time - FALL_DURATION; // Song time when it appears at top
+        
+        if (spawnTimeRel > targetSeconds) {
+            // This note spawns in the future. 
+            // This is where our spawner loop should start next frame.
+            visualEventIndex = i;
+            break;
+        }
+        
+        // If we are here, the note has conceptually "spawned" already.
+        // Check if it should be visible on screen (hasn't hit bottom yet).
+        if (evt.time > targetSeconds) {
+            // It spawned, but hits later. It belongs on screen now.
+            const hitTimeAbs = playbackStartTime + evt.time; // Absolute system time
+            spawnFallingNote(evt.freq, evt.duration, hitTimeAbs);
+        }
+        
+        // Handle end of list case
+        if (i === currentPlaybackEvents.length - 1) {
+            visualEventIndex = currentPlaybackEvents.length;
+        }
+    }
 }
 
 function processRecordedEvents() {
@@ -154,8 +194,6 @@ function schedulerLoop() {
             // 2. UI Highlight
             Tone.Draw.schedule(() => {
                 if (typeof highlightKey === 'function') highlightKey(event.freq);
-                
-                // Particle creation removed
             }, triggerTime);
 
             Tone.Draw.schedule(() => {
