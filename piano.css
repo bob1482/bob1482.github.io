@@ -275,6 +275,16 @@ body {
   animation: pulse-yellow 1s infinite;
 }
 
+#btn-reset-memory {
+  width: 120px;
+  font-size: 11px;
+  background: linear-gradient(to bottom, #ff4444, #cc0000);
+}
+
+#btn-reset-memory:hover {
+  background: linear-gradient(to bottom, #ff6666, #ee0000);
+}
+
 @keyframes pulse-red {
   0% { opacity: 1; }
   50% { opacity: 0.7; }
@@ -324,12 +334,9 @@ body {
   position: fixed;
   right: 0;
   top: 0;
-  height: 100vh;     /* Span full height */
+  height: 83vh;      /* Span full height minus piano strip (100vh - 17vh) */
   width: 50px;       /* Clickable area width */
   z-index: 2500;     /* Above other overlays */
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background: rgba(0, 0, 0, 0.0); /* Transparent but captures hover if needed */
   pointer-events: auto;
 }
@@ -337,12 +344,15 @@ body {
 #progress-bar {
   -webkit-appearance: none;
   appearance: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
   /* Rotate -90deg: Bottom is 0 (Start), Top is 100 (End) */
-  transform: rotate(-90deg); 
+  transform: translate(-50%, -50%) rotate(-90deg); 
   
   /* NOTE: Because it's rotated, 'width' becomes the visual height */
-  width: 90vh; 
-  height: 8px; /* Thickness of the bar */
+  width: calc(83vh - 10px); /* Full height minus small margin */
+  height: 8px;       /* Thickness of the bar */
   
   background: rgba(80, 80, 80, 0.6);
   outline: none;

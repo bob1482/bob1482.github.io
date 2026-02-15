@@ -187,3 +187,70 @@ function resetSettings() {
     localStorage.removeItem('wickiPianoSettings');
     location.reload();
 }
+
+// ==========================================
+// MEMORY RESET
+// ==========================================
+function resetBrowserMemory() {
+    const ok = confirm(
+        "This will reset browser memory and reload the page.\n\n" +
+        "- Clear all recordings\n" +
+        "- Clear note pools and caches\n" +
+        "- Reset audio engine state\n" +
+        "- Clear localStorage settings\n\n" +
+        "Continue?"
+    );
+
+    if (!ok) return;
+
+    console.log("=== INITIATING BROWSER MEMORY RESET ===");
+
+    // 1) Stop playback and release any active notes
+    if (typeof stopPlayback === 'function') stopPlayback();
+    if (typeof releaseAllStuckNotes === 'function') releaseAllStuckNotes();
+
+    // 2) Stop metronome / transport
+    if (typeof metroLoop !== 'undefined') metroLoop.stop();
+    Tone.Transport.stop();
+    Tone.Transport.cancel(0);
+    isMetronomeOn = false;
+
+    // 3) Clear recording buffers
+    recordedEvents = [];
+    recordingsList = [];
+    currentRecordingIndex = -1;
+    isRecording = false;
+    isPlaying = false;
+    isPaused = false;
+    if (typeof updateRecordSelectUI === 'function') updateRecordSelectUI();
+
+    // 4) Clear visual pools/caches
+    if (typeof recycleAllNotes === 'function') recycleAllNotes();
+    if (typeof notePool !== 'undefined') notePool = [];
+    if (typeof visualNotes !== 'undefined') visualNotes = [];
+    if (typeof fallingNotes !== 'undefined') fallingNotes = [];
+    if (typeof keyCoordinates !== 'undefined') keyCoordinates = {};
+
+    // 5) Clear DOM/input caches
+    if (typeof domKeyCache !== 'undefined') domKeyCache = {};
+    if (typeof activePhysicalKeys !== 'undefined') activePhysicalKeys = {};
+    if (typeof activeTouches !== 'undefined') activeTouches = {};
+    if (typeof freqToKeyMapLeft !== 'undefined') freqToKeyMapLeft = {};
+    if (typeof freqToKeyMapRight !== 'undefined') freqToKeyMapRight = {};
+
+    // 6) Reset audio runtime state
+    if (typeof sampler !== 'undefined') sampler.releaseAll();
+    activeVoices = [];
+
+    // 7) Clear pending scheduler timers
+    if (typeof schedulerTimer !== 'undefined' && schedulerTimer) {
+        clearTimeout(schedulerTimer);
+        schedulerTimer = null;
+    }
+
+    // 8) Clear persisted settings and reload
+    localStorage.removeItem('wickiPianoSettings');
+
+    console.log("=== MEMORY RESET COMPLETE - RELOADING ===");
+    location.reload();
+}

@@ -408,6 +408,9 @@ window.addEventListener('samplesLoaded', () => {
     if (typeof initVisualizer === 'function') initVisualizer();
 });
 
+// --- MEMORY RESET BUTTON ---
+document.getElementById('btn-reset-memory')?.addEventListener('click', resetBrowserMemory);
+
 renderBoard();
 updateUI();
 
