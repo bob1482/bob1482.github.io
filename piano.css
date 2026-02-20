@@ -433,11 +433,9 @@ body {
   margin-bottom: 15px;
 }
 
-.row-4 { margin-left: 83px; }
-.row-3 { margin-left: 0px; }
-.row-2 { margin-left: 83px; }
-.row-1 { margin-left: 0px; }
-.row-0 { margin-left: 83px; }
+/* Dynamic Wicki-Hayden Staggering */
+.even-row { margin-left: 84px; }
+.odd-row { margin-left: 0px; }
 
 /* --- KEY STYLING --- */
 .key {
@@ -481,4 +479,57 @@ body {
 }
 .key.accidental.active {
   background: rgba(75, 75, 75, 0.2);
+}
+
+/* ==========================================
+   MOBILE & TOUCH OVERRIDES
+   ========================================== */
+@media (max-width: 850px), (hover: none) and (pointer: coarse) {
+  /* Hide desktop-only controls */
+  .desktop-only {
+    display: none !important;
+  }
+
+  /* Hide the bottom piano strip */
+  #piano-strip {
+    display: none !important;
+  }
+  
+  /* Expand canvas and progress bar to fill the freed-up space */
+  #synthesia-canvas {
+    height: 100vh !important;
+  }
+  
+  #progress-container {
+    height: 100vh !important;
+  }
+  
+  #progress-bar {
+    width: calc(100vh - 10px) !important;
+  }
+  
+  /* Single board with 4 columns by 9 rows - scale to fit screen */
+  #board-wrapper {
+    transform: translate(-50%, -50%) scale(0.65);
+  }
+
+  /* Hide the scrollbar for Chrome, Safari and Opera */
+  ::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  /* Hide the scrollbar for IE, Edge, and Firefox, and prevent scrolling */
+  body, html {
+    -ms-overflow-style: none !important;  /* IE and Edge */
+    scrollbar-width: none !important;     /* Firefox */
+    overflow: hidden !important;          /* Lock scrolling */
+    touch-action: none !important;        /* Prevent mobile browser pull-to-refresh and bouncing */
+  }
+}
+
+/* Hide the fullscreen button on desktop devices */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  .mobile-only {
+    display: none !important;
+  }
 }

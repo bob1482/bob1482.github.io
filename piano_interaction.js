@@ -439,10 +439,15 @@ function updateUI() {
   }
   
   // Playback State
+  const progressContainer = document.getElementById('progress-container');
+  
   if (isPlaying) {
     btnPlay.innerText = "■"; 
     btnPlay.classList.add("playing");
     btnPause.disabled = false;
+    
+    // Show the progress bar when playing
+    if (progressContainer) progressContainer.style.display = "block";
     
     if (isPaused) {
         btnPause.innerText = "▶";
@@ -457,6 +462,9 @@ function updateUI() {
     btnPause.innerText = "II";
     btnPause.disabled = true;
     btnPause.classList.remove("paused");
+    
+    // Hide the progress bar when stopped
+    if (progressContainer) progressContainer.style.display = "none";
   }
 }
 

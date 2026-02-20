@@ -18,22 +18,22 @@
     </div>
     
     <div id="controls">
-      <div class="control-group">
+      <div class="control-group desktop-only">
         <span class="control-label">Labels</span>
         <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="cycleLabels()" id="btn-labels">NOTES</button>
       </div>
       
-      <div class="control-group">
+      <div class="control-group desktop-only">
         <span class="control-label">Board</span>
         <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleBoard()" id="btn-board">HIDE</button>
       </div>
       
-      <div class="control-group">
+      <div class="control-group desktop-only">
         <span class="control-label">F-Keys</span>
         <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleFKeys()" id="btn-fkeys">F3-F12</button>
       </div>
       
-      <div class="control-group">
+      <div class="control-group desktop-only">
         <span class="control-label">Recorder</span>
         <div class="btn-row">
           <button class="control-btn" id="btn-record" onclick="toggleRecording()" title="Record">●</button>
@@ -42,13 +42,13 @@
         </div>
       </div>
 
-      <div class="control-group playback-controls">
+      <div class="control-group playback-controls desktop-only">
          <select id="record-select" onchange="changeRecording(this.value)">
            <option value="-1">No Records</option>
          </select>
       </div>
 
-      <div class="control-group">
+      <div class="control-group desktop-only">
         <span class="control-label">Metronome</span>
         <div class="btn-row">
           <button class="control-btn" id="btn-metro" onclick="toggleMetronome()" title="Toggle Click">M</button>
@@ -60,14 +60,14 @@
       <div class="control-group">
         <div style="display: flex; gap: 10px;">
           <div style="display:flex; flex-direction:column; align-items:center;">
-            <span class="side-label">LEFT</span>
+            <span class="side-label">TRANSPOSE</span>
             <div class="btn-row">
               <button class="control-btn" onclick="changeTranspose('left', -1)">-</button>
               <span class="control-val" id="disp-trans-l">0</span>
               <button class="control-btn" onclick="changeTranspose('left', 1)">+</button>
             </div>
           </div>
-          <div style="display:flex; flex-direction:column; align-items:center;">
+          <div style="display:flex; flex-direction:column; align-items:center;" class="desktop-only">
             <span class="side-label">RIGHT</span>
             <div class="btn-row">
               <button class="control-btn" onclick="changeTranspose('right', -1)">-</button>
@@ -78,21 +78,26 @@
         </div>
       </div>
 
-     <div class="control-group" style="display: none;">
+     <div class="control-group desktop-only" style="display: none;">
       <span class="side-label" style="margin-top: 5px;">transequence</span>
       <input type="text" id="input-sequence" 
              value="-5:-5 -12:0 5:5 12:12 -17:-17 17:5" 
              style="width: 300px; background: #222; color: white; border: 1px solid #666; border-radius: 4px; padding: 4px; font-size: 11px; text-align: center;">
     </div>
 
-    <div class="control-group">
+    <div class="control-group desktop-only">
         <span class="control-label">Visuals</span>
         <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleVisuals()" id="btn-visuals">ON</button>
       </div>
 
+      <div class="control-group mobile-only">
+        <span class="control-label">Screen</span>
+        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleFullScreen()" id="btn-fullscreen">FULL</button>
+      </div>
+
       <div class="control-group">
         <span class="control-label">System</span>
-        <button id="btn-reset-memory" class="control-btn" title="Reset Browser Memory">RESET MEMORY</button>
+        <button id="btn-reset-memory" class="control-btn" title="Reset Browser Memory">RESET</button>
       </div>
     </div>
 
@@ -116,6 +121,7 @@
     <script src="piano_render.js"></script> 
     <script src="piano_interaction.js"></script>
     <script src="piano_midi.js"></script>
+    <script src="piano_mobile.js"></script>
     
     <script>
       // Wait for scripts to load, then initialize

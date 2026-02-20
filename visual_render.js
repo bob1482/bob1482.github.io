@@ -20,7 +20,9 @@ window.addEventListener('resize', () => {
 
 function resizeCanvas() {
   canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight * 0.83; 
+  const strip = document.getElementById("piano-strip");
+  const isMobile = strip && window.getComputedStyle(strip).display === "none";
+  canvas.height = isMobile ? window.innerHeight : window.innerHeight * 0.83; 
   updateKeyCoordinates();
 }
 

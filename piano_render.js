@@ -87,28 +87,38 @@ function renderBoard() {
   // Clear Maps
   window.freqToKeyMapLeft = {}; 
   window.freqToKeyMapRight = {};
-  
   domKeyCache = {}; 
-  const SPLIT_COL = 6; 
+  
+  // Determine if we are on mobile
+  const isMobile = typeof isMobileMode === 'function' ? isMobileMode() : false;
+  
+  // Dynamic dimensions based on screen mode
+  const currentRows = isMobile ? 7 : 5;   // 9 rows on mobile, 5 on desktop
+  const currentCols = isMobile ? 6 : 12;  // 4 columns on mobile, 12 on desktop
+  const SPLIT_COL = isMobile ? currentCols : 6; // Put everything on boardLeft in mobile
 
-  for (let r = 0; r < ROWS; r++) {
+  for (let r = 0; r < currentRows; r++) {
     const rowDivL = document.createElement("div");
-    rowDivL.className = "row row-" + r;
+    rowDivL.className = `row ${r % 2 === 0 ? 'even-row' : 'odd-row'}`;
+    
     const rowDivR = document.createElement("div");
-    rowDivR.className = "row row-" + r;
+    rowDivR.className = `row ${r % 2 === 0 ? 'even-row' : 'odd-row'}`;
 
-    for (let c = 0; c < COLS; c++) {
-      const mapRowIndex = ROWS - 1 - r;
+    for (let c = 0; c < currentCols; c++) {
+      const mapRowIndex = currentRows - 1 - r;
       let keyCode = "";
-      if (KEY_MAPS[mapRowIndex] && KEY_MAPS[mapRowIndex][c]) {
+      
+      // Only apply PC Keyboard mappings if we are NOT on mobile
+      if (!isMobile && KEY_MAPS[mapRowIndex] && KEY_MAPS[mapRowIndex][c]) {
         keyCode = KEY_MAPS[mapRowIndex][c];
       }
 
       // Calculate Pitch
       let rowManualShift = 0;
-      if (r === 4) rowManualShift = 4; 
-      else if (r === 3) rowManualShift = 2; 
-      else if (r === 2) rowManualShift = 2; 
+      
+      rowManualShift = r - r % 2;
+
+      
       
       let activeTranspose = (c < SPLIT_COL) ? transposeLeft : transposeRight;
       let semitoneOffset = r * 5 + c * 2 + activeTranspose + rowManualShift;
@@ -161,14 +171,23 @@ function renderBoard() {
           if(typeof releaseNote === 'function') releaseNote(freq);
       });
 
-      if (c < SPLIT_COL) rowDivL.appendChild(key);
-      else rowDivR.appendChild(key);
+      if (c < SPLIT_COL) {
+          rowDivL.appendChild(key);
+      } else {
+          rowDivR.appendChild(key);
+      }
     }
+    
     boardLeft.appendChild(rowDivL);
-    boardRight.appendChild(rowDivR);
+    if (!isMobile) boardRight.appendChild(rowDivR);
   }
   
-  renderTraditionalPiano();
+  // Hide right board entirely on mobile
+  boardRight.style.display = isMobile ? "none" : "flex";
+  
+  // Render bottom piano strip only if not mobile to save performance
+  if (!isMobile) renderTraditionalPiano();
+  
   if(typeof updateKeyCoordinates === 'function') updateKeyCoordinates();
 }
 
@@ -329,10 +348,15 @@ function updateUI() {
   }
   
   // Playback State
+  const progressContainer = document.getElementById('progress-container');
+  
   if (isPlaying) {
     btnPlay.innerText = "■"; 
     btnPlay.classList.add("playing");
     btnPause.disabled = false;
+    
+    // Show the progress bar when playing
+    if (progressContainer) progressContainer.style.display = "block";
     
     if (isPaused) {
         btnPause.innerText = "▶";
@@ -347,6 +371,9 @@ function updateUI() {
     btnPause.innerText = "II";
     btnPause.disabled = true;
     btnPause.classList.remove("paused");
+    
+    // Hide the progress bar when stopped
+    if (progressContainer) progressContainer.style.display = "none";
   }
 }
 
