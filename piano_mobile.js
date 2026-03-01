@@ -48,3 +48,24 @@ window.addEventListener('resize', () => {
         if (typeof renderBoard === 'function') renderBoard();
     }
 });
+
+// Toggle the settings panel on mobile
+function toggleMobileSettings() {
+    const controls = document.getElementById('controls');
+    if (controls) {
+        controls.classList.toggle('mobile-visible');
+    }
+}
+
+// Optional: Automatically close the mobile settings if the user taps the canvas/board
+window.addEventListener('touchstart', (e) => {
+    const controls = document.getElementById('controls');
+    const settingsBtn = document.getElementById('btn-mobile-settings');
+    
+    // If we are touching outside the controls AND outside the settings button
+    if (controls && controls.classList.contains('mobile-visible')) {
+        if (!controls.contains(e.target) && !settingsBtn.contains(e.target)) {
+            controls.classList.remove('mobile-visible');
+        }
+    }
+});

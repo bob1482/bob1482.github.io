@@ -13,7 +13,31 @@ body {
   background-color: #000000;
 }
 
-/* Settings Toggle Button CSS Removed */
+/* --- FLOATING MOBILE SETTINGS BUTTON --- */
+#btn-mobile-settings {
+  position: fixed;
+  top: 15px;
+  right: 15px;
+  z-index: 3000;
+  background: rgba(30, 30, 30, 0.8);
+  border: 1px solid #555;
+  color: white;
+  border-radius: 50%;
+  width: 45px;
+  height: 45px;
+  font-size: 22px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+#btn-mobile-settings:active {
+  transform: scale(0.9);
+  background: rgba(60, 60, 60, 0.9);
+}
 
 /* --- LOADING OVERLAY --- */
 #loading-overlay {
@@ -485,6 +509,20 @@ body {
    MOBILE & TOUCH OVERRIDES
    ========================================== */
 @media (max-width: 850px), (hover: none) and (pointer: coarse) {
+  /* Hide the controls by default on mobile */
+  #controls {
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  
+  /* When the 'mobile-visible' class is added via JS, show it! */
+  #controls.mobile-visible {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   /* Hide desktop-only controls */
   .desktop-only {
     display: none !important;
