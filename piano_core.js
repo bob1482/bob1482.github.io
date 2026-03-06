@@ -16,6 +16,9 @@ let isLoaded = false;
 let sequenceIndex = 0;
 let bpm = 120; 
 let isMetronomeOn = false; 
+let mobileZoom = 0.65; // Track mobile zoom level
+let showMobileStrip = false; // Track mobile strip visibility
+let stripHeight = 17; // Granular strip height (vh)
 
 // --- PHYSICAL KEY TRACKING ---
 let activePhysicalKeys = {}; 
@@ -37,9 +40,9 @@ let freqToKeyMap = {};
 
 const KEY_MAPS = [
   F_ROW_VARIANTS[0], 
-  ["Digit1","Digit2","Digit3","Digit4","Digit5","Digit6","Digit7","Digit8","Digit9","Digit0","Minus","Equal"],
+  ["Digit2","Digit3","Digit4","Digit5","Digit6","Digit7","Digit8","Digit9","Digit0","Minus","Equal","Backspace"],
   ["KeyQ","KeyW","KeyE","KeyR","KeyT","KeyY","KeyU","KeyI","KeyO","KeyP","BracketLeft","BracketRight"],
-  ["CapsLock","KeyA","KeyS","KeyD","KeyF","KeyG","KeyH","KeyJ","KeyK","KeyL","Semicolon","Quote"],
+  ["KeyA","KeyS","KeyD","KeyF","KeyG","KeyH","KeyJ","KeyK","KeyL","Semicolon","Quote", "Enter"],
   ["ShiftLeft","KeyZ","KeyX","KeyC","KeyV","KeyB","KeyN","KeyM","Comma","Period","Slash","ShiftRight"]
 ];
 
@@ -53,6 +56,8 @@ let recordingStartTime = 0;
 // MULTI-RECORDING STORAGE
 let recordingsList = []; // Array of objects: { name, events, duration }
 let currentRecordingIndex = -1; // -1 means using raw buffer (recordedEvents)
+
+let playbackRate = 1.0;
 
 // --- AUDIO ENGINE (TONE.JS) ---
 Tone.context.lookAhead = 0.05; 
@@ -142,6 +147,9 @@ function saveSettings() {
         labelMode: labelMode,
         fKeyMode: fKeyMode,
         isVisualizerOn: typeof isVisualizerOn !== 'undefined' ? isVisualizerOn : true,
+        mobileZoom: mobileZoom,
+        showMobileStrip: showMobileStrip,
+        stripHeight: stripHeight
     };
     
     localStorage.setItem('wickiPianoSettings', JSON.stringify(settings));
@@ -163,6 +171,20 @@ function loadSettings() {
         if (settings.bpm !== undefined) bpm = settings.bpm;
         if (settings.labelMode !== undefined) labelMode = settings.labelMode;
         if (settings.fKeyMode !== undefined) fKeyMode = settings.fKeyMode;
+        if (settings.mobileZoom !== undefined) mobileZoom = settings.mobileZoom;
+        if (settings.showMobileStrip !== undefined) showMobileStrip = settings.showMobileStrip;
+        if (settings.stripHeight !== undefined) {
+            stripHeight = settings.stripHeight;
+        } else if (settings.stripHeightMode !== undefined) {
+            // Backward compatibility with legacy 3-state strip height setting.
+            if (settings.stripHeightMode === 1) stripHeight = 30;
+            else if (settings.stripHeightMode === 2) stripHeight = 10;
+            else stripHeight = 17;
+        }
+        stripHeight = parseFloat(stripHeight);
+        if (Number.isNaN(stripHeight)) stripHeight = 17;
+        if (stripHeight < 5) stripHeight = 5;
+        if (stripHeight > 50) stripHeight = 50;
         if (settings.isVisualizerOn !== undefined && typeof isVisualizerOn !== 'undefined') {
             isVisualizerOn = settings.isVisualizerOn;
         }

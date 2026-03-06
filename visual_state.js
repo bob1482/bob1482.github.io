@@ -107,58 +107,60 @@ function updatePhysics(dt) {
     const canvas = document.getElementById("synthesia-canvas");
     if (!canvas) return;
 
-    if (isPaused) {
-        // Particle logic removed
-        return; 
-    }
+    // 1. Determine the "current time". If paused, use the exact moment we paused/scrubbed to.
+    const currentAudioTime = isPaused ? pauseStartTimestamp : Tone.now();
+    const effectiveTime = currentAudioTime - totalPausedTime;
 
-    const currentAudioTime = Tone.now(); 
-    const effectiveTime = currentAudioTime - totalPausedTime; 
-    
     const pixelsPerSecond = canvas.height / FALL_DURATION;
 
-    // 1. PLAYBACK LOGIC (Spawning falling notes)
+    // 2. PLAYBACK LOGIC
     if (isPlaying) {
-        while(visualEventIndex < currentPlaybackEvents.length) {
-            const evt = currentPlaybackEvents[visualEventIndex];
-            const hitTime = playbackStartTime + evt.time + totalPausedTime; 
-            const spawnTime = hitTime - FALL_DURATION;
-            
-            if (currentAudioTime >= spawnTime) {
-                spawnFallingNote(evt.freq, evt.duration, hitTime);
-                visualEventIndex++;
-            } else {
-                break; 
+        // Only continuously spawn new falling notes if actively playing
+        if (!isPaused) {
+            while(visualEventIndex < currentPlaybackEvents.length) {
+                const evt = currentPlaybackEvents[visualEventIndex];
+                const hitTime = playbackStartTime + evt.time + totalPausedTime;
+                const spawnTime = hitTime - FALL_DURATION;
+                
+                if (currentAudioTime >= spawnTime) {
+                    spawnFallingNote(evt.freq, evt.duration, hitTime);
+                    visualEventIndex++;
+                } else {
+                    break; 
+                }
             }
         }
 
-        // Move & Cull Falling Notes
+        // ALWAYS calculate positions so scrubbing while paused updates the screen instantly
         for (let i = fallingNotes.length - 1; i >= 0; i--) {
             const note = fallingNotes[i];
-            const timeRemaining = note.targetTime - (currentAudioTime);
+            const timeRemaining = note.targetTime - currentAudioTime;
             
             const y = canvas.height - (timeRemaining * pixelsPerSecond);
             note.drawY = y - note.height;
 
-            if (note.drawY > canvas.height) {
+            // Only delete notes if we are actively playing and they fall off screen
+            if (!isPaused && note.drawY > canvas.height) {
                 recycleNote(note);
                 fallingNotes.splice(i, 1);
             }
         }
         
-        // Update Progress Bar
-        const elapsed = (effectiveTime - playbackStartTime);
-        if (playbackTotalDuration > 0) {
-            const pct = (elapsed / playbackTotalDuration) * 100;
-            const bar = document.getElementById('progress-bar');
-            if (bar) bar.value = Math.min(pct, 100);
+        // Update Progress Bar if actively playing
+        if (!isPaused) {
+            const elapsed = (effectiveTime - playbackStartTime);
+            if (playbackTotalDuration > 0) {
+                const pct = (elapsed / playbackTotalDuration) * 100;
+                const bar = document.getElementById('progress-bar');
+                if (bar) bar.value = Math.min(pct, 100);
+            }
         }
 
     } else {
         if(fallingNotes.length > 0) recycleAllNotes();
     }
 
-    // 2. MANUAL NOTES LOGIC
+    // 3. MANUAL NOTES LOGIC (Unfrozen during pause)
     for (let i = visualNotes.length - 1; i >= 0; i--) {
         const note = visualNotes[i];
         if (note.active) {
@@ -172,7 +174,5 @@ function updatePhysics(dt) {
             visualNotes.splice(i, 1);
         }
     }
-
-    // Particle update loop removed
 }
 

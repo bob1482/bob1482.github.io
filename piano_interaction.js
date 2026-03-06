@@ -258,6 +258,103 @@ function changeTranspose(side, delta) {
   saveSettings();
 }
 
+// --- ZOOM CONTROLS ---
+
+function changeZoom(delta) {
+    mobileZoom += delta;
+    // Clamp the zoom so they can't make it too tiny or absurdly huge
+    if (mobileZoom < 0.3) mobileZoom = 0.3;
+    if (mobileZoom > 1.5) mobileZoom = 1.5;
+    
+    applyZoom();
+    updateUI();
+    saveSettings();
+}
+
+function applyZoom() {
+    const boardWrapper = document.getElementById("board-wrapper");
+    if (boardWrapper) {
+        const isMobile = typeof isMobileMode === 'function' ? isMobileMode() : false;
+        if (isMobile) {
+            boardWrapper.style.transform = `translate(-50%, -50%) scale(${mobileZoom})`;
+        } else {
+            boardWrapper.style.transform = `translate(-50%, -50%) scale(0.85)`; // Default desktop scale
+        }
+    }
+}
+
+// --- MOBILE STRIP CONTROLS ---
+
+function toggleMobileStrip() {
+    showMobileStrip = !showMobileStrip;
+    
+    applyMobileStripState();
+    if (typeof applyStripHeight === 'function') applyStripHeight();
+    
+    // Re-render to physically draw the DOM keys, and resize the canvas
+    if (typeof renderBoard === 'function') renderBoard();
+    if (typeof resizeCanvas === 'function') resizeCanvas();
+    
+    updateUI();
+    saveSettings();
+}
+
+function applyMobileStripState() {
+    const body = document.body;
+    const btn = document.getElementById("btn-mobile-strip");
+    
+    if (showMobileStrip) {
+        body.classList.add("force-strip");
+        if (btn) btn.innerText = "HIDE";
+    } else {
+        body.classList.remove("force-strip");
+        if (btn) btn.innerText = "SHOW";
+    }
+}
+
+// --- STRIP HEIGHT CONTROLS ---
+
+function changeStripHeight(delta) {
+    stripHeight += delta;
+    
+    if (stripHeight < 5) stripHeight = 5;
+    if (stripHeight > 50) stripHeight = 50;
+    
+    applyStripHeight();
+    
+    if (typeof resizeCanvas === 'function') resizeCanvas();
+    if (typeof updateKeyCoordinates === 'function') updateKeyCoordinates();
+    
+    updateUI();
+    saveSettings();
+}
+
+function applyStripHeight() {
+    const strip = document.getElementById("piano-strip");
+    const canvas = document.getElementById("synthesia-canvas");
+    const progCont = document.getElementById("progress-container");
+    const progBar = document.getElementById("progress-bar");
+    const body = document.body;
+    
+    const canvasHeight = 100 - stripHeight;
+    const isMobileStripHidden = strip && window.getComputedStyle(strip).display === "none";
+    const shouldApplyDynamic = !isMobileStripHidden;
+    
+    if (!shouldApplyDynamic) {
+        if (strip) strip.style.removeProperty("height");
+        if (canvas) canvas.style.removeProperty("height");
+        if (progCont) progCont.style.removeProperty("height");
+        if (progBar) progBar.style.removeProperty("width");
+        return;
+    }
+    
+    const importantFlag = body.classList.contains("force-strip") ? "important" : "";
+    if (strip) strip.style.setProperty("height", `${stripHeight}vh`, importantFlag);
+    if (canvas) canvas.style.setProperty("height", `${canvasHeight}vh`, importantFlag);
+    if (progCont) progCont.style.setProperty("height", `${canvasHeight}vh`, importantFlag);
+    if (progBar) progBar.style.setProperty("width", `calc(${canvasHeight}vh - 10px)`, importantFlag);
+}
+
 function cycleLabels() {
   labelMode = (labelMode + 1) % 3;
   updateUI();
@@ -374,6 +471,46 @@ window.addEventListener("keydown", (e) => {
     return;
   }
 
+  // --- NUMPAD PLAYBACK CONTROLS ---
+  
+  // Numpad 5: Play / Pause
+  if (e.code === "Numpad5") {
+      e.preventDefault();
+      if (isPlaying) {
+          if (isPaused) resumePlayback();
+          else pausePlayback();
+      } else {
+          startPlayback();
+      }
+      return;
+  }
+
+  // Numpad 8 (Forward) & Numpad 2 (Backward): Seek 5 seconds
+  if (e.code === "Numpad8" || e.code === "Numpad2") {
+      e.preventDefault();
+      if (!isPlaying) return;
+      
+      const currentAudioTime = Tone.now();
+      const elapsed = currentAudioTime - totalPausedTime - playbackStartTime;
+      let targetSeconds = elapsed + (e.code === "Numpad8" ? 5 : -5);
+
+      // Clamp to beginning and end boundaries
+      if (targetSeconds < 0) targetSeconds = 0;
+      if (targetSeconds > playbackTotalDuration) targetSeconds = playbackTotalDuration;
+
+      const targetPercent = (targetSeconds / playbackTotalDuration) * 100;
+      seekToTime(targetPercent);
+      return;
+  }
+
+  // Numpad 6 (Faster) & Numpad 4 (Slower): Speed Control
+  if (e.code === "Numpad6" || e.code === "Numpad4") {
+      e.preventDefault();
+      const delta = (e.code === "Numpad6") ? 0.1 : -0.1;
+      changePlaybackSpeed(delta);
+      return;
+  }
+
   if (e.repeat) return;
 
   const key = document.querySelector(`.key[data-key="${CSS.escape(e.code)}"]`);
@@ -413,6 +550,40 @@ document.getElementById('btn-reset-memory')?.addEventListener('click', resetBrow
 
 renderBoard();
 updateUI();
+
+function deleteCurrentRecording() {
+    // If there is no active recording and the buffer is empty, do nothing
+    if (currentRecordingIndex === -1 && recordedEvents.length === 0) {
+        return;
+    }
+
+    // Stop audio if it's currently playing
+    if (isPlaying) {
+        stopPlayback();
+    }
+
+    if (currentRecordingIndex >= 0) {
+        // Remove the currently selected recording from the array
+        recordingsList.splice(currentRecordingIndex, 1);
+        
+        if (recordingsList.length === 0) {
+            // If that was the last recording, reset everything
+            currentRecordingIndex = -1;
+            recordedEvents = [];
+        } else {
+            // Otherwise, shift to the previous recording (or the first one)
+            currentRecordingIndex = Math.max(0, currentRecordingIndex - 1);
+            recordedEvents = [...recordingsList[currentRecordingIndex].events];
+        }
+    } else {
+        // If it's just the unsaved buffer, clear it
+        recordedEvents = [];
+    }
+    
+    // Refresh the dropdown and UI states
+    updateRecordSelectUI();
+    updateUI();
+}
 
 function updateUI() {
   document.getElementById("disp-trans-l").innerText = transposeLeft;
@@ -466,6 +637,12 @@ function updateUI() {
     // Hide the progress bar when stopped
     if (progressContainer) progressContainer.style.display = "none";
   }
+
+  if (typeof applyMobileStripState === 'function') applyMobileStripState();
+  if (typeof applyStripHeight === 'function') applyStripHeight();
+  
+  const dispStrip = document.getElementById("disp-strip-height");
+  if (dispStrip) dispStrip.innerText = stripHeight;
 }
 
 // ==========================================

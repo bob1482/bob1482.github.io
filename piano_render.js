@@ -13,6 +13,7 @@ const COLOR_RIGHT = '#c87ad1';
 
 // --- CACHE ---
 let domKeyCache = {};   
+let playedFrequencies = new Set(); // Tracks played notes across redraws   
 
 // --- DOM CACHING ---
 function getCachedKeys(freqStr) {
@@ -61,6 +62,13 @@ function unhighlightKey(freq) {
 function clearAllHighlights() {
     const activeKeys = document.querySelectorAll('.active');
     activeKeys.forEach(k => k.classList.remove('active'));
+    
+    // Clear the persistent scale markers
+    const playedKeys = document.querySelectorAll('.played-note');
+    playedKeys.forEach(k => k.classList.remove('played-note'));
+    
+    // Clear the tracking memory
+    if (typeof playedFrequencies !== 'undefined') playedFrequencies.clear();
 }
 
 function hideBoard() {
@@ -116,7 +124,7 @@ function renderBoard() {
       // Calculate Pitch
       let rowManualShift = 0;
       
-      rowManualShift = r - r % 2;
+      rowManualShift = r + r % 2;
 
       
       
@@ -140,6 +148,12 @@ function renderBoard() {
 
       const key = document.createElement("div");
       key.className = `key ${isNatural ? "natural" : "accidental"}`;
+      
+      // Restore played marker if it exists in our memory
+      if (typeof playedFrequencies !== 'undefined' && playedFrequencies.has(freqStr)) {
+          key.classList.add("played-note");
+      }
+      
       key.setAttribute("data-note", freqStr);
       if (keyCode) key.setAttribute("data-key", keyCode); 
 
@@ -185,10 +199,15 @@ function renderBoard() {
   // Hide right board entirely on mobile
   boardRight.style.display = isMobile ? "none" : "flex";
   
-  // Render bottom piano strip only if not mobile to save performance
-  if (!isMobile) renderTraditionalPiano();
+  // Render bottom piano strip only if not mobile, OR if forced to show
+  if (!isMobile || showMobileStrip) {
+      renderTraditionalPiano();
+  }
   
   if(typeof updateKeyCoordinates === 'function') updateKeyCoordinates();
+
+  // Apply the proper zoom scale immediately after rendering
+  if(typeof applyZoom === 'function') applyZoom();
 }
 
 function renderTraditionalPiano() {
@@ -322,12 +341,20 @@ function getLabelText(semitoneOffset, keyCode) {
 
 
 function updateUI() {
-  document.getElementById("disp-vol").innerText = Math.round(globalVolume * 10);
-  document.getElementById("disp-sus").innerText = sustainMultiplier.toFixed(2) * 5;
+  const dispVol = document.getElementById("disp-vol");
+  if (dispVol) dispVol.innerText = Math.round(globalVolume * 10);
+  
+  const dispSus = document.getElementById("disp-sus");
+  if (dispSus) dispSus.innerText = sustainMultiplier.toFixed(2) * 5;
+  
   document.getElementById("disp-trans-l").innerText = transposeLeft;
   document.getElementById("disp-trans-r").innerText = transposeRight;
   document.getElementById("btn-labels").innerText = LABEL_MODES[labelMode];
   document.getElementById("btn-fkeys").innerText = F_KEY_LABELS[fKeyMode];
+  
+  // Update Zoom Display
+  const dispZoom = document.getElementById("disp-zoom");
+  if (dispZoom) dispZoom.innerText = Math.round(mobileZoom * 100);
   
   const btnRecord = document.getElementById("btn-record");
   const btnPlay = document.getElementById("btn-play");
@@ -375,6 +402,12 @@ function updateUI() {
     // Hide the progress bar when stopped
     if (progressContainer) progressContainer.style.display = "none";
   }
+
+  // Apply the strip state visually on load
+  if (typeof applyMobileStripState === 'function') applyMobileStripState();
+  
+  // Apply dynamic strip height on load
+  if (typeof applyStripHeight === 'function') applyStripHeight();
 }
 
 

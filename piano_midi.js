@@ -128,3 +128,76 @@ function convertMidiToEvents(midiData) {
     if (typeof startPlayback === 'function') startPlayback();
     if (typeof updateUI === 'function') updateUI();
 }
+
+// ==========================================
+// MIDI EXPORT
+// ==========================================
+
+function downloadCurrentMidi() {
+    let eventsToExport = [];
+    let exportName = "wicki_recording.mid";
+
+    // Determine what to export (saved recording or raw unsaved buffer)
+    if (currentRecordingIndex >= 0 && currentRecordingIndex < recordingsList.length) {
+        eventsToExport = recordingsList[currentRecordingIndex].events;
+        exportName = recordingsList[currentRecordingIndex].name.replace(/[^a-z0-9]/gi, '_').toLowerCase() + ".mid";
+    } else if (recordedEvents.length > 0) {
+        eventsToExport = recordedEvents;
+    } else {
+        alert("No recording to download!");
+        return;
+    }
+
+    // Process raw on/off events into discrete notes with durations
+    let active = {};
+    let processedNotes = [];
+    let sortedEvents = [...eventsToExport].sort((a, b) => a.time - b.time);
+
+    sortedEvents.forEach(evt => {
+        if (evt.type === 'on') {
+            active[evt.freq] = { ...evt, duration: 0.5 }; // Clone and set default duration
+            processedNotes.push(active[evt.freq]);
+        } else if (evt.type === 'off') {
+            if (active[evt.freq]) {
+                active[evt.freq].duration = evt.time - active[evt.freq].time;
+                delete active[evt.freq];
+            }
+        }
+    });
+
+    // Initialize @tonejs/midi object
+    const midi = new Midi();
+    const track = midi.addTrack();
+
+    // Populate track with notes
+    processedNotes.forEach(noteEvent => {
+        // Convert frequency to MIDI note number
+        const midiNote = Math.round(69 + 12 * Math.log2(noteEvent.freq / 440));
+        
+        track.addNote({
+            midi: midiNote,
+            time: noteEvent.time,
+            duration: noteEvent.duration,
+            velocity: 0.8 
+        });
+    });
+
+    // Create a Blob and trigger download
+    const midiData = midi.toArray();
+    const blob = new Blob([midiData], { type: "audio/midi" });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement("a");
+    a.style.display = "none";
+    a.href = url;
+    a.download = exportName;
+    
+    document.body.appendChild(a);
+    a.click();
+    
+    // Clean up DOM and memory
+    setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    }, 100);
+}

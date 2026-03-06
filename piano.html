@@ -44,9 +44,13 @@
       </div>
 
       <div class="control-group playback-controls desktop-only">
-         <select id="record-select" onchange="changeRecording(this.value)">
-           <option value="-1">No Records</option>
-         </select>
+         <div class="btn-row" style="width: 100%; padding: 0; background: transparent;">
+           <select id="record-select" onchange="changeRecording(this.value)" style="flex-grow: 1;">
+             <option value="-1">No Records</option>
+           </select>
+           <button class="control-btn" onclick="deleteCurrentRecording()" title="Delete Recording" style="background-color: #d9534f; width: 25px;">X</button>
+         </div>
+         <button class="control-btn" id="btn-download-midi" onclick="downloadCurrentMidi()" title="Download MIDI" style="width: 100%; font-size: 10px; margin-top: 5px;">SAVE MIDI</button>
       </div>
 
       <div class="control-group desktop-only">
@@ -86,14 +90,37 @@
              style="width: 300px; background: #222; color: white; border: 1px solid #666; border-radius: 4px; padding: 4px; font-size: 11px; text-align: center;">
     </div>
 
-    <div class="control-group desktop-only">
+      <div class="control-group desktop-only">
         <span class="control-label">Visuals</span>
         <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleVisuals()" id="btn-visuals">ON</button>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">Strip H</span>
+        <div class="btn-row">
+          <button class="control-btn" onclick="changeStripHeight(-1)">-</button>
+          <span class="control-val" id="disp-strip-height">17</span>
+          <button class="control-btn" onclick="changeStripHeight(1)">+</button>
+        </div>
       </div>
 
       <div class="control-group mobile-only">
         <span class="control-label">Screen</span>
         <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleFullScreen()" id="btn-fullscreen">FULL</button>
+      </div>
+
+      <div class="control-group mobile-only">
+        <span class="control-label">Zoom</span>
+        <div class="btn-row">
+          <button class="control-btn" onclick="changeZoom(-0.05)">-</button>
+          <span class="control-val" id="disp-zoom">65</span>
+          <button class="control-btn" onclick="changeZoom(0.05)">+</button>
+        </div>
+      </div>
+
+      <div class="control-group mobile-only">
+        <span class="control-label">Strip</span>
+        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleMobileStrip()" id="btn-mobile-strip">SHOW</button>
       </div>
 
       <div class="control-group">

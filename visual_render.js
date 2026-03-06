@@ -22,7 +22,11 @@ function resizeCanvas() {
   canvas.width = window.innerWidth;
   const strip = document.getElementById("piano-strip");
   const isMobile = strip && window.getComputedStyle(strip).display === "none";
-  canvas.height = isMobile ? window.innerHeight : window.innerHeight * 0.83; 
+  
+  const currentStripHeight = typeof stripHeight !== 'undefined' ? stripHeight : 17;
+  const canvasViewportRatio = (100 - currentStripHeight) / 100;
+  
+  canvas.height = isMobile ? window.innerHeight : window.innerHeight * canvasViewportRatio;
   updateKeyCoordinates();
 }
 

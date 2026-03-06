@@ -420,7 +420,6 @@ body {
   box-shadow: 0 0 5px rgba(0, 210, 255, 0.8);
 }
 
-/* --- BOARD CONTAINER (CENTERED & LAYERED UNDER) --- */
 #board-wrapper {
   display: flex;
   flex-direction: row;
@@ -436,8 +435,7 @@ body {
   /* Layering: Lower than canvas (100) but visible */
   z-index: 50; 
   
-  contain: layout paint;
-  pointer-events: none; 
+  pointer-events: none; /* contain: layout paint; is removed */
 }
 
 #board-left, #board-right {
@@ -458,7 +456,7 @@ body {
 }
 
 /* Dynamic Wicki-Hayden Staggering */
-.even-row { margin-left: 84px; }
+.even-row { margin-left: -84px; }
 .odd-row { margin-left: 0px; }
 
 /* --- KEY STYLING --- */
@@ -503,6 +501,18 @@ body {
 }
 .key.accidental.active {
   background: rgba(75, 75, 75, 0.2);
+}
+
+/* --- PERSISTENT PLAYED NOTE MARKER --- */
+.key.played-note {
+  border: 2px solid #00d2ff; 
+  background: rgba(0, 210, 255, 0.15); 
+}
+
+/* Ensure the active "press" state still pops over the persistent marker */
+.key.played-note.active {
+  background: rgba(0, 210, 255, 0.6);
+  transform: translateY(5px);
 }
 
 /* ==========================================
@@ -570,4 +580,17 @@ body {
   .mobile-only {
     display: none !important;
   }
+}
+/* --- FORCE STRIP ON MOBILE --- */
+body.force-strip #piano-strip {
+  display: block !important;
+}
+body.force-strip #synthesia-canvas {
+  height: 83vh !important;
+}
+body.force-strip #progress-container {
+  height: 83vh !important;
+}
+body.force-strip #progress-bar {
+  width: calc(83vh - 10px) !important;
 }
