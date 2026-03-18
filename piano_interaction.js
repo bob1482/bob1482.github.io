@@ -380,7 +380,7 @@ function applyStripHeight() {
 }
 
 function cycleLabels() {
-  labelMode = (labelMode + 1) % 3;
+  labelMode = (labelMode + 1) % 4;
   updateUI();
   renderBoard();
   saveSettings();
@@ -393,6 +393,25 @@ function toggleBoard() {
   } else {
     hideBoard();
   }
+}
+
+// --- LAYOUT MODE CONTROLS ---
+
+const LAYOUT_LABELS = ["AUTO", "DESKTOP", "MOBILE"];
+
+function cycleLayout() {
+    layoutMode = (layoutMode + 1) % 3;
+    
+    // Apply the CSS class
+    if (typeof applyLayoutModeClass === 'function') applyLayoutModeClass();
+    
+    // Force a redraw of the keys and canvas
+    if (typeof renderBoard === 'function') renderBoard();
+    if (typeof resizeCanvas === 'function') resizeCanvas();
+    if (typeof updateKeyCoordinates === 'function') updateKeyCoordinates();
+    
+    updateUI();
+    saveSettings();
 }
 
 function toggleFKeys() {
@@ -668,6 +687,13 @@ function updateUI() {
     // Hide the progress bar when stopped
     if (progressContainer) progressContainer.style.display = "none";
   }
+
+  // Update the Layout button text
+  const btnLayout = document.getElementById("btn-layout");
+  if (btnLayout) btnLayout.innerText = LAYOUT_LABELS[layoutMode];
+  
+  // Ensure the body has the correct CSS class on load
+  if (typeof applyLayoutModeClass === 'function') applyLayoutModeClass();
 
   if (typeof applyMobileStripState === 'function') applyMobileStripState();
   if (typeof applyStripHeight === 'function') applyStripHeight();

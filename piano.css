@@ -163,7 +163,7 @@ body {
   font-size: 9px;
   font-weight: bold;
   line-height: 9px;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+  /* text-shadow removed for cleaner visuals */
 }
 
 /* Left Board Label (Cyan) */
@@ -518,68 +518,59 @@ body {
 /* ==========================================
    MOBILE & TOUCH OVERRIDES
    ========================================== */
-@media (max-width: 850px), (hover: none) and (pointer: coarse) {
-  /* Hide the controls by default on mobile */
-  #controls {
-    transform: translateY(-100%);
-    opacity: 0;
-    pointer-events: none;
-  }
-  
-  /* When the 'mobile-visible' class is added via JS, show it! */
-  #controls.mobile-visible {
-    transform: translateY(0);
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  /* Hide desktop-only controls */
-  .desktop-only {
-    display: none !important;
-  }
-
-  /* Hide the bottom piano strip */
-  #piano-strip {
-    display: none !important;
-  }
-  
-  /* Expand canvas and progress bar to fill the freed-up space */
-  #synthesia-canvas {
-    height: 100vh !important;
-  }
-  
-  #progress-container {
-    height: 100vh !important;
-  }
-  
-  #progress-bar {
-    width: calc(100vh - 10px) !important;
-  }
-  
-  /* Single board with 4 columns by 9 rows - scale to fit screen */
-  #board-wrapper {
-    transform: translate(-50%, -50%) scale(0.65);
-  }
-
-  /* Hide the scrollbar for Chrome, Safari and Opera */
-  ::-webkit-scrollbar {
-    display: none !important;
-  }
-
-  /* Hide the scrollbar for IE, Edge, and Firefox, and prevent scrolling */
-  body, html {
-    -ms-overflow-style: none !important;  /* IE and Edge */
-    scrollbar-width: none !important;     /* Firefox */
-    overflow: hidden !important;          /* Lock scrolling */
-    touch-action: none !important;        /* Prevent mobile browser pull-to-refresh and bouncing */
-  }
+/* ==========================================
+   MOBILE & TOUCH OVERRIDES (JS CONTROLLED)
+   ========================================== */
+body.is-mobile #controls {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
 }
 
-/* Hide the fullscreen button on desktop devices */
-@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
-  .mobile-only {
-    display: none !important;
-  }
+body.is-mobile #controls.mobile-visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+body.is-mobile .desktop-only {
+  display: none !important;
+}
+
+body.is-mobile #piano-strip {
+  display: none !important;
+}
+
+body.is-mobile #synthesia-canvas {
+  height: 100vh !important;
+}
+
+body.is-mobile #progress-container {
+  height: 100vh !important;
+}
+
+body.is-mobile #progress-bar {
+  width: calc(100vh - 10px) !important;
+}
+
+body.is-mobile #board-wrapper {
+  transform: translate(-50%, -50%) scale(0.65);
+}
+
+body.is-mobile ::-webkit-scrollbar {
+  display: none !important;
+}
+
+body.is-mobile {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+  overflow: hidden !important;
+  touch-action: none !important;
+}
+
+/* Hide the fullscreen button on desktop mode */
+body:not(.is-mobile) .mobile-only {
+  display: none !important;
 }
 /* --- FORCE STRIP ON MOBILE --- */
 body.force-strip #piano-strip {
@@ -593,4 +584,9 @@ body.force-strip #progress-container {
 }
 body.force-strip #progress-bar {
   width: calc(83vh - 10px) !important;
+}
+
+/* --- WICKI BOARD RANGE HIGHLIGHTING --- */
+.p-key.out-of-range:not(.active):not(:active) {
+  opacity: 0.25;
 }

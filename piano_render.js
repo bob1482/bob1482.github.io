@@ -95,6 +95,7 @@ function renderBoard() {
   // Clear Maps
   window.freqToKeyMapLeft = {}; 
   window.freqToKeyMapRight = {};
+  window.boardFrequencies = new Set(); // Track all frequencies currently on the Wicki board
   domKeyCache = {}; 
   
   // Determine if we are on mobile
@@ -136,6 +137,7 @@ function renderBoard() {
       let isNatural = [0, 2, 4, 5, 7, 9, 11].includes(noteIndex);
 
       const freqStr = freq.toFixed(2);
+      window.boardFrequencies.add(freqStr); // Save this note to our tracking set
       
       // --- MAP KEYCODE TO SPECIFIC SIDE ---
       if (keyCode) {
@@ -157,7 +159,7 @@ function renderBoard() {
       key.setAttribute("data-note", freqStr);
       if (keyCode) key.setAttribute("data-key", keyCode); 
 
-      key.innerText = getLabelText(semitoneOffset, keyCode);
+      key.innerHTML = getLabelText(semitoneOffset, keyCode);
 
       // Determine Side for Event Listeners
       const isLeft = c < SPLIT_COL;
@@ -220,7 +222,7 @@ function renderTraditionalPiano() {
   strip.appendChild(wrapper);
   
   const totalNotes = 88;
-  const startOffset = -27; 
+  const startOffset = -27; // Starts at A0
   const totalWhiteKeys = 52; 
   const whiteKeyWidthPercent = 100 / totalWhiteKeys;
   const blackKeyWidthPercent = whiteKeyWidthPercent * 0.7; 
@@ -230,8 +232,12 @@ function renderTraditionalPiano() {
       const currentSemitone = startOffset + i; 
       const freq = BASE_NOTE_FREQ * Math.pow(2, currentSemitone / 12);
       const freqStr = freq.toFixed(2);
-      const noteIndex = i % 12;
-      const isWhite = [0, 2, 3, 5, 7, 8, 10].includes(noteIndex);
+      
+      // FIX: Calculate note index strictly relative to C (0 = C, 1 = C#, etc.)
+      const noteIndex = ((currentSemitone % 12) + 12) % 12;
+      
+      // FIX: Use standard C-based layout for white keys
+      const isWhite = [0, 2, 4, 5, 7, 9, 11].includes(noteIndex);
 
       const key = document.createElement("div");
       key.setAttribute("data-note", freqStr);
@@ -259,8 +265,30 @@ function renderTraditionalPiano() {
       if (labelMode === 0) {
            const lbl = document.createElement("div");
            lbl.className = "key-label";
-           lbl.style.color = "#555";
-           lbl.innerText = NOTE_NAMES[noteIndex];
+           // Removed hardcoded grey so it inherits the high-contrast key colors
+           
+           const octave = Math.floor(currentSemitone / 12) + 3;
+           lbl.innerText = NOTE_NAMES[noteIndex] + octave;
+           
+           key.appendChild(lbl);
+      }
+
+      // Numeric Mode for Traditional Piano Strip
+      if (labelMode === 2) {
+           const lbl = document.createElement("div");
+           lbl.className = "key-label";
+           // Removed hardcoded grey so it inherits the high-contrast key colors
+           
+           const octave = Math.floor(currentSemitone / 12) + 3;
+           const numNames = ["1", "1#", "2", "2#", "3", "4", "4#", "5", "5#", "6", "6#", "7"];
+           const dotsTop = octave > 4 ? "•".repeat(octave - 4) : "";
+           const dotsBottom = octave < 4 ? "•".repeat(4 - octave) : "";
+           
+           lbl.innerHTML = `<div style="display:flex; flex-direction:column; align-items:center; line-height: 1;">
+                     <span style="font-size: 6px; height: 6px; display: block; letter-spacing: 1px;">${dotsTop}</span>
+                     <span>${numNames[noteIndex]}</span>
+                     <span style="font-size: 6px; height: 6px; display: block; letter-spacing: 1px;">${dotsBottom}</span>
+                  </div>`;
            key.appendChild(lbl);
       }
 
@@ -275,7 +303,12 @@ function renderTraditionalPiano() {
           key.style.left = ((whiteKeyCount * whiteKeyWidthPercent) - (blackKeyWidthPercent / 2)) + "%";
       }
 
-      // Add Interaction Listeners (Same as before)
+      // Dim the key if it is NOT currently on the Wicki board
+      if (window.boardFrequencies && !window.boardFrequencies.has(freqStr)) {
+          key.classList.add("out-of-range");
+      }
+
+      // Add Interaction Listeners
       key.addEventListener("mousedown", () => pressNote(freq, false, 'right'));
       key.addEventListener("mouseup", () => releaseNote(freq));
       key.addEventListener("mouseleave", () => releaseNote(freq));
@@ -303,12 +336,11 @@ function getFriendlyKeyName(keyCode) {
 }
 
 function getLabelText(semitoneOffset, keyCode) {
-  if (labelMode === 2) return ""; 
+  if (labelMode === 3) return ""; // 3 is now NONE
   
   if (labelMode === 1) { // KEYS MODE
     if (!keyCode) return "";
     
-    // Convert DOM 'code' to user-friendly text
     if (keyCode.startsWith("Key")) return keyCode.replace("Key", "");
     if (keyCode.startsWith("Digit")) return keyCode.replace("Digit", "");
     if (keyCode.startsWith("F") && keyCode.length <= 3) return keyCode; 
@@ -332,7 +364,24 @@ function getLabelText(semitoneOffset, keyCode) {
     }
   }
   
-  // NOTES MODE
+  if (labelMode === 2) { // NUMERIC MODE (Jianpu)
+    const noteIndex = ((semitoneOffset % 12) + 12) % 12; 
+    const octave = Math.floor(semitoneOffset / 12) + 3; 
+    const numNames = ["1", "1#", "2", "2#", "3", "4", "4#", "5", "5#", "6", "6#", "7"];
+    
+    // Octave 4 has no dots. Higher = dots above, Lower = dots below.
+    const dotsTop = octave > 4 ? "•".repeat(octave - 4) : "";
+    const dotsBottom = octave < 4 ? "•".repeat(4 - octave) : "";
+    
+    // Wrap in a tiny flexbox to stack the dots vertically
+    return `<div style="display:flex; flex-direction:column; align-items:center; line-height: 1; margin-top: -2px;">
+               <span style="font-size: 8px; height: 8px; display: block; letter-spacing: 1px;">${dotsTop}</span>
+               <span>${numNames[noteIndex]}</span>
+               <span style="font-size: 8px; height: 8px; display: block; letter-spacing: 1px;">${dotsBottom}</span>
+            </div>`;
+  }
+  
+  // NOTES MODE (labelMode === 0)
   const totalSteps = semitoneOffset;
   const noteIndex = ((totalSteps % 12) + 12) % 12; 
   const octave = Math.floor(totalSteps / 12) + 3; 

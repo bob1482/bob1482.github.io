@@ -19,12 +19,13 @@ let isMetronomeOn = false;
 let mobileZoom = 0.65; // Track mobile zoom level
 let showMobileStrip = false; // Track mobile strip visibility
 let stripHeight = 17; // Granular strip height (vh)
+let layoutMode = 0; // 0 = Auto, 1 = Desktop, 2 = Mobile
 
 // --- PHYSICAL KEY TRACKING ---
 let activePhysicalKeys = {}; 
 
-let labelMode = 1; // 0 = Notes, 1 = Keys, 2 = None
-const LABEL_MODES = ["NOTES", "KEYS", "NONE"];
+let labelMode = 1; // 0 = Notes, 1 = Keys, 2 = Numeric, 3 = None
+const LABEL_MODES = ["NOTES", "KEYS", "NUMERIC", "NONE"];
 
 let fKeyMode = 0; 
 const F_ROW_VARIANTS = [
@@ -149,7 +150,8 @@ function saveSettings() {
         isVisualizerOn: typeof isVisualizerOn !== 'undefined' ? isVisualizerOn : true,
         mobileZoom: mobileZoom,
         showMobileStrip: showMobileStrip,
-        stripHeight: stripHeight
+        stripHeight: stripHeight,
+        layoutMode: layoutMode
     };
     
     localStorage.setItem('wickiPianoSettings', JSON.stringify(settings));
@@ -188,6 +190,7 @@ function loadSettings() {
         if (settings.isVisualizerOn !== undefined && typeof isVisualizerOn !== 'undefined') {
             isVisualizerOn = settings.isVisualizerOn;
         }
+        if (settings.layoutMode !== undefined) layoutMode = settings.layoutMode;
         
         // Apply complex settings
         Tone.Destination.volume.value = Tone.gainToDb(globalVolume);

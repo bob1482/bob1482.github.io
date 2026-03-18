@@ -34,18 +34,34 @@ function updateFullscreenButton() {
     btn.innerText = isFullscreen ? "EXIT" : "FULL";
 }
 
-// Check if we are in mobile mode
+// Check if we are in mobile mode (Respects User Override)
 function isMobileMode() {
+    if (typeof layoutMode !== 'undefined') {
+        if (layoutMode === 1) return false; // Force Desktop
+        if (layoutMode === 2) return true;  // Force Mobile
+    }
+    // Auto Mode Default
     return window.innerWidth <= 850 || window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+}
+
+// NEW: Apply the CSS class to the body based on the current mode
+function applyLayoutModeClass() {
+    if (isMobileMode()) {
+        document.body.classList.add('is-mobile');
+    } else {
+        document.body.classList.remove('is-mobile');
+    }
 }
 
 // Re-render the board automatically if the user resizes the window or rotates their device
 let wasMobile = isMobileMode();
 window.addEventListener('resize', () => {
+    applyLayoutModeClass(); // Keep CSS in sync when window resizes
     const isNowMobile = isMobileMode();
     if (wasMobile !== isNowMobile) {
         wasMobile = isNowMobile;
         if (typeof renderBoard === 'function') renderBoard();
+        if (typeof resizeCanvas === 'function') resizeCanvas();
     }
 });
 
