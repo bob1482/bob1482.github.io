@@ -56,6 +56,30 @@ function releaseAllStuckNotes() {
     activeTouches = {};
 }
 
+// --- HIGHLIGHT RESET ---
+
+function resetHighlights() {
+    // 1. Release any physically stuck notes (stops audio and removes the base 'active' class)
+    if (typeof releaseAllStuckNotes === 'function') {
+        releaseAllStuckNotes();
+    }
+    
+    // 2. Clear all persistent scale markers (the blue/pink borders)
+    if (typeof clearAllHighlights === 'function') {
+        clearAllHighlights();
+    }
+    
+    // 3. Clear manual visual notes rising on the canvas
+    if (typeof visualNotes !== 'undefined' && typeof recycleNote === 'function') {
+        for (let i = visualNotes.length - 1; i >= 0; i--) {
+            recycleNote(visualNotes[i]);
+        }
+        visualNotes.length = 0; // Empty the array
+    }
+    
+    console.log("Keys and visuals reset!");
+}
+
 // --- TOUCH ENGINE ---
 let activeTouches = {}; 
 
@@ -482,6 +506,13 @@ window.addEventListener("keydown", (e) => {
       } else {
           startPlayback();
       }
+      return;
+  }
+
+  // Numpad 0: Reset Highlights
+  if (e.code === "Numpad0") {
+      e.preventDefault();
+      if (typeof resetHighlights === 'function') resetHighlights();
       return;
   }
 

@@ -36,7 +36,6 @@ function recycleAllNotes() {
 
 // --- LOGIC HELPERS ---
 function spawnFallingNote(freqStr, duration, targetTime) {
-  // Requires canvas to be accessible globally or via window
   const canvas = document.getElementById("synthesia-canvas");
   if (!canvas) return;
 
@@ -48,7 +47,9 @@ function spawnFallingNote(freqStr, duration, targetTime) {
   const coords = keyCoordinates[freqFixed];
   if (!coords) return;
   
-  const pixelsPerSecond = canvas.height / FALL_DURATION;
+  // NEW: Adjust fall duration based on playback speed so the visual length stays the same
+  const effectiveFallDuration = FALL_DURATION / playbackRate;
+  const pixelsPerSecond = canvas.height / effectiveFallDuration;
   const noteHeight = duration * pixelsPerSecond;
 
   const note = getNoteFromPool();
@@ -107,20 +108,20 @@ function updatePhysics(dt) {
     const canvas = document.getElementById("synthesia-canvas");
     if (!canvas) return;
 
-    // 1. Determine the "current time". If paused, use the exact moment we paused/scrubbed to.
     const currentAudioTime = isPaused ? pauseStartTimestamp : Tone.now();
     const effectiveTime = currentAudioTime - totalPausedTime;
 
-    const pixelsPerSecond = canvas.height / FALL_DURATION;
+    // NEW: Apply playback rate to physics
+    const effectiveFallDuration = FALL_DURATION / playbackRate;
+    const pixelsPerSecond = canvas.height / effectiveFallDuration;
 
     // 2. PLAYBACK LOGIC
     if (isPlaying) {
-        // Only continuously spawn new falling notes if actively playing
         if (!isPaused) {
             while(visualEventIndex < currentPlaybackEvents.length) {
                 const evt = currentPlaybackEvents[visualEventIndex];
                 const hitTime = playbackStartTime + evt.time + totalPausedTime;
-                const spawnTime = hitTime - FALL_DURATION;
+                const spawnTime = hitTime - effectiveFallDuration; // Adjusted spawn time
                 
                 if (currentAudioTime >= spawnTime) {
                     spawnFallingNote(evt.freq, evt.duration, hitTime);
@@ -131,7 +132,6 @@ function updatePhysics(dt) {
             }
         }
 
-        // ALWAYS calculate positions so scrubbing while paused updates the screen instantly
         for (let i = fallingNotes.length - 1; i >= 0; i--) {
             const note = fallingNotes[i];
             const timeRemaining = note.targetTime - currentAudioTime;
@@ -139,14 +139,12 @@ function updatePhysics(dt) {
             const y = canvas.height - (timeRemaining * pixelsPerSecond);
             note.drawY = y - note.height;
 
-            // Only delete notes if we are actively playing and they fall off screen
             if (!isPaused && note.drawY > canvas.height) {
                 recycleNote(note);
                 fallingNotes.splice(i, 1);
             }
         }
         
-        // Update Progress Bar if actively playing
         if (!isPaused) {
             const elapsed = (effectiveTime - playbackStartTime);
             if (playbackTotalDuration > 0) {
@@ -160,7 +158,7 @@ function updatePhysics(dt) {
         if(fallingNotes.length > 0) recycleAllNotes();
     }
 
-    // 3. MANUAL NOTES LOGIC (Unfrozen during pause)
+    // 3. MANUAL NOTES LOGIC
     for (let i = visualNotes.length - 1; i >= 0; i--) {
         const note = visualNotes[i];
         if (note.active) {

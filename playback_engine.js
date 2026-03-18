@@ -20,11 +20,10 @@ function startPlayback() {
   isPlaying = true;
   isPaused = false;
   totalPausedTime = 0;
-  seekedWhilePaused = false; // Reset flag on fresh playback
+  seekedWhilePaused = false; 
 
   currentPlaybackEvents = processRecordedEvents();
   
-  // Calculate total duration for progress bar
   playbackTotalDuration = 0;
   if(currentPlaybackEvents.length > 0) {
       const last = currentPlaybackEvents[currentPlaybackEvents.length-1];
@@ -35,8 +34,10 @@ function startPlayback() {
   visualEventIndex = 0;
   
   const now = Tone.now();
-  // Start playing immediately (visuals fall from top, so they spawn 'in past' virtually)
-  playbackStartTime = now + FALL_DURATION; 
+  
+  // NEW: Apply playback rate to the start time offset
+  const effectiveFallDuration = FALL_DURATION / playbackRate;
+  playbackStartTime = now + effectiveFallDuration; 
   
   if(isMetronomeOn) {
       Tone.Transport.start();
@@ -96,44 +97,38 @@ function setVisualizerPause(paused) {
 function seekToTime(percent) {
     if (!isPlaying) return;
     
-    // 1. Pause the scheduler and cancel upcoming audio/visuals to prevent distortion
     if (schedulerTimer) clearTimeout(schedulerTimer);
     if (typeof sampler !== 'undefined') sampler.releaseAll();
-    activeVoices = []; // Clear polyphony tracker
+    activeVoices = []; 
     Tone.Draw.cancel(0);
     
-    // Clear any currently active visual highlights when jumping around the timeline
     document.querySelectorAll('.active').forEach(key => key.classList.remove('active'));
     
-    // 2. Calculate new time target in seconds
     const targetSeconds = (percent / 100) * playbackTotalDuration;
     
-    // 3. Clear existing visuals
     if (typeof recycleAllNotes === 'function') recycleAllNotes();
     
-    // 4. Reset Time Base
     const now = Tone.now();
     totalPausedTime = 0; 
     playbackStartTime = now - targetSeconds;
     
-    // If we're paused, update the pause timestamp so unpause timing is correct
     if (isPaused) {
         pauseStartTimestamp = now;
-        // The seekedWhilePaused flag has been intentionally removed
     }
 
-    // 5. Find Audio Index (Next event to play sound)
     nextEventIndex = 0;
     while(nextEventIndex < currentPlaybackEvents.length && currentPlaybackEvents[nextEventIndex].time < targetSeconds) {
         nextEventIndex++;
     }
     
-    // 6. Visuals: Backfill Logic
     visualEventIndex = 0;
+    
+    // NEW: Apply playback rate to the scrub/seek visual recalculation
+    const effectiveFallDuration = FALL_DURATION / playbackRate;
     
     for (let i = 0; i < currentPlaybackEvents.length; i++) {
         const evt = currentPlaybackEvents[i];
-        const spawnTimeRel = evt.time - FALL_DURATION; 
+        const spawnTimeRel = evt.time - effectiveFallDuration; 
         
         if (spawnTimeRel > targetSeconds) {
             visualEventIndex = i;
@@ -150,7 +145,6 @@ function seekToTime(percent) {
         }
     }
     
-    // 7. Restart scheduler if we are not paused
     if (!isPaused) {
         schedulerLoop();
     }
