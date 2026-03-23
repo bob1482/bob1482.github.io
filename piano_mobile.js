@@ -2,6 +2,37 @@
 // PIANO MOBILE: Android/Brave Immersive Fullscreen
 // ==========================================
 
+// Dynamically move controls between the top bar and the gear menu
+function rearrangeUI() {
+    const isMobile = isMobileMode();
+    const quickControls = document.getElementById('quick-controls');
+    const settingsPanel = document.getElementById('settings-panel');
+
+    const groupsToMove = [
+        document.getElementById('group-recorder'),
+        document.getElementById('group-memory'),
+        document.getElementById('group-labels'),
+        document.getElementById('group-transpose')
+    ];
+
+    if (isMobile) {
+        if (quickControls) quickControls.style.display = 'none';
+
+        for (let i = groupsToMove.length - 1; i >= 0; i--) {
+            const ctrl = groupsToMove[i];
+            if (ctrl && settingsPanel) {
+                settingsPanel.insertBefore(ctrl, settingsPanel.firstChild);
+            }
+        }
+    } else {
+        if (quickControls) quickControls.style.display = 'flex';
+
+        groupsToMove.forEach(ctrl => {
+            if (ctrl && quickControls) quickControls.appendChild(ctrl);
+        });
+    }
+}
+
 function toggleFullScreen() {
     const docEl = document.documentElement;
 
@@ -60,28 +91,31 @@ window.addEventListener('resize', () => {
     const isNowMobile = isMobileMode();
     if (wasMobile !== isNowMobile) {
         wasMobile = isNowMobile;
+        rearrangeUI();
         if (typeof renderBoard === 'function') renderBoard();
         if (typeof resizeCanvas === 'function') resizeCanvas();
     }
 });
 
-// Toggle the settings panel on mobile
-function toggleMobileSettings() {
-    const controls = document.getElementById('controls');
-    if (controls) {
-        controls.classList.toggle('mobile-visible');
+// Toggle the settings panel globally
+function toggleSettings() {
+    const panel = document.getElementById('settings-panel');
+    if (panel) {
+        panel.classList.toggle('settings-visible');
     }
 }
 
-// Optional: Automatically close the mobile settings if the user taps the canvas/board
-window.addEventListener('touchstart', (e) => {
-    const controls = document.getElementById('controls');
-    const settingsBtn = document.getElementById('btn-mobile-settings');
+// Automatically close the settings if the user clicks/taps outside of it.
+window.addEventListener('pointerdown', (e) => {
+    const panel = document.getElementById('settings-panel');
+    const settingsBtn = document.getElementById('btn-settings');
     
-    // If we are touching outside the controls AND outside the settings button
-    if (controls && controls.classList.contains('mobile-visible')) {
-        if (!controls.contains(e.target) && !settingsBtn.contains(e.target)) {
-            controls.classList.remove('mobile-visible');
+    // If settings are open, and the click was outside the panel and the button, close them.
+    if (panel && panel.classList.contains('settings-visible')) {
+        if (!panel.contains(e.target) && settingsBtn && !settingsBtn.contains(e.target)) {
+            panel.classList.remove('settings-visible');
         }
     }
 });
+
+window.addEventListener('DOMContentLoaded', rearrangeUI);

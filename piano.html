@@ -12,29 +12,14 @@
     <script src="https://unpkg.com/@tonejs/midi"></script>
   </head>
   <body>
-    <button id="btn-mobile-settings" class="mobile-only" onclick="toggleMobileSettings()">⚙️</button>
+    <button id="btn-settings" onclick="toggleSettings()">⚙️</button>
     
     <div id="drop-zone">
       <div class="drop-text">DROP MIDI FILE HERE</div>
     </div>
     
-    <div id="controls">
-      <div class="control-group desktop-only">
-        <span class="control-label">Labels</span>
-        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="cycleLabels()" id="btn-labels">NOTES</button>
-      </div>
-      
-      <div class="control-group desktop-only">
-        <span class="control-label">Board</span>
-        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleBoard()" id="btn-board">HIDE</button>
-      </div>
-      
-      <div class="control-group desktop-only">
-        <span class="control-label">F-Keys</span>
-        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleFKeys()" id="btn-fkeys">F3-F12</button>
-      </div>
-      
-      <div class="control-group desktop-only">
+    <div id="quick-controls">
+      <div class="control-group" id="group-recorder">
         <span class="control-label">Recorder</span>
         <div class="btn-row">
           <button class="control-btn" id="btn-record" onclick="toggleRecording()" title="Record">●</button>
@@ -44,7 +29,8 @@
         <button class="control-btn" onclick="resetHighlights()" title="Clear Active Notes" style="width: 100%; font-size: 10px; margin-top: 5px; background-color: #555;">CLEAR KEYS</button>
       </div>
 
-      <div class="control-group playback-controls desktop-only">
+      <div class="control-group playback-controls" id="group-memory">
+         <span class="control-label">Memory</span>
          <div class="btn-row" style="width: 100%; padding: 0; background: transparent;">
            <select id="record-select" onchange="changeRecording(this.value)" style="flex-grow: 1;">
              <option value="-1">No Records</option>
@@ -54,19 +40,16 @@
          <button class="control-btn" id="btn-download-midi" onclick="downloadCurrentMidi()" title="Download MIDI" style="width: 100%; font-size: 10px; margin-top: 5px;">SAVE MIDI</button>
       </div>
 
-      <div class="control-group desktop-only">
-        <span class="control-label">Metronome</span>
-        <div class="btn-row">
-          <button class="control-btn" id="btn-metro" onclick="toggleMetronome()" title="Toggle Click">M</button>
-          <input type="number" id="input-bpm" value="120" onchange="updateBPM(this.value)" 
-                 style="width: 40px; background: rgba(111,111,111,0.3); border: none; color: white; border-radius: 4px; padding: 4px; font-weight: bold; text-align: center;">
-        </div>
+      <div class="control-group" id="group-labels">
+        <span class="control-label">Labels</span>
+        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="cycleLabels()" id="btn-labels">NOTES</button>
       </div>
-      
-      <div class="control-group">
+
+      <div class="control-group" id="group-transpose">
+        <span class="control-label">Transpose</span>
         <div style="display: flex; gap: 10px;">
           <div style="display:flex; flex-direction:column; align-items:center;">
-            <span class="side-label">TRANSPOSE</span>
+            <span class="side-label">LEFT</span>
             <div class="btn-row">
               <button class="control-btn" onclick="changeTranspose('left', -1)">-</button>
               <span class="control-val" id="disp-trans-l">0</span>
@@ -83,13 +66,34 @@
           </div>
         </div>
       </div>
-
-     <div class="control-group desktop-only" style="display: none;">
-      <span class="side-label" style="margin-top: 5px;">transequence</span>
-      <input type="text" id="input-sequence" 
-             value="-5:-5 -12:0 5:5 12:12 -17:-17 17:5" 
-             style="width: 300px; background: #222; color: white; border: 1px solid #666; border-radius: 4px; padding: 4px; font-size: 11px; text-align: center;">
     </div>
+
+    <div id="settings-panel">
+      <div class="control-group desktop-only">
+        <span class="control-label">Board</span>
+        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleBoard()" id="btn-board">HIDE</button>
+      </div>
+      
+      <div class="control-group desktop-only">
+        <span class="control-label">F-Keys</span>
+        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleFKeys()" id="btn-fkeys">F3-F12</button>
+      </div>
+
+      <div class="control-group desktop-only">
+        <span class="control-label">Metronome</span>
+        <div class="btn-row">
+          <button class="control-btn" id="btn-metro" onclick="toggleMetronome()" title="Toggle Click">M</button>
+          <input type="number" id="input-bpm" value="120" onchange="updateBPM(this.value)"
+                 style="width: 40px; background: rgba(111,111,111,0.3); border: none; color: white; border-radius: 4px; padding: 4px; font-weight: bold; text-align: center;">
+        </div>
+      </div>
+
+      <div class="control-group desktop-only" style="display: none;">
+        <span class="side-label" style="margin-top: 5px;">transequence</span>
+        <input type="text" id="input-sequence"
+               value="-5:-5 -12:0 5:5 12:12 -17:-17 17:5"
+               style="width: 300px; background: #222; color: white; border: 1px solid #666; border-radius: 4px; padding: 4px; font-size: 11px; text-align: center;">
+      </div>
 
       <div class="control-group desktop-only">
         <span class="control-label">Visuals</span>
@@ -102,10 +106,32 @@
       </div>
 
       <div class="control-group">
+        <span class="control-label">Strip Range</span>
+        <div style="display: flex; gap: 10px;">
+          <div style="display:flex; flex-direction:column; align-items:center;">
+            <span class="side-label">LEFT</span>
+            <div class="btn-row">
+              <button class="control-btn" onclick="changeStripRange('left', -1)">-</button>
+              <span class="control-val" id="disp-strip-l">-27</span>
+              <button class="control-btn" onclick="changeStripRange('left', 1)">+</button>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center;">
+            <span class="side-label">RIGHT</span>
+            <div class="btn-row">
+              <button class="control-btn" onclick="changeStripRange('right', -1)">-</button>
+              <span class="control-val" id="disp-strip-r">60</span>
+              <button class="control-btn" onclick="changeStripRange('right', 1)">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="control-group">
         <span class="control-label">Strip H</span>
         <div class="btn-row">
           <button class="control-btn" onclick="changeStripHeight(-1)">-</button>
-          <span class="control-val" id="disp-strip-height">17</span>
+          <span class="control-val" id="disp-strip-height">5</span>
           <button class="control-btn" onclick="changeStripHeight(1)">+</button>
         </div>
       </div>

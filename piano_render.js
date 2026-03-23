@@ -165,25 +165,19 @@ function renderBoard() {
       const isLeft = c < SPLIT_COL;
       const side = isLeft ? 'left' : 'right';
 
-      // Mouse Events
-      key.addEventListener("mousedown", () => {
+      // Upgraded Mouse Events (Touch is now handled globally)
+      key.addEventListener("mousedown", (e) => {
+          if (e.button !== 0) return;
           if(typeof pressNote === 'function') pressNote(freq, false, side);
       });
-      key.addEventListener("mouseup", () => {
-          if(typeof releaseNote === 'function') releaseNote(freq);
+      key.addEventListener("mouseenter", () => {
+          if(window.isMouseDown && typeof pressNote === 'function') pressNote(freq, false, side);
       });
       key.addEventListener("mouseleave", () => {
           if(typeof releaseNote === 'function') releaseNote(freq);
       });
-
-      // Touch Events
-      key.addEventListener("touchstart", (e) => {
-          if(e.cancelable) e.preventDefault(); 
-          if(typeof pressNote === 'function') pressNote(freq, false, side);
-      }, {passive: false});
-
-      key.addEventListener("touchend", (e) => {
-          if(e.cancelable) e.preventDefault();
+      key.addEventListener("mouseup", (e) => {
+          if (e.button !== 0) return;
           if(typeof releaseNote === 'function') releaseNote(freq);
       });
 
@@ -220,10 +214,21 @@ function renderTraditionalPiano() {
   const wrapper = document.createElement("div");
   wrapper.className = "piano-wrapper";
   strip.appendChild(wrapper);
-  
-  const totalNotes = 88;
-  const startOffset = -27; // Starts at A0
-  const totalWhiteKeys = 52; 
+
+  const startOffset = typeof stripRangeLeft !== 'undefined' ? stripRangeLeft : -27;
+  const endOffset = typeof stripRangeRight !== 'undefined' ? stripRangeRight : 60;
+  const totalNotes = endOffset - startOffset + 1;
+
+  let totalWhiteKeys = 0;
+  for (let i = 0; i < totalNotes; i++) {
+      const noteIndex = (((startOffset + i) % 12) + 12) % 12;
+      if ([0, 2, 4, 5, 7, 9, 11].includes(noteIndex)) {
+          totalWhiteKeys++;
+      }
+  }
+
+  if (totalWhiteKeys === 0) totalWhiteKeys = 1;
+
   const whiteKeyWidthPercent = 100 / totalWhiteKeys;
   const blackKeyWidthPercent = whiteKeyWidthPercent * 0.7; 
   let whiteKeyCount = 0;
@@ -308,12 +313,19 @@ function renderTraditionalPiano() {
           key.classList.add("out-of-range");
       }
 
-      // Add Interaction Listeners
-      key.addEventListener("mousedown", () => pressNote(freq, false, 'right'));
-      key.addEventListener("mouseup", () => releaseNote(freq));
+      // Upgraded Mouse Events (Touch is now handled globally)
+      key.addEventListener("mousedown", (e) => {
+          if (e.button !== 0) return;
+          pressNote(freq, false, 'right');
+      });
+      key.addEventListener("mouseenter", () => {
+          if (window.isMouseDown) pressNote(freq, false, 'right');
+      });
       key.addEventListener("mouseleave", () => releaseNote(freq));
-      key.addEventListener("touchstart", (e) => { e.preventDefault(); pressNote(freq, false, 'right'); }, {passive: false});
-      key.addEventListener("touchend", (e) => { e.preventDefault(); releaseNote(freq); });
+      key.addEventListener("mouseup", (e) => {
+          if (e.button !== 0) return;
+          releaseNote(freq);
+      });
 
       wrapper.appendChild(key);
   }
@@ -387,78 +399,6 @@ function getLabelText(semitoneOffset, keyCode) {
   const octave = Math.floor(totalSteps / 12) + 3; 
   return NOTE_NAMES[noteIndex] + octave;
 }
-
-
-function updateUI() {
-  const dispVol = document.getElementById("disp-vol");
-  if (dispVol) dispVol.innerText = Math.round(globalVolume * 10);
-  
-  const dispSus = document.getElementById("disp-sus");
-  if (dispSus) dispSus.innerText = sustainMultiplier.toFixed(2) * 5;
-  
-  document.getElementById("disp-trans-l").innerText = transposeLeft;
-  document.getElementById("disp-trans-r").innerText = transposeRight;
-  document.getElementById("btn-labels").innerText = LABEL_MODES[labelMode];
-  document.getElementById("btn-fkeys").innerText = F_KEY_LABELS[fKeyMode];
-  
-  // Update Zoom Display
-  const dispZoom = document.getElementById("disp-zoom");
-  if (dispZoom) dispZoom.innerText = Math.round(mobileZoom * 100);
-  
-  const btnRecord = document.getElementById("btn-record");
-  const btnPlay = document.getElementById("btn-play");
-  const btnPause = document.getElementById("btn-pause");
-  
-  // Recording State
-  if (isRecording) {
-      btnRecord.classList.add("recording");
-      btnPlay.disabled = true;
-      btnPause.disabled = true;
-      document.getElementById('progress-bar').disabled = true;
-      document.getElementById('record-select').disabled = true;
-  } else {
-      btnRecord.classList.remove("recording");
-      btnPlay.disabled = false;
-      document.getElementById('progress-bar').disabled = false;
-      document.getElementById('record-select').disabled = false;
-  }
-  
-  // Playback State
-  const progressContainer = document.getElementById('progress-container');
-  
-  if (isPlaying) {
-    btnPlay.innerText = "■"; 
-    btnPlay.classList.add("playing");
-    btnPause.disabled = false;
-    
-    // Show the progress bar when playing
-    if (progressContainer) progressContainer.style.display = "block";
-    
-    if (isPaused) {
-        btnPause.innerText = "▶";
-        btnPause.classList.add("paused");
-    } else {
-        btnPause.innerText = "II";
-        btnPause.classList.remove("paused");
-    }
-  } else {
-    btnPlay.innerText = "▶"; 
-    btnPlay.classList.remove("playing");
-    btnPause.innerText = "II";
-    btnPause.disabled = true;
-    btnPause.classList.remove("paused");
-    
-    // Hide the progress bar when stopped
-    if (progressContainer) progressContainer.style.display = "none";
-  }
-
-  // Apply the strip state visually on load
-  if (typeof applyMobileStripState === 'function') applyMobileStripState();
-  
-  // Apply dynamic strip height on load
-  if (typeof applyStripHeight === 'function') applyStripHeight();
-}
-
 
 // --- INITIALIZATION ---
 // Show loading immediately

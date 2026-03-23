@@ -56,6 +56,16 @@ function releaseAllStuckNotes() {
     activeTouches = {};
 }
 
+// --- GLOBAL MOUSE TRACKING ---
+window.isMouseDown = false;
+
+window.addEventListener('mousedown', (e) => {
+    if (e.button === 0) window.isMouseDown = true;
+});
+window.addEventListener('mouseup', (e) => {
+    if (e.button === 0) window.isMouseDown = false;
+});
+
 // --- HIGHLIGHT RESET ---
 
 function resetHighlights() {
@@ -89,7 +99,8 @@ function handleTouchStart(e) {
     for (let i = 0; i < touches.length; i++) {
         const touch = touches[i];
         const target = document.elementFromPoint(touch.clientX, touch.clientY);
-        if (target && target.classList.contains('key')) {
+
+        if (target && (target.classList.contains('key') || target.classList.contains('p-key'))) {
             const freq = parseFloat(target.getAttribute('data-note'));
             const parent = target.closest('.wicki-board');
             const side = (parent && parent.id === 'board-left') ? 'left' : 'right';
@@ -105,7 +116,8 @@ function handleTouchMove(e) {
     for (let i = 0; i < touches.length; i++) {
         const touch = touches[i];
         const target = document.elementFromPoint(touch.clientX, touch.clientY);
-        if (target && target.classList.contains('key')) {
+
+        if (target && (target.classList.contains('key') || target.classList.contains('p-key'))) {
             const newFreq = parseFloat(target.getAttribute('data-note'));
             const oldFreq = activeTouches[touch.identifier];
             if (newFreq !== oldFreq) {
@@ -139,12 +151,19 @@ function handleTouchEnd(e) {
 }
 
 const boardContainer = document.getElementById('board-wrapper');
-if (boardContainer) {
-    boardContainer.addEventListener('touchstart', handleTouchStart, {passive: false});
-    boardContainer.addEventListener('touchmove', handleTouchMove, {passive: false});
-    boardContainer.addEventListener('touchend', handleTouchEnd);
-    boardContainer.addEventListener('touchcancel', handleTouchEnd);
+const stripContainer = document.getElementById('piano-strip');
+
+function bindTouchEvents(element) {
+    if (element) {
+        element.addEventListener('touchstart', handleTouchStart, {passive: false});
+        element.addEventListener('touchmove', handleTouchMove, {passive: false});
+        element.addEventListener('touchend', handleTouchEnd);
+        element.addEventListener('touchcancel', handleTouchEnd);
+    }
 }
+
+bindTouchEvents(boardContainer);
+bindTouchEvents(stripContainer);
 
 // Settings toggle removed
 
@@ -270,12 +289,12 @@ function changeTranspose(side, delta) {
   releaseAllStuckNotes(); 
   if (side === 'left') {
     transposeLeft += delta;
-    if (transposeLeft < -30) transposeLeft = -30;
-    if (transposeLeft > 24) transposeLeft = 24;
+    if (transposeLeft < -50) transposeLeft = -50;
+    if (transposeLeft > 50) transposeLeft = 50;
   } else {
     transposeRight += delta;
-    if (transposeRight < -30) transposeRight = -30;
-    if (transposeRight > 24) transposeRight = 24;
+    if (transposeRight < -50) transposeRight = -50;
+    if (transposeRight > 50) transposeRight = 50;
   }
   renderBoard(); 
   updateUI();
@@ -337,6 +356,26 @@ function applyMobileStripState() {
 }
 
 // --- STRIP HEIGHT CONTROLS ---
+
+function changeStripRange(side, delta) {
+    if (typeof releaseAllStuckNotes === 'function') releaseAllStuckNotes();
+
+    if (side === 'left') {
+        stripRangeLeft -= delta;
+        if (stripRangeLeft > 0) stripRangeLeft = 0;
+        if (stripRangeLeft < -50) stripRangeLeft = -50;
+    } else {
+        stripRangeRight += delta;
+        if (stripRangeRight < 0) stripRangeRight = 0;
+        if (stripRangeRight > 70) stripRangeRight = 70;
+    }
+
+    if (stripRangeLeft > stripRangeRight) stripRangeLeft = stripRangeRight;
+
+    if (typeof renderBoard === 'function') renderBoard();
+    updateUI();
+    saveSettings();
+}
 
 function changeStripHeight(delta) {
     stripHeight += delta;
@@ -502,10 +541,10 @@ window.addEventListener("keydown", (e) => {
 
       transposeLeft += deltaLeft;
       transposeRight += deltaRight;
-      if (transposeLeft < -30) transposeLeft = -30;
-      if (transposeLeft > 24) transposeLeft = 24;
-      if (transposeRight < -30) transposeRight = -30;
-      if (transposeRight > 24) transposeRight = 24;
+      if (transposeLeft < -50) transposeLeft = -50;
+      if (transposeLeft > 50) transposeLeft = 50;
+      if (transposeRight < -50) transposeRight = -50;
+      if (transposeRight > 50) transposeRight = 50;
 
       renderBoard();
       updateUI();
@@ -640,6 +679,9 @@ function updateUI() {
   document.getElementById("disp-trans-r").innerText = transposeRight;
   document.getElementById("btn-labels").innerText = LABEL_MODES[labelMode];
   document.getElementById("btn-fkeys").innerText = F_KEY_LABELS[fKeyMode];
+
+  const dispZoom = document.getElementById("disp-zoom");
+  if (dispZoom) dispZoom.innerText = Math.round(mobileZoom * 100);
   
   const btnRecord = document.getElementById("btn-record");
   const btnPlay = document.getElementById("btn-play");
@@ -700,31 +742,10 @@ function updateUI() {
   
   const dispStrip = document.getElementById("disp-strip-height");
   if (dispStrip) dispStrip.innerText = stripHeight;
-}
 
-// ==========================================
-// AUTO-HIDE CONTROLS LOGIC
-// ==========================================
+  const dispStripL = document.getElementById("disp-strip-l");
+  if (dispStripL) dispStripL.innerText = stripRangeLeft;
 
-const controlsPanel = document.getElementById('controls');
-const HOVER_THRESHOLD = 200; // Pixels from top where controls stay visible
-
-if (controlsPanel) {
-    window.addEventListener('mousemove', (e) => {
-        // 1. Safety Check: Don't hide if the user is interacting with an input
-        // (e.g. typing in the sequencer or dragging the progress bar)
-        const active = document.activeElement;
-        if (active && (active.tagName === 'INPUT' || active.tagName === 'SELECT') && controlsPanel.contains(active)) {
-            return;
-        }
-
-        // 2. Position Check
-        if (e.clientY < HOVER_THRESHOLD) {
-            // Mouse is near the top -> Show
-            controlsPanel.classList.remove('hidden');
-        } else {
-            // Mouse is far away -> Hide
-            controlsPanel.classList.add('hidden');
-        }
-    });
+  const dispStripR = document.getElementById("disp-strip-r");
+  if (dispStripR) dispStripR.innerText = stripRangeRight;
 }

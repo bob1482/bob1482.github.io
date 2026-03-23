@@ -7,19 +7,24 @@ const COLS = 12;
 const BASE_NOTE_FREQ = 130.81; // Approx C3
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
+// Evaluate initial screen size for intelligent defaults
+const initIsMobile = window.innerWidth <= 850 || window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
 // --- GLOBAL SETTINGS STATE ---
-let transposeLeft = 2;
-let transposeRight = 2;
+let transposeLeft = initIsMobile ? -22 : 2;
+let transposeRight = initIsMobile ? -22 : 2;
 let globalVolume = 0.5;
 let sustainMultiplier = 1.0;
 let isLoaded = false; 
 let sequenceIndex = 0;
 let bpm = 120; 
 let isMetronomeOn = false; 
-let mobileZoom = 0.65; // Track mobile zoom level
-let showMobileStrip = false; // Track mobile strip visibility
-let stripHeight = 17; // Granular strip height (vh)
+let mobileZoom = initIsMobile ? 1.30 : 0.65; // 130 on mobile, 65 on desktop
+let showMobileStrip = true;
+let stripHeight = initIsMobile ? 5 : 16; // 5 on mobile, 16 on desktop
 let layoutMode = 0; // 0 = Auto, 1 = Desktop, 2 = Mobile
+let stripRangeLeft = initIsMobile ? 0 : -27; // 0 on mobile, -27 on desktop
+let stripRangeRight = initIsMobile ? 47 : 60; // 47 on mobile, 60 on desktop
 
 // --- PHYSICAL KEY TRACKING ---
 let activePhysicalKeys = {}; 
@@ -151,7 +156,9 @@ function saveSettings() {
         mobileZoom: mobileZoom,
         showMobileStrip: showMobileStrip,
         stripHeight: stripHeight,
-        layoutMode: layoutMode
+        layoutMode: layoutMode,
+        stripRangeLeft: stripRangeLeft,
+        stripRangeRight: stripRangeRight
     };
     
     localStorage.setItem('wickiPianoSettings', JSON.stringify(settings));
@@ -181,16 +188,26 @@ function loadSettings() {
             // Backward compatibility with legacy 3-state strip height setting.
             if (settings.stripHeightMode === 1) stripHeight = 30;
             else if (settings.stripHeightMode === 2) stripHeight = 10;
-            else stripHeight = 17;
+            else stripHeight = initIsMobile ? 5 : 16;
         }
         stripHeight = parseFloat(stripHeight);
-        if (Number.isNaN(stripHeight)) stripHeight = 17;
+        if (Number.isNaN(stripHeight)) stripHeight = initIsMobile ? 5 : 16;
         if (stripHeight < 5) stripHeight = 5;
         if (stripHeight > 50) stripHeight = 50;
         if (settings.isVisualizerOn !== undefined && typeof isVisualizerOn !== 'undefined') {
             isVisualizerOn = settings.isVisualizerOn;
         }
         if (settings.layoutMode !== undefined) layoutMode = settings.layoutMode;
+        if (settings.stripRangeLeft !== undefined) {
+            stripRangeLeft = settings.stripRangeLeft;
+        } else {
+            stripRangeLeft = initIsMobile ? 0 : -27;
+        }
+        if (settings.stripRangeRight !== undefined) {
+            stripRangeRight = settings.stripRangeRight;
+        } else {
+            stripRangeRight = initIsMobile ? 47 : 60;
+        }
         
         // Apply complex settings
         Tone.Destination.volume.value = Tone.gainToDb(globalVolume);
