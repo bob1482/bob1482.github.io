@@ -93,16 +93,21 @@ function resetHighlights() {
 // --- TOUCH ENGINE ---
 let activeTouches = {}; 
 
+function getTouchedKeyElement(touch) {
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    return target ? target.closest('.key, .p-key') : null;
+}
+
 function handleTouchStart(e) {
     e.preventDefault(); 
     const touches = e.changedTouches;
     for (let i = 0; i < touches.length; i++) {
         const touch = touches[i];
-        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        const keyElement = getTouchedKeyElement(touch);
 
-        if (target && (target.classList.contains('key') || target.classList.contains('p-key'))) {
-            const freq = parseFloat(target.getAttribute('data-note'));
-            const parent = target.closest('.wicki-board');
+        if (keyElement) {
+            const freq = parseFloat(keyElement.getAttribute('data-note'));
+            const parent = keyElement.closest('.wicki-board');
             const side = (parent && parent.id === 'board-left') ? 'left' : 'right';
             pressNote(freq, false, side);
             activeTouches[touch.identifier] = freq;
@@ -115,14 +120,14 @@ function handleTouchMove(e) {
     const touches = e.changedTouches;
     for (let i = 0; i < touches.length; i++) {
         const touch = touches[i];
-        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        const keyElement = getTouchedKeyElement(touch);
 
-        if (target && (target.classList.contains('key') || target.classList.contains('p-key'))) {
-            const newFreq = parseFloat(target.getAttribute('data-note'));
+        if (keyElement) {
+            const newFreq = parseFloat(keyElement.getAttribute('data-note'));
             const oldFreq = activeTouches[touch.identifier];
             if (newFreq !== oldFreq) {
                 if (oldFreq !== undefined) releaseNote(oldFreq);
-                const parent = target.closest('.wicki-board');
+                const parent = keyElement.closest('.wicki-board');
                 const side = (parent && parent.id === 'board-left') ? 'left' : 'right';
                 pressNote(newFreq, false, side);
                 activeTouches[touch.identifier] = newFreq;
@@ -412,10 +417,10 @@ function applyStripHeight() {
     }
     
     const importantFlag = body.classList.contains("force-strip") ? "important" : "";
-    if (strip) strip.style.setProperty("height", `${stripHeight}vh`, importantFlag);
-    if (canvas) canvas.style.setProperty("height", `${canvasHeight}vh`, importantFlag);
-    if (progCont) progCont.style.setProperty("height", `${canvasHeight}vh`, importantFlag);
-    if (progBar) progBar.style.setProperty("width", `calc(${canvasHeight}vh - 10px)`, importantFlag);
+    if (strip) strip.style.setProperty("height", `${stripHeight}dvh`, importantFlag);
+    if (canvas) canvas.style.setProperty("height", `${canvasHeight}dvh`, importantFlag);
+    if (progCont) progCont.style.setProperty("height", `${canvasHeight}dvh`, importantFlag);
+    if (progBar) progBar.style.setProperty("width", `calc(${canvasHeight}dvh - 10px)`, importantFlag);
 }
 
 function cycleLabels() {
