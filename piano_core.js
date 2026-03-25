@@ -25,6 +25,10 @@ let stripHeight = initIsMobile ? 5 : 16; // 5 on mobile, 16 on desktop
 let layoutMode = 0; // 0 = Auto, 1 = Desktop, 2 = Mobile
 let stripRangeLeft = initIsMobile ? 0 : -27; // 0 on mobile, -27 on desktop
 let stripRangeRight = initIsMobile ? 47 : 60; // 47 on mobile, 60 on desktop
+let customBackground = null; // Holds the base64 image data
+let customKeyIdle = null;
+let customKeyPressed = null;
+let transposeSequence = "-5:-5 -12:0 5:5 12:12 -17:-17 17:5";
 
 // --- PHYSICAL KEY TRACKING ---
 let activePhysicalKeys = {}; 
@@ -158,11 +162,19 @@ function saveSettings() {
         stripHeight: stripHeight,
         layoutMode: layoutMode,
         stripRangeLeft: stripRangeLeft,
-        stripRangeRight: stripRangeRight
+        stripRangeRight: stripRangeRight,
+        customBackground: customBackground,
+        customKeyIdle: customKeyIdle,
+        customKeyPressed: customKeyPressed,
+        transposeSequence: transposeSequence
     };
-    
-    localStorage.setItem('wickiPianoSettings', JSON.stringify(settings));
-    console.log("Settings Saved:", settings);
+
+    try {
+        localStorage.setItem('wickiPianoSettings', JSON.stringify(settings));
+        console.log("Settings Saved");
+    } catch (e) {
+        console.warn("Storage full. Could not save background permanently.", e);
+    }
 }
 
 function loadSettings() {
@@ -208,6 +220,18 @@ function loadSettings() {
         } else {
             stripRangeRight = initIsMobile ? 47 : 60;
         }
+        if (settings.customBackground !== undefined) {
+            customBackground = settings.customBackground;
+            if (typeof applyBackground === 'function') applyBackground();
+        }
+        if (settings.customKeyIdle !== undefined) customKeyIdle = settings.customKeyIdle;
+        if (settings.customKeyPressed !== undefined) customKeyPressed = settings.customKeyPressed;
+        if (settings.transposeSequence !== undefined) {
+            transposeSequence = settings.transposeSequence;
+            const seqInput = document.getElementById("input-sequence");
+            if (seqInput) seqInput.value = transposeSequence;
+        }
+        if (typeof applyKeyImages === 'function') applyKeyImages();
         
         // Apply complex settings
         Tone.Destination.volume.value = Tone.gainToDb(globalVolume);
@@ -231,68 +255,87 @@ function resetSettings() {
 }
 
 // ==========================================
-// MEMORY RESET
+// GRANULAR MEMORY RESET
 // ==========================================
-function resetBrowserMemory() {
-    const ok = confirm(
-        "This will reset browser memory and reload the page.\n\n" +
-        "- Clear all recordings\n" +
-        "- Clear note pools and caches\n" +
-        "- Reset audio engine state\n" +
-        "- Clear localStorage settings\n\n" +
-        "Continue?"
-    );
 
-    if (!ok) return;
+function openResetModal() {
+    const modal = document.getElementById('reset-modal');
+    if (modal) modal.classList.add('active');
+}
 
-    console.log("=== INITIATING BROWSER MEMORY RESET ===");
+function closeResetModal() {
+    const modal = document.getElementById('reset-modal');
+    if (modal) modal.classList.remove('active');
+}
 
-    // 1) Stop playback and release any active notes
-    if (typeof stopPlayback === 'function') stopPlayback();
-    if (typeof releaseAllStuckNotes === 'function') releaseAllStuckNotes();
+function executeReset() {
+    const resetRecs = document.getElementById('reset-recs').checked;
+    const resetMedia = document.getElementById('reset-media').checked;
+    const resetPrefs = document.getElementById('reset-prefs').checked;
 
-    // 2) Stop metronome / transport
-    if (typeof metroLoop !== 'undefined') metroLoop.stop();
-    Tone.Transport.stop();
-    Tone.Transport.cancel(0);
-    isMetronomeOn = false;
-
-    // 3) Clear recording buffers
-    recordedEvents = [];
-    recordingsList = [];
-    currentRecordingIndex = -1;
-    isRecording = false;
-    isPlaying = false;
-    isPaused = false;
-    if (typeof updateRecordSelectUI === 'function') updateRecordSelectUI();
-
-    // 4) Clear visual pools/caches
-    if (typeof recycleAllNotes === 'function') recycleAllNotes();
-    if (typeof notePool !== 'undefined') notePool = [];
-    if (typeof visualNotes !== 'undefined') visualNotes = [];
-    if (typeof fallingNotes !== 'undefined') fallingNotes = [];
-    if (typeof keyCoordinates !== 'undefined') keyCoordinates = {};
-
-    // 5) Clear DOM/input caches
-    if (typeof domKeyCache !== 'undefined') domKeyCache = {};
-    if (typeof activePhysicalKeys !== 'undefined') activePhysicalKeys = {};
-    if (typeof activeTouches !== 'undefined') activeTouches = {};
-    if (typeof freqToKeyMapLeft !== 'undefined') freqToKeyMapLeft = {};
-    if (typeof freqToKeyMapRight !== 'undefined') freqToKeyMapRight = {};
-
-    // 6) Reset audio runtime state
-    if (typeof sampler !== 'undefined') sampler.releaseAll();
-    activeVoices = [];
-
-    // 7) Clear pending scheduler timers
-    if (typeof schedulerTimer !== 'undefined' && schedulerTimer) {
-        clearTimeout(schedulerTimer);
-        schedulerTimer = null;
+    if (!resetRecs && !resetMedia && !resetPrefs) {
+        closeResetModal();
+        return; // Nothing selected!
     }
 
-    // 8) Clear persisted settings and reload
-    localStorage.removeItem('wickiPianoSettings');
+    // Safety: Stop audio and release keys during any reset
+    if (typeof stopPlayback === 'function') stopPlayback();
+    if (typeof releaseAllStuckNotes === 'function') releaseAllStuckNotes();
+    if (typeof sampler !== 'undefined') sampler.releaseAll();
 
-    console.log("=== MEMORY RESET COMPLETE - RELOADING ===");
-    location.reload();
+    // 1. Clear Recordings
+    if (resetRecs) {
+        recordingsList = [];
+        recordedEvents = [];
+        currentRecordingIndex = -1;
+        isRecording = false;
+        if (typeof updateRecordSelectUI === 'function') updateRecordSelectUI();
+        if (typeof recycleAllNotes === 'function') recycleAllNotes();
+    }
+
+    // 2. Manage Local Storage & Preferences
+    if (resetMedia || resetPrefs) {
+        let saved = localStorage.getItem('wickiPianoSettings');
+        let settings = saved ? JSON.parse(saved) : {};
+
+        // Wipe Custom Images
+        if (resetMedia) {
+            customBackground = null;
+            customKeyIdle = null;
+            customKeyPressed = null;
+            delete settings.customBackground;
+            delete settings.customKeyIdle;
+            delete settings.customKeyPressed;
+            if (typeof applyBackground === 'function') applyBackground();
+            if (typeof applyKeyImages === 'function') applyKeyImages();
+        }
+
+        // Soft Reset Transpose & Sequence (NO RELOAD)
+        if (resetPrefs) {
+            // 1. Reset live variables to defaults
+            transposeLeft = initIsMobile ? -22 : 2;
+            transposeRight = initIsMobile ? -22 : 2;
+            transposeSequence = "-5:-5 -12:0 5:5 12:12 -17:-17 17:5";
+            sequenceIndex = 0;
+
+            // 2. Delete them from the saved settings object so they don't persist
+            delete settings.transposeLeft;
+            delete settings.transposeRight;
+            delete settings.transposeSequence;
+
+            // 3. Reset the physical text box input
+            const seqInput = document.getElementById("input-sequence");
+            if (seqInput) seqInput.value = transposeSequence;
+
+            // 4. Redraw the board to reflect the new transpose values
+            if (typeof renderBoard === 'function') renderBoard();
+        }
+
+        localStorage.setItem('wickiPianoSettings', JSON.stringify(settings));
+    }
+
+    closeResetModal();
+
+    // Always update the visible numbers and buttons at the end
+    if (typeof updateUI === 'function') updateUI();
 }

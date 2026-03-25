@@ -504,6 +504,11 @@ function toggleVisuals() {
 // --- KEYBOARD LISTENERS ---
 
 window.addEventListener("keydown", (e) => {
+  const active = document.activeElement;
+  if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT")) {
+    return;
+  }
+
   if (e.code.startsWith("Arrow")) {
     if (e.repeat) return;
     const smallStep = 1;  
@@ -521,8 +526,7 @@ window.addEventListener("keydown", (e) => {
     if (e.repeat) return;
     releaseAllStuckNotes();
 
-    const input = document.getElementById("input-sequence").value;
-    const steps = input.trim().split(/\s+/);
+    const steps = transposeSequence.trim().split(/\s+/);
     
     if (steps.length > 0 && steps[0] !== "") {
       const stepStr = steps[sequenceIndex % steps.length];
@@ -614,6 +618,11 @@ window.addEventListener("keydown", (e) => {
 });
 
 window.addEventListener("keyup", (e) => {
+  const active = document.activeElement;
+  if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT")) {
+    return;
+  }
+
   if (activePhysicalKeys[e.code]) {
       const freq = activePhysicalKeys[e.code];
       releaseNote(freq);
@@ -635,7 +644,7 @@ window.addEventListener('samplesLoaded', () => {
 });
 
 // --- MEMORY RESET BUTTON ---
-document.getElementById('btn-reset-memory')?.addEventListener('click', resetBrowserMemory);
+document.getElementById('btn-reset-memory')?.addEventListener('click', openResetModal);
 
 renderBoard();
 updateUI();
@@ -748,4 +757,184 @@ function updateUI() {
 
   const dispStripR = document.getElementById("disp-strip-r");
   if (dispStripR) dispStripR.innerText = stripRangeRight;
+}
+
+// ==========================================
+// BACKGROUND UPLOAD LOGIC
+// ==========================================
+
+function handleBackgroundUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const MAX_WIDTH = 1920;
+      const MAX_HEIGHT = 1080;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+        const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+        width *= ratio;
+        height *= ratio;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+
+      customBackground = canvas.toDataURL("image/jpeg", 0.8);
+      applyBackground();
+      saveSettings();
+
+      event.target.value = "";
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearBackground() {
+  customBackground = null;
+  applyBackground();
+  saveSettings();
+
+  const uploadInput = document.getElementById("bg-upload");
+  if (uploadInput) uploadInput.value = "";
+}
+
+function applyBackground() {
+  if (customBackground) {
+    document.body.style.backgroundImage = "url('" + customBackground + "')";
+  } else {
+    document.body.style.backgroundImage = "none";
+  }
+}
+
+// ==========================================
+// WICKI KEY IMAGE UPLOAD LOGIC
+// ==========================================
+
+function handleKeyImageUpload(event, type) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const MAX_SIZE = 150;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > MAX_SIZE || height > MAX_SIZE) {
+        const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
+        width *= ratio;
+        height *= ratio;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const compressed = canvas.toDataURL("image/png", 0.9);
+
+      if (type === "idle") {
+        customKeyIdle = compressed;
+      } else if (type === "press") {
+        customKeyPressed = compressed;
+      }
+
+      applyKeyImages();
+      saveSettings();
+
+      event.target.value = "";
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearKeyImages() {
+  customKeyIdle = null;
+  customKeyPressed = null;
+  applyKeyImages();
+  saveSettings();
+
+  const idleInput = document.getElementById("key-idle-upload");
+  const pressInput = document.getElementById("key-press-upload");
+  if (idleInput) idleInput.value = "";
+  if (pressInput) pressInput.value = "";
+}
+
+function applyKeyImages() {
+  let styleTag = document.getElementById("dynamic-key-styles");
+  if (!styleTag) {
+    styleTag = document.createElement("style");
+    styleTag.id = "dynamic-key-styles";
+    document.head.appendChild(styleTag);
+  }
+
+  if (!customKeyIdle && !customKeyPressed) {
+    styleTag.innerHTML = "";
+    return;
+  }
+
+  let css = `
+    .wicki-board .key {
+      background-size: contain !important;
+      background-position: center !important;
+      background-repeat: no-repeat !important;
+    }
+    .wicki-board .key.natural,
+    .wicki-board .key.accidental {
+      background-color: transparent !important;
+    }
+  `;
+
+  if (customKeyIdle) {
+    css += `
+      .wicki-board .key {
+        background-image: url('${customKeyIdle}') !important;
+      }
+    `;
+  }
+
+  if (customKeyPressed) {
+    css += `
+      .wicki-board .key:active,
+      .wicki-board .key.active,
+      .wicki-board .key.played-note.active {
+        background-image: url('${customKeyPressed}') !important;
+      }
+    `;
+  } else if (customKeyIdle) {
+    css += `
+      .wicki-board .key:active,
+      .wicki-board .key.active,
+      .wicki-board .key.played-note.active {
+        filter: brightness(0.7);
+      }
+    `;
+  }
+
+  styleTag.innerHTML = css;
+}
+
+// ==========================================
+// TRANSPOSE SEQUENCE LOGIC
+// ==========================================
+
+function updateSequence(val) {
+    transposeSequence = val;
+    sequenceIndex = 0; // Reset the spacebar progression back to the start
+    saveSettings();
+    console.log("New Transpose Sequence Saved:", transposeSequence);
 }

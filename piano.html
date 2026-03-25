@@ -88,16 +88,37 @@
         </div>
       </div>
 
-      <div class="control-group desktop-only" style="display: none;">
-        <span class="side-label" style="margin-top: 5px;">transequence</span>
-        <input type="text" id="input-sequence"
-               value="-5:-5 -12:0 5:5 12:12 -17:-17 17:5"
-               style="width: 300px; background: #222; color: white; border: 1px solid #666; border-radius: 4px; padding: 4px; font-size: 11px; text-align: center;">
+      <div class="control-group" style="width: 100%; max-width: 280px;">
+        <span class="control-label">Transpose Sequence (Spacebar)</span>
+        <input type="text" id="input-sequence" 
+               value="-5:-5 -12:0 5:5 12:12 -17:-17 17:5" 
+               onchange="updateSequence(this.value)"
+               style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.5); color: white; border: 1px solid #444; border-radius: 4px; padding: 6px; font-size: 12px; font-family: monospace; text-align: center;">
       </div>
 
       <div class="control-group desktop-only">
         <span class="control-label">Visuals</span>
         <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleVisuals()" id="btn-visuals">ON</button>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">Background</span>
+        <div class="btn-row">
+          <input type="file" id="bg-upload" accept="image/*" style="display: none;" onchange="handleBackgroundUpload(event)">
+          <button class="control-btn" style="width: 60px; font-size: 11px;" onclick="document.getElementById('bg-upload').click()">UPLOAD</button>
+          <button class="control-btn" style="width: 25px; font-size: 11px; background-color: #d9534f;" onclick="clearBackground()" title="Clear Background">X</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">Wicki Keys</span>
+        <div class="btn-row">
+          <input type="file" id="key-idle-upload" accept="image/*" style="display: none;" onchange="handleKeyImageUpload(event, 'idle')">
+          <input type="file" id="key-press-upload" accept="image/*" style="display: none;" onchange="handleKeyImageUpload(event, 'press')">
+          <button class="control-btn" style="width: 40px; font-size: 10px;" onclick="document.getElementById('key-idle-upload').click()">IDLE</button>
+          <button class="control-btn" style="width: 40px; font-size: 10px;" onclick="document.getElementById('key-press-upload').click()">PRESS</button>
+          <button class="control-btn" style="width: 25px; font-size: 11px; background-color: #d9534f;" onclick="clearKeyImages()" title="Clear Key Images">X</button>
+        </div>
       </div>
 
       <div class="control-group">
@@ -172,6 +193,32 @@
 
     <div id="progress-container">
       <input type="range" id="progress-bar" min="0" max="100" value="0" oninput="scrubProgress(this.value)">
+    </div>
+
+    <div id="reset-modal" class="modal-overlay">
+      <div class="modal-content">
+        <h3 style="margin-top: 0; text-align: center; color: #ff4444;">Reset Options</h3>
+
+        <label class="reset-option">
+          <input type="checkbox" id="reset-recs">
+          <span>Clear All Recordings</span>
+        </label>
+
+        <label class="reset-option">
+          <input type="checkbox" id="reset-media">
+          <span>Clear Custom Images (Background & Keys)</span>
+        </label>
+
+        <label class="reset-option">
+          <input type="checkbox" id="reset-prefs" checked>
+          <span>Reset Transpose & Sequence Only</span>
+        </label>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button class="control-btn" onclick="executeReset()" style="background: linear-gradient(to bottom, #ff4444, #cc0000); width: 100%;">CONFIRM</button>
+          <button class="control-btn" onclick="closeResetModal()" style="width: 100%;">CANCEL</button>
+        </div>
+      </div>
     </div>
     
     <script src="piano_core.js"></script>

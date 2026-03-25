@@ -11,6 +11,9 @@ body {
   overflow: hidden;
   user-select: none;
   background-color: #000000;
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
 }
 
 /* --- FLOATING SETTINGS BUTTON --- */
@@ -590,4 +593,60 @@ body.force-strip #progress-bar {
 /* --- WICKI BOARD RANGE HIGHLIGHTING --- */
 .p-key.out-of-range:not(.active):not(:active) {
   opacity: 0.25;
+}
+
+/* --- RESET MODAL --- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 4000; /* Highest z-index to sit above everything */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-content {
+  background: rgba(20, 20, 20, 0.98);
+  border: 1px solid #555;
+  border-radius: 12px;
+  padding: 25px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-width: 90%;
+  width: 320px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.9);
+  transform: scale(0.95);
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.modal-overlay.active .modal-content {
+  transform: scale(1);
+}
+
+.reset-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #ccc;
+}
+
+.reset-option input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
 }
