@@ -20,6 +20,8 @@ let sequenceIndex = 0;
 let bpm = 120; 
 let isMetronomeOn = false; 
 let mobileZoom = initIsMobile ? 1.30 : 0.65; // 130 on mobile, 65 on desktop
+let boardOffsetX = 0;
+let boardOffsetY = 0;
 let showMobileStrip = true;
 let stripHeight = initIsMobile ? 5 : 16; // 5 on mobile, 16 on desktop
 let layoutMode = 0; // 0 = Auto, 1 = Desktop, 2 = Mobile
@@ -166,7 +168,9 @@ function saveSettings() {
         customBackground: customBackground,
         customKeyIdle: customKeyIdle,
         customKeyPressed: customKeyPressed,
-        transposeSequence: transposeSequence
+        transposeSequence: transposeSequence,
+        boardOffsetX: boardOffsetX,
+        boardOffsetY: boardOffsetY
     };
 
     try {
@@ -200,11 +204,11 @@ function loadSettings() {
             // Backward compatibility with legacy 3-state strip height setting.
             if (settings.stripHeightMode === 1) stripHeight = 30;
             else if (settings.stripHeightMode === 2) stripHeight = 10;
-            else stripHeight = initIsMobile ? 5 : 16;
+            else stripHeight = initIsMobile ? 0 : 16;
         }
         stripHeight = parseFloat(stripHeight);
-        if (Number.isNaN(stripHeight)) stripHeight = initIsMobile ? 5 : 16;
-        if (stripHeight < 5) stripHeight = 5;
+        if (Number.isNaN(stripHeight)) stripHeight = initIsMobile ? 0 : 16;
+        if (stripHeight < 0) stripHeight = 0;
         if (stripHeight > 50) stripHeight = 50;
         if (settings.isVisualizerOn !== undefined && typeof isVisualizerOn !== 'undefined') {
             isVisualizerOn = settings.isVisualizerOn;
@@ -231,6 +235,8 @@ function loadSettings() {
             const seqInput = document.getElementById("input-sequence");
             if (seqInput) seqInput.value = transposeSequence;
         }
+        if (settings.boardOffsetX !== undefined) boardOffsetX = settings.boardOffsetX;
+        if (settings.boardOffsetY !== undefined) boardOffsetY = settings.boardOffsetY;
         if (typeof applyKeyImages === 'function') applyKeyImages();
         
         // Apply complex settings
@@ -317,11 +323,15 @@ function executeReset() {
             transposeRight = initIsMobile ? -22 : 2;
             transposeSequence = "-5:-5 -12:0 5:5 12:12 -17:-17 17:5";
             sequenceIndex = 0;
+            boardOffsetX = 0;
+            boardOffsetY = 0;
 
             // 2. Delete them from the saved settings object so they don't persist
             delete settings.transposeLeft;
             delete settings.transposeRight;
             delete settings.transposeSequence;
+            delete settings.boardOffsetX;
+            delete settings.boardOffsetY;
 
             // 3. Reset the physical text box input
             const seqInput = document.getElementById("input-sequence");
@@ -329,6 +339,8 @@ function executeReset() {
 
             // 4. Redraw the board to reflect the new transpose values
             if (typeof renderBoard === 'function') renderBoard();
+            if (typeof applyZoom === 'function') applyZoom();
+            if (typeof updateKeyCoordinates === 'function') updateKeyCoordinates();
         }
 
         localStorage.setItem('wickiPianoSettings', JSON.stringify(settings));

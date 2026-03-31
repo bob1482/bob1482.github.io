@@ -130,6 +130,26 @@ function convertMidiToEvents(midiData) {
 }
 
 // ==========================================
+// STANDARD MIDI UPLOAD HANDLER
+// ==========================================
+
+function handleMidiUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    initMidiAccess();
+
+    if (file.name.toLowerCase().endsWith('.mid') || file.name.toLowerCase().endsWith('.midi')) {
+        loadMidiFile(file);
+    } else {
+        console.warn("Not a valid MIDI file.");
+        alert("Please select a valid .mid or .midi file.");
+    }
+
+    event.target.value = "";
+}
+
+// ==========================================
 // MIDI EXPORT
 // ==========================================
 

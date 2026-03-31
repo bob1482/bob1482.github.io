@@ -102,7 +102,7 @@ function renderBoard() {
   const isMobile = typeof isMobileMode === 'function' ? isMobileMode() : false;
   
   // Dynamic dimensions based on screen mode
-  const currentRows = isMobile ? 12 : 5;   // 9 rows on mobile, 5 on desktop
+  const currentRows = isMobile ? 8 : 5;   // 9 rows on mobile, 5 on desktop
   const currentCols = isMobile ? 12 : 12;  // 4 columns on mobile, 12 on desktop
   const SPLIT_COL = isMobile ? currentCols : 6; // Put everything on boardLeft in mobile
 

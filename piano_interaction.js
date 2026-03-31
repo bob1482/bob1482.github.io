@@ -319,15 +319,27 @@ function changeZoom(delta) {
     saveSettings();
 }
 
+function changeBoardOffset(axis, delta) {
+    if (axis === 'x') {
+        boardOffsetX += delta;
+    } else if (axis === 'y') {
+        boardOffsetY += delta;
+    }
+
+    applyZoom();
+
+    if (typeof updateKeyCoordinates === 'function') updateKeyCoordinates();
+
+    updateUI();
+    saveSettings();
+}
+
 function applyZoom() {
     const boardWrapper = document.getElementById("board-wrapper");
     if (boardWrapper) {
         const isMobile = typeof isMobileMode === 'function' ? isMobileMode() : false;
-        if (isMobile) {
-            boardWrapper.style.transform = `translate(-50%, -50%) scale(${mobileZoom})`;
-        } else {
-            boardWrapper.style.transform = `translate(-50%, -50%) scale(0.85)`; // Default desktop scale
-        }
+        const scale = isMobile ? mobileZoom : 0.85;
+        boardWrapper.style.transform = `translate(calc(-50% + ${boardOffsetX}px), calc(-50% + ${boardOffsetY}px)) scale(${scale})`;
     }
 }
 
@@ -385,7 +397,7 @@ function changeStripRange(side, delta) {
 function changeStripHeight(delta) {
     stripHeight += delta;
     
-    if (stripHeight < 5) stripHeight = 5;
+    if (stripHeight < 0) stripHeight = 0;
     if (stripHeight > 50) stripHeight = 50;
     
     applyStripHeight();
@@ -393,6 +405,32 @@ function changeStripHeight(delta) {
     if (typeof resizeCanvas === 'function') resizeCanvas();
     if (typeof updateKeyCoordinates === 'function') updateKeyCoordinates();
     
+    updateUI();
+    saveSettings();
+}
+
+// --- AUDIO CONTROLS ---
+
+function changeVolume(delta) {
+    globalVolume += delta;
+
+    if (globalVolume < 0) globalVolume = 0;
+    if (globalVolume > 1) globalVolume = 1;
+
+    if (typeof Tone !== 'undefined' && Tone.Destination) {
+        Tone.Destination.volume.value = Tone.gainToDb(globalVolume);
+    }
+
+    updateUI();
+    saveSettings();
+}
+
+function changeSustain(delta) {
+    sustainMultiplier += delta;
+
+    if (sustainMultiplier < 0.1) sustainMultiplier = 0.1;
+    if (sustainMultiplier > 5.0) sustainMultiplier = 5.0;
+
     updateUI();
     saveSettings();
 }
@@ -696,6 +734,18 @@ function updateUI() {
 
   const dispZoom = document.getElementById("disp-zoom");
   if (dispZoom) dispZoom.innerText = Math.round(mobileZoom * 100);
+
+  const dispBoardX = document.getElementById("disp-board-x");
+  if (dispBoardX) dispBoardX.innerText = boardOffsetX;
+
+  const dispBoardY = document.getElementById("disp-board-y");
+  if (dispBoardY) dispBoardY.innerText = boardOffsetY;
+
+  const dispVol = document.getElementById("disp-volume");
+  if (dispVol) dispVol.innerText = Math.round(globalVolume * 100) + "%";
+
+  const dispSus = document.getElementById("disp-sustain");
+  if (dispSus) dispSus.innerText = sustainMultiplier.toFixed(1) + "x";
   
   const btnRecord = document.getElementById("btn-record");
   const btnPlay = document.getElementById("btn-play");

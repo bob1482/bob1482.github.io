@@ -37,7 +37,11 @@
            </select>
            <button class="control-btn" onclick="deleteCurrentRecording()" title="Delete Recording" style="background-color: #d9534f; width: 25px;">X</button>
          </div>
-         <button class="control-btn" id="btn-download-midi" onclick="downloadCurrentMidi()" title="Download MIDI" style="width: 100%; font-size: 10px; margin-top: 5px;">SAVE MIDI</button>
+         <div style="display: flex; gap: 5px; width: 100%; margin-top: 5px;">
+           <input type="file" id="midi-upload" accept=".mid,.midi" style="display: none;" onchange="handleMidiUpload(event)">
+           <button class="control-btn" onclick="document.getElementById('midi-upload').click()" title="Load MIDI File" style="width: 100%; font-size: 10px;">LOAD</button>
+           <button class="control-btn" id="btn-download-midi" onclick="downloadCurrentMidi()" title="Download MIDI" style="width: 100%; font-size: 10px;">SAVE</button>
+         </div>
       </div>
 
       <div class="control-group" id="group-labels">
@@ -88,7 +92,7 @@
         </div>
       </div>
 
-      <div class="control-group" style="width: 100%; max-width: 280px;">
+      <div class="control-group desktop-only" style="width: 100%; max-width: 280px;">
         <span class="control-label">Transpose Sequence (Spacebar)</span>
         <input type="text" id="input-sequence" 
                value="-5:-5 -12:0 5:5 12:12 -17:-17 17:5" 
@@ -124,6 +128,46 @@
       <div class="control-group">
         <span class="control-label">Layout</span>
         <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="cycleLayout()" id="btn-layout">AUTO</button>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">Position</span>
+        <div style="display: flex; gap: 10px;">
+          <div style="display:flex; flex-direction:column; align-items:center;">
+            <span class="side-label">X-AXIS</span>
+            <div class="btn-row">
+              <button class="control-btn" onclick="changeBoardOffset('x', -20)">-</button>
+              <span class="control-val" id="disp-board-x">0</span>
+              <button class="control-btn" onclick="changeBoardOffset('x', 20)">+</button>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center;">
+            <span class="side-label">Y-AXIS</span>
+            <div class="btn-row">
+              <button class="control-btn" onclick="changeBoardOffset('y', -20)">-</button>
+              <span class="control-val" id="disp-board-y">0</span>
+              <button class="control-btn" onclick="changeBoardOffset('y', 20)">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">Volume</span>
+        <div class="btn-row">
+          <button class="control-btn" onclick="changeVolume(-0.1)">-</button>
+          <span class="control-val" id="disp-volume">50%</span>
+          <button class="control-btn" onclick="changeVolume(0.1)">+</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">Sustain</span>
+        <div class="btn-row">
+          <button class="control-btn" onclick="changeSustain(-0.5)">-</button>
+          <span class="control-val" id="disp-sustain">1.0x</span>
+          <button class="control-btn" onclick="changeSustain(0.5)">+</button>
+        </div>
       </div>
 
       <div class="control-group">
@@ -169,11 +213,6 @@
           <span class="control-val" id="disp-zoom">65</span>
           <button class="control-btn" onclick="changeZoom(0.05)">+</button>
         </div>
-      </div>
-
-      <div class="control-group mobile-only">
-        <span class="control-label">Strip</span>
-        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleMobileStrip()" id="btn-mobile-strip">SHOW</button>
       </div>
 
       <div class="control-group">
