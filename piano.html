@@ -60,7 +60,7 @@
               <button class="control-btn" onclick="changeTranspose('left', 1)">+</button>
             </div>
           </div>
-          <div style="display:flex; flex-direction:column; align-items:center;" class="desktop-only">
+          <div style="display:flex; flex-direction:column; align-items:center;">
             <span class="side-label">RIGHT</span>
             <div class="btn-row">
               <button class="control-btn" onclick="changeTranspose('right', -1)">-</button>
@@ -69,6 +69,11 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <div class="control-group" id="group-layout">
+        <span class="control-label">Layout</span>
+        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="cycleLayout()" id="btn-layout">AUTO</button>
       </div>
     </div>
 
@@ -123,11 +128,6 @@
           <button class="control-btn" style="width: 40px; font-size: 10px;" onclick="document.getElementById('key-press-upload').click()">PRESS</button>
           <button class="control-btn" style="width: 25px; font-size: 11px; background-color: #d9534f;" onclick="clearKeyImages()" title="Clear Key Images">X</button>
         </div>
-      </div>
-
-      <div class="control-group">
-        <span class="control-label">Layout</span>
-        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="cycleLayout()" id="btn-layout">AUTO</button>
       </div>
 
       <div class="control-group">
@@ -201,7 +201,7 @@
         </div>
       </div>
 
-      <div class="control-group mobile-only">
+      <div class="control-group">
         <span class="control-label">Screen</span>
         <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleFullScreen()" id="btn-fullscreen">FULL</button>
       </div>

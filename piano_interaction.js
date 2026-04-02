@@ -4,7 +4,7 @@
 
 // --- NOTE LOGIC ---
 
-async function pressNote(freq, isAutomated = false, side = 'right') {
+async function pressNote(freq, isAutomated = false, side = 'right', sourceElement = null) {
   if (Tone.context.state !== 'running') await Tone.start();
   // Always check loading since we only have Sample mode now
   if (!isLoaded) return; 
@@ -15,9 +15,19 @@ async function pressNote(freq, isAutomated = false, side = 'right') {
 
   const freqStr = freq.toFixed(2);
 
-  if (typeof getCachedKeys === 'function') {
+  if (sourceElement) {
+      sourceElement.classList.add("active");
+      if (sourceElement.classList.contains("key") && typeof createRipple === 'function') {
+          createRipple(sourceElement);
+      }
+  } else if (typeof getCachedKeys === 'function') {
       const keys = getCachedKeys(freqStr);
-      for (let i = 0; i < keys.length; i++) keys[i].classList.add("active");
+      for (let i = 0; i < keys.length; i++) {
+          keys[i].classList.add("active");
+          if (keys[i].classList.contains("key") && typeof createRipple === 'function') {
+              createRipple(keys[i]);
+          }
+      }
   }
   
   if(!isAutomated && typeof startManualVisualNote === 'function') {
@@ -25,17 +35,19 @@ async function pressNote(freq, isAutomated = false, side = 'right') {
       startManualVisualNote(freqStr, color); 
   }
 
-  if(!isAutomated) triggerSound(freq, 0); 
+  if(!isAutomated) triggerSound(freq, 0);
 }
 
-function releaseNote(freq, isAutomated = false) {
+function releaseNote(freq, isAutomated = false, sourceElement = null) {
   if (isRecording && !isAutomated) {
     recordedEvents.push({ type: 'off', freq: freq, time: Tone.now() - recordingStartTime });
   }
 
   const freqStr = freq.toFixed(2);
   
-  if (typeof getCachedKeys === 'function') {
+  if (sourceElement) {
+      sourceElement.classList.remove("active");
+  } else if (typeof getCachedKeys === 'function') {
       const keys = getCachedKeys(freqStr);
       for (let i = 0; i < keys.length; i++) keys[i].classList.remove("active");
   }
@@ -46,12 +58,20 @@ function releaseNote(freq, isAutomated = false) {
 }
 
 function releaseAllStuckNotes() {
-    for (const [keyIdentifier, freq] of Object.entries(activePhysicalKeys)) {
-        releaseNote(freq);
+    for (const [keyIdentifier, data] of Object.entries(activePhysicalKeys)) {
+        if (typeof data === 'object') {
+            releaseNote(data.freq, false, data.element);
+        } else {
+            releaseNote(data);
+        }
     }
     activePhysicalKeys = {};
-    for (const [id, freq] of Object.entries(activeTouches)) {
-        releaseNote(freq);
+    for (const [id, data] of Object.entries(activeTouches)) {
+        if (typeof data === 'object') {
+            releaseNote(data.freq, false, data.element);
+        } else {
+            releaseNote(data);
+        }
     }
     activeTouches = {};
 }
@@ -109,8 +129,8 @@ function handleTouchStart(e) {
             const freq = parseFloat(keyElement.getAttribute('data-note'));
             const parent = keyElement.closest('.wicki-board');
             const side = (parent && parent.id === 'board-left') ? 'left' : 'right';
-            pressNote(freq, false, side);
-            activeTouches[touch.identifier] = freq;
+            activeTouches[touch.identifier] = { freq: freq, element: keyElement };
+            pressNote(freq, false, side, keyElement);
         }
     }
 }
@@ -124,18 +144,18 @@ function handleTouchMove(e) {
 
         if (keyElement) {
             const newFreq = parseFloat(keyElement.getAttribute('data-note'));
-            const oldFreq = activeTouches[touch.identifier];
-            if (newFreq !== oldFreq) {
-                if (oldFreq !== undefined) releaseNote(oldFreq);
+            const oldData = activeTouches[touch.identifier];
+            if (!oldData || keyElement !== oldData.element) {
+                if (oldData) releaseNote(oldData.freq, false, oldData.element);
                 const parent = keyElement.closest('.wicki-board');
                 const side = (parent && parent.id === 'board-left') ? 'left' : 'right';
-                pressNote(newFreq, false, side);
-                activeTouches[touch.identifier] = newFreq;
+                activeTouches[touch.identifier] = { freq: newFreq, element: keyElement };
+                pressNote(newFreq, false, side, keyElement);
             }
         } else {
-            const oldFreq = activeTouches[touch.identifier];
-            if (oldFreq !== undefined) {
-                releaseNote(oldFreq);
+            const oldData = activeTouches[touch.identifier];
+            if (oldData) {
+                releaseNote(oldData.freq, false, oldData.element);
                 delete activeTouches[touch.identifier];
             }
         }
@@ -147,9 +167,9 @@ function handleTouchEnd(e) {
     const touches = e.changedTouches;
     for (let i = 0; i < touches.length; i++) {
         const touch = touches[i];
-        const freq = activeTouches[touch.identifier];
-        if (freq !== undefined) {
-            releaseNote(freq);
+        const data = activeTouches[touch.identifier];
+        if (data) {
+            releaseNote(data.freq, false, data.element);
             delete activeTouches[touch.identifier];
         }
     }
@@ -486,6 +506,14 @@ function cycleLayout() {
     
     // Apply the CSS class
     if (typeof applyLayoutModeClass === 'function') applyLayoutModeClass();
+
+    // Move quick controls between the top bar and settings panel immediately
+    if (typeof rearrangeUI === 'function') rearrangeUI();
+
+    // Keep the mobile resize tracker in sync with manual layout changes
+    if (typeof isMobileMode === 'function') {
+        wasMobile = isMobileMode();
+    }
     
     // Force a redraw of the keys and canvas
     if (typeof renderBoard === 'function') renderBoard();
@@ -655,8 +683,8 @@ window.addEventListener("keydown", (e) => {
     const freq = parseFloat(key.getAttribute("data-note"));
     const parentBoard = key.closest('.wicki-board');
     const side = (parentBoard && parentBoard.id === 'board-left') ? 'left' : 'right';
-    activePhysicalKeys[e.code] = freq;
-    pressNote(freq, false, side);
+    activePhysicalKeys[e.code] = { freq: freq, element: key };
+    pressNote(freq, false, side, key);
   }
 });
 
@@ -667,8 +695,8 @@ window.addEventListener("keyup", (e) => {
   }
 
   if (activePhysicalKeys[e.code]) {
-      const freq = activePhysicalKeys[e.code];
-      releaseNote(freq);
+      const { freq, element } = activePhysicalKeys[e.code];
+      releaseNote(freq, false, element);
       delete activePhysicalKeys[e.code];
       return;
   }

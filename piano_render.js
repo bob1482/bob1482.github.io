@@ -50,13 +50,30 @@ function hideLoading() {
 function highlightKey(freq) {
   const freqStr = freq.toFixed(2);
   const keys = getCachedKeys(freqStr);
-  for (let i = 0; i < keys.length; i++) keys[i].classList.add("active");
+  for (let i = 0; i < keys.length; i++) {
+      keys[i].classList.add("active");
+      if (keys[i].classList.contains("key")) createRipple(keys[i]);
+  }
 }
 
 function unhighlightKey(freq) {
   const freqStr = freq.toFixed(2);
   const keys = getCachedKeys(freqStr);
   for (let i = 0; i < keys.length; i++) keys[i].classList.remove("active");
+}
+
+function createRipple(keyElement) {
+    const ripple = document.createElement('div');
+    ripple.className = 'ripple';
+
+    const parent = keyElement.closest('.wicki-board');
+    ripple.style.borderColor = parent && parent.id === 'board-left' ? COLOR_LEFT : COLOR_RIGHT;
+
+    keyElement.appendChild(ripple);
+
+    setTimeout(() => {
+        if (ripple.parentNode) ripple.parentNode.removeChild(ripple);
+    }, 500);
 }
 
 function clearAllHighlights() {
@@ -102,9 +119,9 @@ function renderBoard() {
   const isMobile = typeof isMobileMode === 'function' ? isMobileMode() : false;
   
   // Dynamic dimensions based on screen mode
-  const currentRows = isMobile ? 8 : 5;   // 9 rows on mobile, 5 on desktop
-  const currentCols = isMobile ? 12 : 12;  // 4 columns on mobile, 12 on desktop
-  const SPLIT_COL = isMobile ? currentCols : 6; // Put everything on boardLeft in mobile
+  const currentRows = isMobile ? 8 : 5;
+  const currentCols = 12;
+  const SPLIT_COL = 6; // Always split at 6 columns for both desktop and mobile
 
   for (let r = 0; r < currentRows; r++) {
     const rowDivL = document.createElement("div");
@@ -168,17 +185,17 @@ function renderBoard() {
       // Upgraded Mouse Events (Touch is now handled globally)
       key.addEventListener("mousedown", (e) => {
           if (e.button !== 0) return;
-          if(typeof pressNote === 'function') pressNote(freq, false, side);
+          if(typeof pressNote === 'function') pressNote(freq, false, side, key);
       });
       key.addEventListener("mouseenter", () => {
-          if(window.isMouseDown && typeof pressNote === 'function') pressNote(freq, false, side);
+          if(window.isMouseDown && typeof pressNote === 'function') pressNote(freq, false, side, key);
       });
       key.addEventListener("mouseleave", () => {
-          if(typeof releaseNote === 'function') releaseNote(freq);
+          if(typeof releaseNote === 'function') releaseNote(freq, false, key);
       });
       key.addEventListener("mouseup", (e) => {
           if (e.button !== 0) return;
-          if(typeof releaseNote === 'function') releaseNote(freq);
+          if(typeof releaseNote === 'function') releaseNote(freq, false, key);
       });
 
       if (c < SPLIT_COL) {
@@ -189,11 +206,11 @@ function renderBoard() {
     }
     
     boardLeft.appendChild(rowDivL);
-    if (!isMobile) boardRight.appendChild(rowDivR);
+    boardRight.appendChild(rowDivR);
   }
   
-  // Hide right board entirely on mobile
-  boardRight.style.display = isMobile ? "none" : "flex";
+  // Keep right board visible
+  boardRight.style.display = "flex";
   
   // Render bottom piano strip only if not mobile, OR if forced to show
   if (!isMobile || showMobileStrip) {
@@ -316,15 +333,15 @@ function renderTraditionalPiano() {
       // Upgraded Mouse Events (Touch is now handled globally)
       key.addEventListener("mousedown", (e) => {
           if (e.button !== 0) return;
-          pressNote(freq, false, 'right');
+          pressNote(freq, false, 'right', key);
       });
       key.addEventListener("mouseenter", () => {
-          if (window.isMouseDown) pressNote(freq, false, 'right');
+          if (window.isMouseDown) pressNote(freq, false, 'right', key);
       });
-      key.addEventListener("mouseleave", () => releaseNote(freq));
+      key.addEventListener("mouseleave", () => releaseNote(freq, false, key));
       key.addEventListener("mouseup", (e) => {
           if (e.button !== 0) return;
-          releaseNote(freq);
+          releaseNote(freq, false, key);
       });
 
       wrapper.appendChild(key);

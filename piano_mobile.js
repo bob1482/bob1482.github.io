@@ -12,7 +12,8 @@ function rearrangeUI() {
         document.getElementById('group-recorder'),
         document.getElementById('group-memory'),
         document.getElementById('group-labels'),
-        document.getElementById('group-transpose')
+        document.getElementById('group-transpose'),
+        document.getElementById('group-layout')
     ];
 
     if (isMobile) {
