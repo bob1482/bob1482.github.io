@@ -15,6 +15,7 @@ let transposeLeft = initIsMobile ? -22 : 2;
 let transposeRight = initIsMobile ? -22 : 2;
 let globalVolume = 0.5;
 let sustainMultiplier = 1.0;
+let sustainMode = 0; // 0 = Timed, 1 = Hold until released
 let isLoaded = false; 
 let sequenceIndex = 0;
 let bpm = 120; 
@@ -77,6 +78,8 @@ Tone.context.lookAhead = 0.05;
 // OPTIMIZATION: Reduced Polyphony Cap to prevent CPU stutter
 const MAX_POLYPHONY = 48; 
 let activeVoices = []; // Now treated as a simple ring buffer
+let timedSustainTrackers = {};
+let nextVoiceId = 1;
 
 const reverb = new Tone.Reverb({
     decay: 2.5,
@@ -122,23 +125,82 @@ Tone.Transport.bpm.value = bpm;
 
 // --- AUDIO FUNCTIONS ---
 
-function triggerSound(frequency, when = 0) {
-  if (when === 0) when = Tone.now();
+function removeActiveVoiceById(voiceId) {
+  activeVoices = activeVoices.filter((voice) => voice.id !== voiceId);
+}
 
-  let baseDuration = 2;
-  let duration = Math.min(baseDuration * sustainMultiplier, 5);
+function clearTimedSustainTrackers(releaseAudio = true) {
+  const releaseTime = Tone.now();
+
+  Object.keys(timedSustainTrackers).forEach((trackerKey) => {
+    const tracker = timedSustainTrackers[trackerKey];
+    if (!tracker) return;
+
+    clearTimeout(tracker.timeoutId);
+
+    if (releaseAudio && typeof sampler !== "undefined") {
+      sampler.triggerRelease(tracker.freq, releaseTime);
+    }
+
+    removeActiveVoiceById(tracker.voiceId);
+    delete timedSustainTrackers[trackerKey];
+  });
+}
+
+function triggerSound(frequency, when = 0, forceDuration = null) {
+  if (when === 0) when = Tone.now();
+  const voiceId = nextVoiceId++;
 
   if (activeVoices.length >= MAX_POLYPHONY) {
     const stolenVoice = activeVoices.shift(); 
+    if (stolenVoice && stolenVoice.timedTrackerId !== undefined) {
+      const tracker = timedSustainTrackers[stolenVoice.timedTrackerId];
+      if (tracker) {
+        clearTimeout(tracker.timeoutId);
+        delete timedSustainTrackers[stolenVoice.timedTrackerId];
+      }
+    }
     sampler.triggerRelease(stolenVoice.freq, when);
   }
 
-  activeVoices.push({
+  const voice = {
+    id: voiceId,
     freq: frequency,
     startTime: when 
-  });
+  };
+  activeVoices.push(voice);
 
-  sampler.triggerAttackRelease(frequency, duration, when);
+  if (forceDuration !== null) {
+    sampler.triggerAttackRelease(frequency, forceDuration, when);
+    const cleanupDelay = Math.max(0, ((when - Tone.now()) + forceDuration) * 1000);
+    window.setTimeout(() => {
+      removeActiveVoiceById(voiceId);
+    }, cleanupDelay);
+  } else if (sustainMode === 1) {
+    sampler.triggerAttack(frequency, when);
+  } else {
+    const baseDuration = 2;
+    const duration = Math.min(baseDuration * sustainMultiplier, 5);
+    const releaseDelay = Math.max(0, ((when - Tone.now()) + duration) * 1000);
+
+    sampler.triggerAttack(frequency, when);
+
+    const timeoutId = window.setTimeout(() => {
+      if (typeof sampler !== "undefined") {
+        sampler.triggerRelease(frequency, Tone.now());
+      }
+
+      removeActiveVoiceById(voiceId);
+      delete timedSustainTrackers[timeoutId];
+    }, releaseDelay);
+
+    voice.timedTrackerId = timeoutId;
+    timedSustainTrackers[timeoutId] = {
+      timeoutId,
+      freq: frequency,
+      voiceId
+    };
+  }
 }
 
 function midiToFreq(midiNote) {
@@ -155,6 +217,7 @@ function saveSettings() {
         transposeRight: transposeRight,
         globalVolume: globalVolume,
         sustainMultiplier: sustainMultiplier,
+        sustainMode: sustainMode,
         bpm: bpm,
         labelMode: labelMode,
         fKeyMode: fKeyMode,
@@ -193,6 +256,7 @@ function loadSettings() {
         if (settings.transposeRight !== undefined) transposeRight = settings.transposeRight;
         if (settings.globalVolume !== undefined) globalVolume = settings.globalVolume;
         if (settings.sustainMultiplier !== undefined) sustainMultiplier = settings.sustainMultiplier;
+        if (settings.sustainMode !== undefined) sustainMode = settings.sustainMode;
         if (settings.bpm !== undefined) bpm = settings.bpm;
         if (settings.labelMode !== undefined) labelMode = settings.labelMode;
         if (settings.fKeyMode !== undefined) fKeyMode = settings.fKeyMode;
@@ -287,6 +351,7 @@ function executeReset() {
     // Safety: Stop audio and release keys during any reset
     if (typeof stopPlayback === 'function') stopPlayback();
     if (typeof releaseAllStuckNotes === 'function') releaseAllStuckNotes();
+    if (typeof clearTimedSustainTrackers === 'function') clearTimedSustainTrackers(false);
     if (typeof sampler !== 'undefined') sampler.releaseAll();
 
     // 1. Clear Recordings
@@ -322,6 +387,7 @@ function executeReset() {
             transposeLeft = initIsMobile ? -22 : 2;
             transposeRight = initIsMobile ? -22 : 2;
             transposeSequence = "-5:-5 -12:0 5:5 12:12 -17:-17 17:5";
+            sustainMode = 0;
             sequenceIndex = 0;
             boardOffsetX = 0;
             boardOffsetY = 0;
@@ -330,6 +396,7 @@ function executeReset() {
             delete settings.transposeLeft;
             delete settings.transposeRight;
             delete settings.transposeSequence;
+            delete settings.sustainMode;
             delete settings.boardOffsetX;
             delete settings.boardOffsetY;
 

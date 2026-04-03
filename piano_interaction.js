@@ -43,6 +43,11 @@ function releaseNote(freq, isAutomated = false, sourceElement = null) {
     recordedEvents.push({ type: 'off', freq: freq, time: Tone.now() - recordingStartTime });
   }
 
+  if (!isAutomated && sustainMode === 1 && typeof sampler !== 'undefined') {
+      sampler.triggerRelease(freq, Tone.now());
+      activeVoices = activeVoices.filter((voice) => voice.freq !== freq);
+  }
+
   const freqStr = freq.toFixed(2);
   
   if (sourceElement) {
@@ -78,12 +83,37 @@ function releaseAllStuckNotes() {
 
 // --- GLOBAL MOUSE TRACKING ---
 window.isMouseDown = false;
+let previousSustainMode = 0;
+
+window.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+});
 
 window.addEventListener('mousedown', (e) => {
-    if (e.button === 0) window.isMouseDown = true;
+    if (e.button === 0) {
+        window.isMouseDown = true;
+    } else if (e.button === 2) {
+        previousSustainMode = sustainMode;
+        sustainMode = 0;
+        if (typeof updateUI === 'function') updateUI();
+    }
 });
 window.addEventListener('mouseup', (e) => {
-    if (e.button === 0) window.isMouseDown = false;
+    if (e.button === 0) {
+        window.isMouseDown = false;
+    } else if (e.button === 2) {
+        sustainMode = previousSustainMode;
+        if (typeof updateUI === 'function') updateUI();
+
+        if (typeof clearTimedSustainTrackers === 'function') {
+            clearTimedSustainTrackers();
+        } else if (typeof sampler !== 'undefined') {
+            sampler.releaseAll();
+            activeVoices = [];
+        }
+
+        console.log("Right-click released: Audio sustains killed, visuals kept.");
+    }
 });
 
 // --- HIGHLIGHT RESET ---
@@ -455,6 +485,13 @@ function changeSustain(delta) {
     saveSettings();
 }
 
+function toggleSustainMode() {
+    releaseAllStuckNotes();
+    sustainMode = (sustainMode === 0) ? 1 : 0;
+    updateUI();
+    saveSettings();
+}
+
 function applyStripHeight() {
     const strip = document.getElementById("piano-strip");
     const canvas = document.getElementById("synthesia-canvas");
@@ -628,6 +665,27 @@ window.addEventListener("keydown", (e) => {
     return;
   }
 
+  // Escape: panic button for timed sustain notes.
+  if (e.code === "Escape") {
+    e.preventDefault();
+
+    if (sustainMode === 0) {
+      if (typeof clearTimedSustainTrackers === "function") {
+        clearTimedSustainTrackers();
+      } else if (typeof sampler !== "undefined") {
+        sampler.releaseAll();
+        activeVoices = [];
+      }
+
+      if (typeof resetHighlights === "function") {
+        resetHighlights();
+      }
+
+      console.log("Escape pressed: All timer-based sustains cleared.");
+    }
+    return;
+  }
+
   // --- NUMPAD PLAYBACK CONTROLS ---
   
   // Numpad 5: Play / Pause
@@ -774,6 +832,11 @@ function updateUI() {
 
   const dispSus = document.getElementById("disp-sustain");
   if (dispSus) dispSus.innerText = sustainMultiplier.toFixed(1) + "x";
+
+  const btnSusMode = document.getElementById("btn-sus-mode");
+  if (btnSusMode) {
+      btnSusMode.innerText = sustainMode === 1 ? "HOLD" : "TIMED";
+  }
   
   const btnRecord = document.getElementById("btn-record");
   const btnPlay = document.getElementById("btn-play");

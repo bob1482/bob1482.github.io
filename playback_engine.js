@@ -72,6 +72,7 @@ function setVisualizerPause(paused) {
         Tone.Transport.pause();
         
         // Stop any notes currently ringing out to prevent hanging sounds
+        if (typeof clearTimedSustainTrackers === 'function') clearTimedSustainTrackers(false);
         if (typeof sampler !== 'undefined') sampler.releaseAll();
         Tone.Draw.cancel(0);
 
@@ -98,6 +99,7 @@ function seekToTime(percent) {
     if (!isPlaying) return;
     
     if (schedulerTimer) clearTimeout(schedulerTimer);
+    if (typeof clearTimedSustainTrackers === 'function') clearTimedSustainTrackers(false);
     if (typeof sampler !== 'undefined') sampler.releaseAll();
     activeVoices = []; 
     Tone.Draw.cancel(0);
@@ -220,7 +222,7 @@ function schedulerLoop() {
         if (triggerTime < currentContextTime + scheduleAheadTime) {
             
             // 1. Audio
-            if (typeof triggerSound === 'function') triggerSound(event.freq, triggerTime);
+            if (typeof triggerSound === 'function') triggerSound(event.freq, triggerTime, event.duration);
 
             // 2. UI Highlight (Note On)
             Tone.Draw.schedule(() => {
