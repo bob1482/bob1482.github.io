@@ -129,21 +129,36 @@ function removeActiveVoiceById(voiceId) {
   activeVoices = activeVoices.filter((voice) => voice.id !== voiceId);
 }
 
+function getTimedSustainTrackerKey(frequency) {
+  return frequency.toFixed(5);
+}
+
+function clearTimedSustainTrackerByKey(
+  trackerKey,
+  releaseAudio = true,
+  releaseTime = Tone.now(),
+  expectedVoiceId = null
+) {
+  const tracker = timedSustainTrackers[trackerKey];
+  if (!tracker) return false;
+  if (expectedVoiceId !== null && tracker.voiceId !== expectedVoiceId) return false;
+
+  clearTimeout(tracker.timeoutId);
+
+  if (releaseAudio && typeof sampler !== "undefined") {
+    sampler.triggerRelease(tracker.freq, releaseTime);
+  }
+
+  removeActiveVoiceById(tracker.voiceId);
+  delete timedSustainTrackers[trackerKey];
+  return true;
+}
+
 function clearTimedSustainTrackers(releaseAudio = true) {
   const releaseTime = Tone.now();
 
   Object.keys(timedSustainTrackers).forEach((trackerKey) => {
-    const tracker = timedSustainTrackers[trackerKey];
-    if (!tracker) return;
-
-    clearTimeout(tracker.timeoutId);
-
-    if (releaseAudio && typeof sampler !== "undefined") {
-      sampler.triggerRelease(tracker.freq, releaseTime);
-    }
-
-    removeActiveVoiceById(tracker.voiceId);
-    delete timedSustainTrackers[trackerKey];
+    clearTimedSustainTrackerByKey(trackerKey, releaseAudio, releaseTime);
   });
 }
 
@@ -153,14 +168,17 @@ function triggerSound(frequency, when = 0, forceDuration = null) {
 
   if (activeVoices.length >= MAX_POLYPHONY) {
     const stolenVoice = activeVoices.shift(); 
-    if (stolenVoice && stolenVoice.timedTrackerId !== undefined) {
-      const tracker = timedSustainTrackers[stolenVoice.timedTrackerId];
-      if (tracker) {
-        clearTimeout(tracker.timeoutId);
-        delete timedSustainTrackers[stolenVoice.timedTrackerId];
+    if (stolenVoice) {
+      if (stolenVoice.timedTrackerKey !== undefined) {
+        clearTimedSustainTrackerByKey(
+          stolenVoice.timedTrackerKey,
+          false,
+          when,
+          stolenVoice.id
+        );
       }
+      sampler.triggerRelease(stolenVoice.freq, when);
     }
-    sampler.triggerRelease(stolenVoice.freq, when);
   }
 
   const voice = {
@@ -182,20 +200,27 @@ function triggerSound(frequency, when = 0, forceDuration = null) {
     const baseDuration = 2;
     const duration = Math.min(baseDuration * sustainMultiplier, 5);
     const releaseDelay = Math.max(0, ((when - Tone.now()) + duration) * 1000);
+    const trackerKey = getTimedSustainTrackerKey(frequency);
+
+    // Reset the note's timer so repeated presses do not get cut off by older releases.
+    clearTimedSustainTrackerByKey(trackerKey, false, when);
 
     sampler.triggerAttack(frequency, when);
 
     const timeoutId = window.setTimeout(() => {
+      const tracker = timedSustainTrackers[trackerKey];
+      if (!tracker || tracker.voiceId !== voiceId) return;
+
       if (typeof sampler !== "undefined") {
         sampler.triggerRelease(frequency, Tone.now());
       }
 
       removeActiveVoiceById(voiceId);
-      delete timedSustainTrackers[timeoutId];
+      delete timedSustainTrackers[trackerKey];
     }, releaseDelay);
 
-    voice.timedTrackerId = timeoutId;
-    timedSustainTrackers[timeoutId] = {
+    voice.timedTrackerKey = trackerKey;
+    timedSustainTrackers[trackerKey] = {
       timeoutId,
       freq: frequency,
       voiceId

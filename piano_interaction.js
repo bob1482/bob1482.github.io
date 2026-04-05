@@ -84,6 +84,46 @@ function releaseAllStuckNotes() {
 // --- GLOBAL MOUSE TRACKING ---
 window.isMouseDown = false;
 let previousSustainMode = 0;
+let pointerLockEscapeGuardUntil = 0;
+let wasPointerLocked = false;
+
+function getPointerLockElement() {
+    return document.pointerLockElement || document.mozPointerLockElement || null;
+}
+
+function lockPointer() {
+    const target = document.body;
+    if (!target) return;
+
+    const requestPointerLock = target.requestPointerLock || target.mozRequestPointerLock;
+    if (typeof requestPointerLock !== "function") {
+        console.warn("Pointer Lock API not supported in this browser.");
+        return;
+    }
+
+    const panel = document.getElementById("settings-panel");
+    if (panel) panel.classList.remove("settings-visible");
+
+    requestPointerLock.call(target);
+}
+
+function updateLockUI() {
+    const btn = document.getElementById("btn-lock-mouse");
+    if (!btn) return;
+
+    const isLocked = getPointerLockElement() === document.body;
+    btn.innerText = isLocked ? "LOCKED" : "LOCK";
+    btn.style.backgroundColor = isLocked ? "#d9534f" : "";
+
+    if (wasPointerLocked && !isLocked) {
+        pointerLockEscapeGuardUntil = performance.now() + 250;
+    }
+
+    wasPointerLocked = isLocked;
+}
+
+document.addEventListener("pointerlockchange", updateLockUI, false);
+document.addEventListener("mozpointerlockchange", updateLockUI, false);
 
 window.addEventListener('contextmenu', (e) => {
     e.preventDefault();
@@ -665,9 +705,16 @@ window.addEventListener("keydown", (e) => {
     return;
   }
 
-  // Escape: panic button for timed sustain notes.
+  // Escape: exit pointer lock first, otherwise panic timed sustain notes.
   if (e.code === "Escape") {
     e.preventDefault();
+
+    if (
+      getPointerLockElement() === document.body ||
+      performance.now() < pointerLockEscapeGuardUntil
+    ) {
+      return;
+    }
 
     if (sustainMode === 0) {
       if (typeof clearTimedSustainTrackers === "function") {
@@ -774,6 +821,7 @@ window.addEventListener('samplesLoaded', () => {
 
 // --- MEMORY RESET BUTTON ---
 document.getElementById('btn-reset-memory')?.addEventListener('click', openResetModal);
+updateLockUI();
 
 renderBoard();
 updateUI();
