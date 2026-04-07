@@ -101,19 +101,23 @@ function lockPointer() {
         return;
     }
 
-    const panel = document.getElementById("settings-panel");
-    if (panel) panel.classList.remove("settings-visible");
+    if (typeof closeSettingsPanel === "function") {
+        closeSettingsPanel();
+    } else {
+        const panel = document.getElementById("settings-panel");
+        if (panel) panel.classList.remove("settings-visible");
+    }
 
     requestPointerLock.call(target);
 }
 
 function updateLockUI() {
-    const btn = document.getElementById("btn-lock-mouse");
-    if (!btn) return;
-
     const isLocked = getPointerLockElement() === document.body;
-    btn.innerText = isLocked ? "LOCKED" : "LOCK";
-    btn.style.backgroundColor = isLocked ? "#d9534f" : "";
+
+    if (!isLocked && sustainMode === 1) {
+        sustainMode = 0;
+        if (typeof updateUI === 'function') updateUI();
+    }
 
     if (wasPointerLocked && !isLocked) {
         pointerLockEscapeGuardUntil = performance.now() + 250;
@@ -396,6 +400,82 @@ function changeTranspose(side, delta) {
   saveSettings();
 }
 
+function setDirectValue(type, value) {
+    const val = parseFloat(value);
+    if (Number.isNaN(val)) {
+        updateUI();
+        return;
+    }
+
+    switch (type) {
+        case 'trans-unified': {
+            releaseAllStuckNotes();
+            const unifiedVal = Math.max(-50, Math.min(50, Math.round(val)));
+            transposeLeft = unifiedVal;
+            transposeRight = unifiedVal;
+            renderBoard();
+            break;
+        }
+        case 'trans-l':
+            releaseAllStuckNotes();
+            transposeLeft = Math.max(-50, Math.min(50, Math.round(val)));
+            renderBoard();
+            break;
+        case 'trans-r':
+            releaseAllStuckNotes();
+            transposeRight = Math.max(-50, Math.min(50, Math.round(val)));
+            renderBoard();
+            break;
+        case 'board-x':
+            boardOffsetX = Math.round(val);
+            applyZoom();
+            if (typeof updateKeyCoordinates === 'function') updateKeyCoordinates();
+            break;
+        case 'board-y':
+            boardOffsetY = Math.round(val);
+            applyZoom();
+            if (typeof updateKeyCoordinates === 'function') updateKeyCoordinates();
+            break;
+        case 'volume':
+            globalVolume = Math.max(0, Math.min(1, val / 100));
+            if (typeof Tone !== 'undefined' && Tone.Destination) {
+                Tone.Destination.volume.value = Tone.gainToDb(globalVolume);
+            }
+            break;
+        case 'sustain':
+            sustainMultiplier = Math.max(0.1, Math.min(5.0, val));
+            break;
+        case 'strip-l':
+            releaseAllStuckNotes();
+            stripRangeLeft = Math.max(-50, Math.min(0, Math.round(val)));
+            if (stripRangeLeft > stripRangeRight) stripRangeLeft = stripRangeRight;
+            renderBoard();
+            break;
+        case 'strip-r':
+            releaseAllStuckNotes();
+            stripRangeRight = Math.max(0, Math.min(70, Math.round(val)));
+            if (stripRangeLeft > stripRangeRight) stripRangeLeft = stripRangeRight;
+            renderBoard();
+            break;
+        case 'strip-height':
+            stripHeight = Math.max(0, Math.min(50, Math.round(val)));
+            applyStripHeight();
+            if (typeof resizeCanvas === 'function') resizeCanvas();
+            if (typeof updateKeyCoordinates === 'function') updateKeyCoordinates();
+            break;
+        case 'zoom':
+            mobileZoom = Math.max(0.3, Math.min(1.5, val / 100));
+            applyZoom();
+            break;
+        default:
+            updateUI();
+            return;
+    }
+
+    updateUI();
+    saveSettings();
+}
+
 // --- ZOOM CONTROLS ---
 
 function changeZoom(delta) {
@@ -427,8 +507,7 @@ function changeBoardOffset(axis, delta) {
 function applyZoom() {
     const boardWrapper = document.getElementById("board-wrapper");
     if (boardWrapper) {
-        const isMobile = typeof isMobileMode === 'function' ? isMobileMode() : false;
-        const scale = isMobile ? mobileZoom : 0.85;
+        const scale = mobileZoom;
         boardWrapper.style.transform = `translate(calc(-50% + ${boardOffsetX}px), calc(-50% + ${boardOffsetY}px)) scale(${scale})`;
     }
 }
@@ -528,6 +607,13 @@ function changeSustain(delta) {
 function toggleSustainMode() {
     releaseAllStuckNotes();
     sustainMode = (sustainMode === 0) ? 1 : 0;
+
+    if (sustainMode === 1) {
+        lockPointer();
+    } else if (getPointerLockElement() && typeof document.exitPointerLock === 'function') {
+        document.exitPointerLock();
+    }
+
     updateUI();
     saveSettings();
 }
@@ -861,25 +947,55 @@ function deleteCurrentRecording() {
 }
 
 function updateUI() {
-  document.getElementById("disp-trans-l").innerText = transposeLeft;
-  document.getElementById("disp-trans-r").innerText = transposeRight;
+  const pedalLight = document.getElementById("pedal-light");
+  if (pedalLight) {
+      if (sustainMode === 0) {
+          pedalLight.classList.add("active-light");
+      } else {
+          pedalLight.classList.remove("active-light");
+      }
+  }
+
+  const transUnifiedContainer = document.getElementById("trans-unified");
+  const transSplitContainer = document.getElementById("trans-split");
+  const dispTransUnified = document.getElementById("disp-trans-unified");
+  const dispTransL = document.getElementById("disp-trans-l");
+  const dispTransR = document.getElementById("disp-trans-r");
+
+  if (transposeLeft === transposeRight) {
+      if (transUnifiedContainer) transUnifiedContainer.style.display = "flex";
+      if (transSplitContainer) transSplitContainer.style.display = "none";
+      if (dispTransUnified) dispTransUnified.value = transposeLeft;
+  } else {
+      if (transUnifiedContainer) transUnifiedContainer.style.display = "none";
+      if (transSplitContainer) transSplitContainer.style.display = "flex";
+      if (dispTransL) dispTransL.value = transposeLeft;
+      if (dispTransR) dispTransR.value = transposeRight;
+  }
+
+  const dispTransLSet = document.getElementById("disp-trans-l-set");
+  if (dispTransLSet) dispTransLSet.value = transposeLeft;
+
+  const dispTransRSet = document.getElementById("disp-trans-r-set");
+  if (dispTransRSet) dispTransRSet.value = transposeRight;
+
   document.getElementById("btn-labels").innerText = LABEL_MODES[labelMode];
   document.getElementById("btn-fkeys").innerText = F_KEY_LABELS[fKeyMode];
 
   const dispZoom = document.getElementById("disp-zoom");
-  if (dispZoom) dispZoom.innerText = Math.round(mobileZoom * 100);
+  if (dispZoom) dispZoom.value = Math.round(mobileZoom * 100);
 
   const dispBoardX = document.getElementById("disp-board-x");
-  if (dispBoardX) dispBoardX.innerText = boardOffsetX;
+  if (dispBoardX) dispBoardX.value = boardOffsetX;
 
   const dispBoardY = document.getElementById("disp-board-y");
-  if (dispBoardY) dispBoardY.innerText = boardOffsetY;
+  if (dispBoardY) dispBoardY.value = boardOffsetY;
 
   const dispVol = document.getElementById("disp-volume");
-  if (dispVol) dispVol.innerText = Math.round(globalVolume * 100) + "%";
+  if (dispVol) dispVol.value = Math.round(globalVolume * 100);
 
   const dispSus = document.getElementById("disp-sustain");
-  if (dispSus) dispSus.innerText = sustainMultiplier.toFixed(1) + "x";
+  if (dispSus) dispSus.value = sustainMultiplier.toFixed(1);
 
   const btnSusMode = document.getElementById("btn-sus-mode");
   if (btnSusMode) {
@@ -944,13 +1060,13 @@ function updateUI() {
   if (typeof applyStripHeight === 'function') applyStripHeight();
   
   const dispStrip = document.getElementById("disp-strip-height");
-  if (dispStrip) dispStrip.innerText = stripHeight;
+  if (dispStrip) dispStrip.value = stripHeight;
 
   const dispStripL = document.getElementById("disp-strip-l");
-  if (dispStripL) dispStripL.innerText = stripRangeLeft;
+  if (dispStripL) dispStripL.value = stripRangeLeft;
 
   const dispStripR = document.getElementById("disp-strip-r");
-  if (dispStripR) dispStripR.innerText = stripRangeRight;
+  if (dispStripR) dispStripR.value = stripRangeRight;
 }
 
 // ==========================================

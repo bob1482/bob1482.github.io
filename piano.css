@@ -18,32 +18,6 @@ body {
   background-attachment: fixed;
 }
 
-/* --- FLOATING SETTINGS BUTTON --- */
-#btn-settings {
-  position: fixed;
-  top: 15px;
-  right: 15px;
-  z-index: 3000;
-  background: rgba(30, 30, 30, 0.8);
-  border: 1px solid #555;
-  color: white;
-  border-radius: 50%;
-  width: 45px;
-  height: 45px;
-  font-size: 22px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.5);
-  transition: background-color 0.2s, transform 0.2s;
-}
-
-#btn-settings:active {
-  transform: scale(0.9);
-  background: rgba(60, 60, 60, 0.9);
-}
-
 /* --- LOADING OVERLAY --- */
 #loading-overlay {
   position: fixed;
@@ -151,8 +125,8 @@ body {
 .p-key {
   position: absolute;
   box-sizing: border-box;
-  border-bottom-left-radius: 3px;
-  border-bottom-right-radius: 3px;
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
   cursor: pointer;
   transition: background-color 0.1s;
   top: 0;
@@ -226,6 +200,7 @@ body {
   transform: translateX(-50%);
   display: flex;
   gap: 25px;
+  align-items: center;
   background: rgba(15, 15, 15, 0.85);
   padding: 12px 25px;
   border-radius: 12px;
@@ -285,6 +260,16 @@ body {
   align-items: center;
   gap: 5px;
   background: rgba(111, 111, 111, 0.3); 
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.btn-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  background: rgba(111, 111, 111, 0.3);
   padding: 4px;
   border-radius: 6px;
 }
@@ -351,6 +336,32 @@ body {
   text-align: center;
   font-size: 12px;
   font-weight: bold;
+}
+
+.control-val-input {
+  width: 40px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: bold;
+  background: transparent;
+  border: 1px solid transparent;
+  color: white;
+  font-family: inherit;
+  border-radius: 4px;
+  transition: all 0.2s;
+  -moz-appearance: textfield;
+}
+
+.control-val-input::-webkit-outer-spin-button,
+.control-val-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.control-val-input:focus {
+  outline: none;
+  border: 1px solid #00d2ff;
+  background: rgba(0, 0, 0, 0.6);
 }
 
 .side-label {
@@ -584,6 +595,16 @@ body.is-mobile {
   touch-action: none !important;
 }
 
+body.is-mobile #quick-controls {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  left: auto !important;
+  right: 20px !important;
+  transform: none !important;
+}
+
 /* Hide the fullscreen button on desktop mode */
 body:not(.is-mobile) .mobile-only {
   display: none !important;
@@ -607,7 +628,7 @@ body.force-strip #progress-bar {
 
 /* --- WICKI BOARD RANGE HIGHLIGHTING --- */
 .p-key.out-of-range:not(.active):not(:active) {
-  opacity: 0.25;
+  filter: brightness(0.3);
 }
 
 /* --- RESET MODAL --- */
@@ -715,4 +736,10 @@ body.force-strip #progress-bar {
     opacity: 0;
     border-width: 0;
   }
+}
+
+/* --- SUSTAIN PEDAL LIGHT --- */
+#pedal-light.active-light {
+  background-color: #00d2ff !important;
+  box-shadow: 0 0 10px #00d2ff, inset 0 0 3px rgba(255,255,255,0.8) !important;
 }

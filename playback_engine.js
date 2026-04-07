@@ -1,6 +1,253 @@
 // ==========================================
-// PLAYBACK ENGINE: Scheduler & Time
+// PLAYBACK ENGINE: Visuals, Scheduler & Time
 // ==========================================
+
+// --- VISUALIZER STATE CONTAINERS ---
+let keyCoordinates = {};
+let notePool = [];
+let visualNotes = [];
+let fallingNotes = [];
+
+// --- VISUALIZER STATE ---
+let isVisualizerOn = true;
+
+// --- VISUALIZER SETTINGS ---
+const FALL_DURATION = 2.0;
+const MANUAL_RISE_SPEED_PPS = 100;
+
+// --- VISUALIZER CANVAS ---
+const canvas = document.getElementById("synthesia-canvas");
+const ctx = canvas.getContext("2d", { alpha: true });
+
+let resizeTimeout;
+
+// --- VISUALIZER OBJECT POOLING ---
+function getNoteFromPool() {
+    if (notePool.length > 0) return notePool.pop();
+    return { freq: 0, x: 0, width: 0, height: 0, y: 0, color: '', targetTime: 0, active: false };
+}
+
+function recycleNote(note) {
+    note.active = false;
+    notePool.push(note);
+}
+
+function recycleAllNotes() {
+    while (fallingNotes.length > 0) recycleNote(fallingNotes.pop());
+    while (visualNotes.length > 0) recycleNote(visualNotes.pop());
+}
+
+// --- VISUALIZER INITIALIZATION ---
+function initVisualizer() {
+    resizeCanvas();
+    startVisualizerLoop();
+}
+
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(resizeCanvas, 150);
+});
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    const strip = document.getElementById("piano-strip");
+    const isMobile = strip && window.getComputedStyle(strip).display === "none";
+
+    const currentStripHeight = typeof stripHeight !== 'undefined' ? stripHeight : 17;
+    const canvasViewportRatio = (100 - currentStripHeight) / 100;
+
+    canvas.height = isMobile ? window.innerHeight : window.innerHeight * canvasViewportRatio;
+    updateKeyCoordinates();
+}
+
+function updateKeyCoordinates() {
+    const keys = document.querySelectorAll('.p-key');
+    keys.forEach(key => {
+        const freq = key.getAttribute('data-note');
+        const rect = key.getBoundingClientRect();
+        keyCoordinates[freq] = { x: rect.left | 0, width: rect.width | 0 };
+    });
+}
+
+// --- VISUALIZER STATE HELPERS ---
+function spawnFallingNote(freqStr, duration, targetTime) {
+    if (!canvas) return;
+
+    if (Object.keys(keyCoordinates).length === 0 && typeof updateKeyCoordinates === 'function') {
+        updateKeyCoordinates();
+    }
+
+    const freqFixed = (typeof freqStr === 'number') ? freqStr.toFixed(2) : freqStr;
+    const coords = keyCoordinates[freqFixed];
+    if (!coords) return;
+
+    const effectiveFallDuration = FALL_DURATION / playbackRate;
+    const pixelsPerSecond = canvas.height / effectiveFallDuration;
+    const noteHeight = duration * pixelsPerSecond;
+
+    const note = getNoteFromPool();
+    note.freq = freqFixed;
+    note.x = coords.x;
+    note.width = coords.width;
+    note.height = noteHeight;
+    note.color = 'rgb(93, 0, 150)';
+    note.targetTime = targetTime;
+    note.active = true;
+
+    fallingNotes.push(note);
+}
+
+function startManualVisualNote(freqStr, color = 'rgb(61, 182, 67)') {
+    if (!canvas) return;
+
+    if (Object.keys(keyCoordinates).length === 0 && typeof updateKeyCoordinates === 'function') {
+        updateKeyCoordinates();
+    }
+
+    const coords = keyCoordinates[freqStr];
+    if (!coords) return;
+
+    for (let i = 0; i < visualNotes.length; i++) {
+        if (visualNotes[i].freq === freqStr && visualNotes[i].active) return;
+    }
+
+    const note = getNoteFromPool();
+    note.freq = freqStr;
+    note.x = coords.x;
+    note.width = coords.width;
+    note.y = canvas.height;
+    note.height = 0;
+    note.color = color;
+    note.active = true;
+
+    visualNotes.push(note);
+}
+
+function endManualVisualNote(freqStr) {
+    for (let i = 0; i < visualNotes.length; i++) {
+        if (visualNotes[i].freq === freqStr && visualNotes[i].active) {
+            visualNotes[i].active = false;
+            return;
+        }
+    }
+}
+
+function updatePhysics(dt) {
+    if (!canvas) return;
+
+    const currentAudioTime = isPaused ? pauseStartTimestamp : Tone.now();
+    const effectiveTime = currentAudioTime - totalPausedTime;
+    const effectiveFallDuration = FALL_DURATION / playbackRate;
+    const pixelsPerSecond = canvas.height / effectiveFallDuration;
+
+    if (isPlaying) {
+        if (!isPaused) {
+            while (visualEventIndex < currentPlaybackEvents.length) {
+                const evt = currentPlaybackEvents[visualEventIndex];
+                const hitTime = playbackStartTime + evt.time + totalPausedTime;
+                const spawnTime = hitTime - effectiveFallDuration;
+
+                if (currentAudioTime >= spawnTime) {
+                    spawnFallingNote(evt.freq, evt.duration, hitTime);
+                    visualEventIndex++;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        for (let i = fallingNotes.length - 1; i >= 0; i--) {
+            const note = fallingNotes[i];
+            const timeRemaining = note.targetTime - currentAudioTime;
+
+            const y = canvas.height - (timeRemaining * pixelsPerSecond);
+            note.drawY = y - note.height;
+
+            if (!isPaused && note.drawY > canvas.height) {
+                recycleNote(note);
+                fallingNotes.splice(i, 1);
+            }
+        }
+
+        if (!isPaused) {
+            const elapsed = effectiveTime - playbackStartTime;
+            if (playbackTotalDuration > 0) {
+                const pct = (elapsed / playbackTotalDuration) * 100;
+                const bar = document.getElementById('progress-bar');
+                if (bar) bar.value = Math.min(pct, 100);
+            }
+        }
+    } else if (fallingNotes.length > 0) {
+        recycleAllNotes();
+    }
+
+    for (let i = visualNotes.length - 1; i >= 0; i--) {
+        const note = visualNotes[i];
+        if (note.active) {
+            note.height += MANUAL_RISE_SPEED_PPS * dt;
+            note.y = canvas.height - note.height;
+        } else {
+            note.y -= MANUAL_RISE_SPEED_PPS * dt;
+        }
+
+        if (note.y + note.height < -50) {
+            recycleNote(note);
+            visualNotes.splice(i, 1);
+        }
+    }
+}
+
+// --- VISUALIZER DRAW LOOP ---
+function startVisualizerLoop() {
+    let lastFrameTime = performance.now();
+    const borderStyle = "rgba(255, 255, 255, 0.7)";
+
+    function loop(currentTime) {
+        const dt = (currentTime - lastFrameTime) / 1000;
+        lastFrameTime = currentTime;
+
+        if (dt > 0.1) {
+            requestAnimationFrame(loop);
+            return;
+        }
+
+        if (typeof updatePhysics === 'function') updatePhysics(dt);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (!isVisualizerOn) {
+            requestAnimationFrame(loop);
+            return;
+        }
+
+        ctx.strokeStyle = borderStyle;
+        ctx.lineWidth = 2;
+
+        if (fallingNotes.length > 0) {
+            ctx.fillStyle = 'rgb(93, 0, 150)';
+            ctx.beginPath();
+            for (let i = 0; i < fallingNotes.length; i++) {
+                const note = fallingNotes[i];
+                ctx.roundRect(note.x | 0, note.drawY | 0, note.width | 0, note.height | 0, 4);
+            }
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        for (let i = 0; i < visualNotes.length; i++) {
+            const note = visualNotes[i];
+            ctx.fillStyle = note.color;
+            ctx.beginPath();
+            ctx.roundRect(note.x | 0, note.y | 0, note.width | 0, note.height | 0, 7);
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        requestAnimationFrame(loop);
+    }
+
+    requestAnimationFrame(loop);
+}
 
 // --- PLAYBACK ENGINE STATE ---
 let schedulerTimer = null; 
@@ -222,7 +469,13 @@ function schedulerLoop() {
         if (triggerTime < currentContextTime + scheduleAheadTime) {
             
             // 1. Audio
-            if (typeof triggerSound === 'function') triggerSound(event.freq, triggerTime, event.duration);
+            if (typeof triggerSound === 'function') {
+                if (typeof sustainMode !== 'undefined' && sustainMode === 0) {
+                    triggerSound(event.freq, triggerTime, null);
+                } else {
+                    triggerSound(event.freq, triggerTime, event.duration);
+                }
+            }
 
             // 2. UI Highlight (Note On)
             Tone.Draw.schedule(() => {

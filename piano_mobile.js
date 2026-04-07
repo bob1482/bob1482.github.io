@@ -2,35 +2,43 @@
 // PIANO MOBILE: Android/Brave Immersive Fullscreen
 // ==========================================
 
-// Dynamically move controls between the top bar and the gear menu
+// Dynamically move controls into the gear menu for a minimal UI on all devices
 function rearrangeUI() {
-    const isMobile = isMobileMode();
-    const quickControls = document.getElementById('quick-controls');
     const settingsPanel = document.getElementById('settings-panel');
+    const quickControls = document.getElementById('quick-controls');
+    const isMobile = typeof isMobileMode === 'function' ? isMobileMode() : false;
 
     const groupsToMove = [
         document.getElementById('group-recorder'),
         document.getElementById('group-memory'),
         document.getElementById('group-labels'),
-        document.getElementById('group-transpose'),
         document.getElementById('group-layout')
     ];
 
-    if (isMobile) {
-        if (quickControls) quickControls.style.display = 'none';
-
-        for (let i = groupsToMove.length - 1; i >= 0; i--) {
-            const ctrl = groupsToMove[i];
-            if (ctrl && settingsPanel) {
+    for (let i = groupsToMove.length - 1; i >= 0; i--) {
+        const ctrl = groupsToMove[i];
+        if (ctrl && settingsPanel) {
+            if (ctrl.parentNode !== settingsPanel) {
                 settingsPanel.insertBefore(ctrl, settingsPanel.firstChild);
             }
         }
-    } else {
-        if (quickControls) quickControls.style.display = 'flex';
+    }
 
-        groupsToMove.forEach(ctrl => {
-            if (ctrl && quickControls) quickControls.appendChild(ctrl);
-        });
+    const pedalGroup = document.getElementById('group-pedal');
+    const settingsBtnGroup = document.getElementById('group-settings-btn');
+
+    if (pedalGroup && settingsPanel && quickControls) {
+        if (isMobile) {
+            if (pedalGroup.parentNode !== settingsPanel) {
+                settingsPanel.insertBefore(pedalGroup, settingsPanel.firstChild);
+            }
+        } else if (pedalGroup.parentNode !== quickControls) {
+            if (settingsBtnGroup && settingsBtnGroup.parentNode === quickControls) {
+                quickControls.insertBefore(pedalGroup, settingsBtnGroup);
+            } else {
+                quickControls.appendChild(pedalGroup);
+            }
+        }
     }
 }
 
@@ -92,6 +100,7 @@ window.addEventListener('resize', () => {
     const isNowMobile = isMobileMode();
     if (wasMobile !== isNowMobile) {
         wasMobile = isNowMobile;
+        if (!isNowMobile) resetQuickControlsPosition();
         rearrangeUI();
         if (typeof renderBoard === 'function') renderBoard();
         if (typeof resizeCanvas === 'function') resizeCanvas();
@@ -103,7 +112,22 @@ function toggleSettings() {
     const panel = document.getElementById('settings-panel');
     if (panel) {
         panel.classList.toggle('settings-visible');
+        if (!panel.classList.contains('settings-visible')) {
+            panel.style.transition = '';
+            panel.style.boxShadow = '';
+            panel.style.transform = '';
+        }
     }
+}
+
+function closeSettingsPanel() {
+    const panel = document.getElementById('settings-panel');
+    if (!panel || !panel.classList.contains('settings-visible')) return;
+
+    panel.classList.remove('settings-visible');
+    panel.style.transition = '';
+    panel.style.boxShadow = '';
+    panel.style.transform = '';
 }
 
 // Automatically close the settings if the user clicks/taps outside of it.
@@ -114,9 +138,109 @@ window.addEventListener('pointerdown', (e) => {
     // If settings are open, and the click was outside the panel and the button, close them.
     if (panel && panel.classList.contains('settings-visible')) {
         if (!panel.contains(e.target) && settingsBtn && !settingsBtn.contains(e.target)) {
-            panel.classList.remove('settings-visible');
+            closeSettingsPanel();
         }
     }
 });
 
 window.addEventListener('DOMContentLoaded', rearrangeUI);
+
+// ==========================================
+// QUICK CONTROLS DRAGGING (LONG PRESS)
+// ==========================================
+let qcDragTimer = null;
+let isDraggingQC = false;
+let qcStartX = 0;
+let qcStartY = 0;
+let qcCurrentOffsetX = 0;
+let qcCurrentOffsetY = 0;
+let qcStartOffsetX = 0;
+let qcStartOffsetY = 0;
+
+const quickControls = document.getElementById('quick-controls');
+
+if (quickControls) {
+    quickControls.addEventListener('touchstart', handleQCTouchStart, { passive: false });
+    quickControls.addEventListener('touchmove', handleQCTouchMove, { passive: false });
+    document.addEventListener('touchend', handleQCTouchEnd);
+    document.addEventListener('touchcancel', handleQCTouchEnd);
+}
+
+function handleQCTouchStart(e) {
+    if (!isMobileMode()) return;
+    if (e.touches.length > 1) return;
+    if (e.target.closest('button, input, select, option')) return;
+
+    if (qcDragTimer) {
+        clearTimeout(qcDragTimer);
+        qcDragTimer = null;
+    }
+
+    const touch = e.touches[0];
+    qcStartX = touch.clientX;
+    qcStartY = touch.clientY;
+    qcStartOffsetX = qcCurrentOffsetX;
+    qcStartOffsetY = qcCurrentOffsetY;
+
+    qcDragTimer = setTimeout(() => {
+        isDraggingQC = true;
+        quickControls.style.transition = 'none';
+        quickControls.style.boxShadow = '0 0 20px rgba(0, 210, 255, 0.8)';
+
+        if (navigator.vibrate) navigator.vibrate(20);
+    }, 400);
+}
+
+function handleQCTouchMove(e) {
+    if (!isDraggingQC) {
+        if (qcDragTimer) {
+            const touch = e.touches[0];
+            if (Math.abs(touch.clientX - qcStartX) > 10 || Math.abs(touch.clientY - qcStartY) > 10) {
+                clearTimeout(qcDragTimer);
+                qcDragTimer = null;
+            }
+        }
+        return;
+    }
+
+    e.preventDefault();
+    const touch = e.touches[0];
+    const dx = touch.clientX - qcStartX;
+    const dy = touch.clientY - qcStartY;
+
+    qcCurrentOffsetX = qcStartOffsetX + dx;
+    qcCurrentOffsetY = qcStartOffsetY + dy;
+
+    quickControls.style.transform = `translate(calc(-50% + ${qcCurrentOffsetX}px), calc(0px + ${qcCurrentOffsetY}px))`;
+}
+
+function handleQCTouchEnd() {
+    if (qcDragTimer) {
+        clearTimeout(qcDragTimer);
+        qcDragTimer = null;
+    }
+
+    if (isDraggingQC) {
+        isDraggingQC = false;
+        quickControls.style.transition = '';
+        quickControls.style.boxShadow = '0 4px 15px rgba(0,0,0,0.5)';
+    }
+}
+
+function resetQuickControlsPosition() {
+    if (!quickControls) return;
+
+    if (qcDragTimer) {
+        clearTimeout(qcDragTimer);
+        qcDragTimer = null;
+    }
+
+    isDraggingQC = false;
+    qcCurrentOffsetX = 0;
+    qcCurrentOffsetY = 0;
+    qcStartOffsetX = 0;
+    qcStartOffsetY = 0;
+    quickControls.style.transition = '';
+    quickControls.style.boxShadow = '0 4px 15px rgba(0,0,0,0.5)';
+    quickControls.style.transform = '';
+}

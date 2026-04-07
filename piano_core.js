@@ -11,8 +11,8 @@ const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", 
 const initIsMobile = window.innerWidth <= 850 || window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 
 // --- GLOBAL SETTINGS STATE ---
-let transposeLeft = initIsMobile ? -22 : 2;
-let transposeRight = initIsMobile ? -22 : 2;
+let transposeLeft = initIsMobile ? -22 : -3;
+let transposeRight = initIsMobile ? -22 : -3;
 let globalVolume = 0.5;
 let sustainMultiplier = 1.0;
 let sustainMode = 0; // 0 = Timed, 1 = Hold until released
@@ -31,7 +31,7 @@ let stripRangeRight = initIsMobile ? 47 : 60; // 47 on mobile, 60 on desktop
 let customBackground = null; // Holds the base64 image data
 let customKeyIdle = null;
 let customKeyPressed = null;
-let transposeSequence = "-5:-5 -12:0 5:5 12:12 -17:-17 17:5";
+let transposeSequence = "5:5 12:12 -17:-17";
 
 // --- PHYSICAL KEY TRACKING ---
 let activePhysicalKeys = {}; 
@@ -356,19 +356,55 @@ function resetSettings() {
 function openResetModal() {
     const modal = document.getElementById('reset-modal');
     if (modal) modal.classList.add('active');
+
+    resetResetModalState();
 }
 
 function closeResetModal() {
     const modal = document.getElementById('reset-modal');
     if (modal) modal.classList.remove('active');
+
+    resetResetModalState();
+}
+
+function toggleFullReset(isFull) {
+    const subResets = document.querySelectorAll('.sub-reset');
+    subResets.forEach((cb) => {
+        cb.disabled = isFull;
+        if (isFull) cb.checked = true;
+    });
+}
+
+function resetResetModalState() {
+    const resetRecs = document.getElementById('reset-recs');
+    if (resetRecs) {
+        resetRecs.checked = false;
+        resetRecs.disabled = false;
+    }
+
+    const resetMedia = document.getElementById('reset-media');
+    if (resetMedia) {
+        resetMedia.checked = false;
+        resetMedia.disabled = false;
+    }
+
+    const resetPrefs = document.getElementById('reset-prefs');
+    if (resetPrefs) {
+        resetPrefs.checked = true;
+        resetPrefs.disabled = false;
+    }
+
+    const resetFull = document.getElementById('reset-full');
+    if (resetFull) resetFull.checked = false;
 }
 
 function executeReset() {
     const resetRecs = document.getElementById('reset-recs').checked;
     const resetMedia = document.getElementById('reset-media').checked;
     const resetPrefs = document.getElementById('reset-prefs').checked;
+    const resetFull = document.getElementById('reset-full').checked;
 
-    if (!resetRecs && !resetMedia && !resetPrefs) {
+    if (!resetRecs && !resetMedia && !resetPrefs && !resetFull) {
         closeResetModal();
         return; // Nothing selected!
     }
@@ -378,6 +414,12 @@ function executeReset() {
     if (typeof releaseAllStuckNotes === 'function') releaseAllStuckNotes();
     if (typeof clearTimedSustainTrackers === 'function') clearTimedSustainTrackers(false);
     if (typeof sampler !== 'undefined') sampler.releaseAll();
+
+    if (resetFull) {
+        localStorage.removeItem('wickiPianoSettings');
+        location.reload();
+        return;
+    }
 
     // 1. Clear Recordings
     if (resetRecs) {
@@ -406,30 +448,67 @@ function executeReset() {
             if (typeof applyKeyImages === 'function') applyKeyImages();
         }
 
-        // Soft Reset Transpose & Sequence (NO RELOAD)
+        // Soft Reset all UI and preferences without reloading
         if (resetPrefs) {
-            // 1. Reset live variables to defaults
-            transposeLeft = initIsMobile ? -22 : 2;
-            transposeRight = initIsMobile ? -22 : 2;
-            transposeSequence = "-5:-5 -12:0 5:5 12:12 -17:-17 17:5";
+            // Reset live variables to startup defaults
+            transposeLeft = initIsMobile ? -22 : -3;
+            transposeRight = initIsMobile ? -22 : -3;
+            transposeSequence = "5:5 12:12 -17:-17";
             sustainMode = 0;
             sequenceIndex = 0;
             boardOffsetX = 0;
             boardOffsetY = 0;
+            globalVolume = 0.5;
+            sustainMultiplier = 1.0;
+            bpm = 120;
+            mobileZoom = initIsMobile ? 1.30 : 0.65;
+            stripHeight = initIsMobile ? 5 : 16;
+            showMobileStrip = true;
+            layoutMode = 0;
+            stripRangeLeft = initIsMobile ? 0 : -27;
+            stripRangeRight = initIsMobile ? 47 : 60;
+            labelMode = 1;
+            fKeyMode = 0;
+            if (typeof isVisualizerOn !== 'undefined') isVisualizerOn = true;
 
-            // 2. Delete them from the saved settings object so they don't persist
-            delete settings.transposeLeft;
-            delete settings.transposeRight;
-            delete settings.transposeSequence;
-            delete settings.sustainMode;
-            delete settings.boardOffsetX;
-            delete settings.boardOffsetY;
+            // Delete them from saved settings so they do not persist
+            const keysToDelete = [
+                'transposeLeft',
+                'transposeRight',
+                'transposeSequence',
+                'sustainMode',
+                'boardOffsetX',
+                'boardOffsetY',
+                'globalVolume',
+                'sustainMultiplier',
+                'bpm',
+                'mobileZoom',
+                'showMobileStrip',
+                'stripHeight',
+                'layoutMode',
+                'stripRangeLeft',
+                'stripRangeRight',
+                'labelMode',
+                'fKeyMode',
+                'isVisualizerOn'
+            ];
+            keysToDelete.forEach((key) => delete settings[key]);
 
-            // 3. Reset the physical text box input
+            // Reset physical UI inputs and audio parameters
             const seqInput = document.getElementById("input-sequence");
             if (seqInput) seqInput.value = transposeSequence;
+            const bpmInput = document.getElementById("input-bpm");
+            if (bpmInput) bpmInput.value = bpm;
 
-            // 4. Redraw the board to reflect the new transpose values
+            if (typeof Tone !== 'undefined' && Tone.Destination) {
+                Tone.Destination.volume.value = Tone.gainToDb(globalVolume);
+                Tone.Transport.bpm.value = bpm;
+            }
+
+            // Re-apply layout and redraw everything
+            if (typeof applyLayoutModeClass === 'function') applyLayoutModeClass();
+            if (typeof applyMobileStripState === 'function') applyMobileStripState();
+            if (typeof applyStripHeight === 'function') applyStripHeight();
             if (typeof renderBoard === 'function') renderBoard();
             if (typeof applyZoom === 'function') applyZoom();
             if (typeof updateKeyCoordinates === 'function') updateKeyCoordinates();
