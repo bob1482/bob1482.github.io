@@ -3,6 +3,26 @@
 // ==========================================
 
 // --- NOTE LOGIC ---
+let manualFreqRefCounts = {};
+let manualHoldFreqs = {};
+
+function releaseManualHoldFreq(freqStr) {
+  if (typeof sampler === 'undefined') return false;
+
+  const heldVoice = activeVoices.find((voice) => {
+      return voice.freq.toFixed(2) === freqStr && voice.timedTrackerKey === undefined;
+  });
+
+  if (!heldVoice) {
+      delete manualHoldFreqs[freqStr];
+      return false;
+  }
+
+  sampler.triggerRelease(heldVoice.freq, Tone.now());
+  activeVoices = activeVoices.filter((voice) => voice.freq.toFixed(2) !== freqStr);
+  delete manualHoldFreqs[freqStr];
+  return true;
+}
 
 async function pressNote(freq, isAutomated = false, side = 'right', sourceElement = null) {
   if (Tone.context.state !== 'running') await Tone.start();
@@ -14,6 +34,13 @@ async function pressNote(freq, isAutomated = false, side = 'right', sourceElemen
   }
 
   const freqStr = freq.toFixed(2);
+
+  if (!isAutomated) {
+      manualFreqRefCounts[freqStr] = (manualFreqRefCounts[freqStr] || 0) + 1;
+      if (sustainMode === 1) {
+          manualHoldFreqs[freqStr] = true;
+      }
+  }
 
   if (sourceElement) {
       sourceElement.classList.add("active");
@@ -43,12 +70,28 @@ function releaseNote(freq, isAutomated = false, sourceElement = null) {
     recordedEvents.push({ type: 'off', freq: freq, time: Tone.now() - recordingStartTime });
   }
 
-  if (!isAutomated && sustainMode === 1 && typeof sampler !== 'undefined') {
-      sampler.triggerRelease(freq, Tone.now());
-      activeVoices = activeVoices.filter((voice) => voice.freq !== freq);
+  const freqStr = freq.toFixed(2);
+  let shouldReleaseAudio = true;
+
+  if (!isAutomated) {
+      manualFreqRefCounts[freqStr] = Math.max(0, (manualFreqRefCounts[freqStr] || 0) - 1);
+      if (manualFreqRefCounts[freqStr] > 0) {
+          shouldReleaseAudio = false;
+      } else {
+          delete manualFreqRefCounts[freqStr];
+      }
   }
 
-  const freqStr = freq.toFixed(2);
+  if (shouldReleaseAudio && !isAutomated && typeof sampler !== 'undefined') {
+      const voice = activeVoices.find((activeVoice) => activeVoice.freq.toFixed(2) === freqStr);
+      const isInfiniteHold = voice && voice.timedTrackerKey === undefined;
+
+      if (sustainMode === 1 || (manualHoldFreqs[freqStr] && isInfiniteHold)) {
+          sampler.triggerRelease(freq, Tone.now());
+          activeVoices = activeVoices.filter((activeVoice) => activeVoice.freq.toFixed(2) !== freqStr);
+          delete manualHoldFreqs[freqStr];
+      }
+  }
   
   if (sourceElement) {
       sourceElement.classList.remove("active");
@@ -79,6 +122,8 @@ function releaseAllStuckNotes() {
         }
     }
     activeTouches = {};
+    manualFreqRefCounts = {};
+    manualHoldFreqs = {};
 }
 
 // --- GLOBAL MOUSE TRACKING ---
@@ -154,6 +199,13 @@ window.addEventListener('mouseup', (e) => {
         } else if (typeof sampler !== 'undefined') {
             sampler.releaseAll();
             activeVoices = [];
+        }
+
+        if (typeof sampler !== 'undefined') {
+            Object.keys(manualHoldFreqs).forEach((freqStr) => {
+                if ((manualFreqRefCounts[freqStr] || 0) > 0) return;
+                releaseManualHoldFreq(freqStr);
+            });
         }
 
         console.log("Right-click released: Audio sustains killed, visuals kept.");
@@ -445,6 +497,34 @@ function setDirectValue(type, value) {
         case 'sustain':
             sustainMultiplier = Math.max(0.1, Math.min(5.0, val));
             break;
+        case 'speed': {
+            const newSpeed = Math.max(0.25, Math.min(3.0, val));
+            if (typeof changePlaybackSpeed === 'function') {
+                changePlaybackSpeed(newSpeed - playbackRate);
+            }
+            return;
+        }
+        case 'play-trans': {
+            const newPTrans = Math.max(-50, Math.min(50, Math.round(val)));
+            if (typeof changePlaybackTranspose === 'function') {
+                changePlaybackTranspose(newPTrans - playbackTranspose);
+            }
+            return;
+        }
+        case 'fall': {
+            const newFall = Math.max(0.5, Math.min(10.0, val));
+            if (typeof changeFallDuration === 'function') {
+                changeFallDuration(newFall - fallDuration);
+            }
+            return;
+        }
+        case 'manual-speed': {
+            const newMSpeed = Math.max(10, Math.min(1000, val));
+            if (typeof changeManualRiseSpeed === 'function') {
+                changeManualRiseSpeed(newMSpeed - manualRiseSpeed);
+            }
+            return;
+        }
         case 'strip-l':
             releaseAllStuckNotes();
             stripRangeLeft = Math.max(-50, Math.min(0, Math.round(val)));
@@ -866,6 +946,17 @@ window.addEventListener("keydown", (e) => {
       return;
   }
 
+  // Numpad 7 (Pitch Up) & Numpad 1 (Pitch Down): Song Transpose
+  if (e.code === "Numpad7" || e.code === "Numpad1") {
+      e.preventDefault();
+      const delta = (e.code === "Numpad7") ? 1 : -1;
+
+      if (typeof changePlaybackTranspose === 'function') {
+          changePlaybackTranspose(delta);
+      }
+      return;
+  }
+
   if (e.repeat) return;
 
   const key = document.querySelector(`.key[data-key="${CSS.escape(e.code)}"]`);
@@ -996,6 +1087,18 @@ function updateUI() {
 
   const dispSus = document.getElementById("disp-sustain");
   if (dispSus) dispSus.value = sustainMultiplier.toFixed(1);
+
+  const dispSpeed = document.getElementById("disp-speed");
+  if (dispSpeed) dispSpeed.value = playbackRate.toFixed(2);
+
+  const dispPlayTrans = document.getElementById("disp-play-trans");
+  if (dispPlayTrans) dispPlayTrans.value = playbackTranspose;
+
+  const dispFall = document.getElementById("disp-fall");
+  if (dispFall) dispFall.value = fallDuration.toFixed(1);
+
+  const dispManual = document.getElementById("disp-manual-speed");
+  if (dispManual) dispManual.value = manualRiseSpeed;
 
   const btnSusMode = document.getElementById("btn-sus-mode");
   if (btnSusMode) {

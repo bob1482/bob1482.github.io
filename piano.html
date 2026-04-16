@@ -195,6 +195,45 @@
       </div>
 
       <div class="control-group">
+        <span class="control-label">Speed & Fall</span>
+        <div style="display: flex; gap: 10px;">
+          <div style="display:flex; flex-direction:column; align-items:center;">
+            <span class="side-label">PLAYBACK</span>
+            <div class="btn-row">
+              <button class="control-btn" onclick="changePlaybackSpeed(-0.1)">-</button>
+              <input type="number" step="0.1" class="control-val-input" id="disp-speed" value="1.0" onchange="setDirectValue('speed', this.value)">
+              <button class="control-btn" onclick="changePlaybackSpeed(0.1)">+</button>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center;">
+            <span class="side-label">NOTE FALL</span>
+            <div class="btn-row">
+              <button class="control-btn" onclick="changeFallDuration(-0.5)">-</button>
+              <input type="number" step="0.5" class="control-val-input" id="disp-fall" value="2.0" onchange="setDirectValue('fall', this.value)">
+              <button class="control-btn" onclick="changeFallDuration(0.5)">+</button>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center;">
+            <span class="side-label">MANUAL SPEED</span>
+            <div class="btn-row">
+              <button class="control-btn" onclick="changeManualRiseSpeed(-10)">-</button>
+              <input type="number" step="10" class="control-val-input" id="disp-manual-speed" value="100" onchange="setDirectValue('manual-speed', this.value)">
+              <button class="control-btn" onclick="changeManualRiseSpeed(10)">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">Song Transpose</span>
+        <div class="btn-row">
+          <button class="control-btn" onclick="changePlaybackTranspose(-1)">-</button>
+          <input type="number" class="control-val-input" id="disp-play-trans" value="0" onchange="setDirectValue('play-trans', this.value)">
+          <button class="control-btn" onclick="changePlaybackTranspose(1)">+</button>
+        </div>
+      </div>
+
+      <div class="control-group">
         <span class="control-label">Strip Range</span>
         <div style="display: flex; gap: 10px;">
           <div style="display:flex; flex-direction:column; align-items:center;">

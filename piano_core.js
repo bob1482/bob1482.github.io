@@ -71,6 +71,9 @@ let recordingsList = []; // Array of objects: { name, events, duration }
 let currentRecordingIndex = -1; // -1 means using raw buffer (recordedEvents)
 
 let playbackRate = 1.0;
+let playbackTranspose = 0; // Transpose for recordings/MIDI files in semitones
+let fallDuration = 2.0;
+let manualRiseSpeed = 100; // Speed in pixels per second
 
 // --- AUDIO ENGINE (TONE.JS) ---
 Tone.context.lookAhead = 0.05; 
@@ -258,7 +261,11 @@ function saveSettings() {
         customKeyPressed: customKeyPressed,
         transposeSequence: transposeSequence,
         boardOffsetX: boardOffsetX,
-        boardOffsetY: boardOffsetY
+        boardOffsetY: boardOffsetY,
+        playbackRate: playbackRate,
+        playbackTranspose: playbackTranspose,
+        fallDuration: fallDuration,
+        manualRiseSpeed: manualRiseSpeed
     };
 
     try {
@@ -326,6 +333,14 @@ function loadSettings() {
         }
         if (settings.boardOffsetX !== undefined) boardOffsetX = settings.boardOffsetX;
         if (settings.boardOffsetY !== undefined) boardOffsetY = settings.boardOffsetY;
+        if (settings.playbackRate !== undefined) playbackRate = settings.playbackRate;
+        if (settings.playbackTranspose !== undefined) playbackTranspose = settings.playbackTranspose;
+        if (settings.fallDuration !== undefined) fallDuration = settings.fallDuration;
+        if (settings.manualRiseSpeed !== undefined) manualRiseSpeed = settings.manualRiseSpeed;
+        playbackRate = Math.max(0.25, Math.min(3.0, Number(playbackRate) || 1.0));
+        playbackTranspose = Math.max(-50, Math.min(50, Math.round(Number(playbackTranspose) || 0)));
+        fallDuration = Math.max(0.5, Math.min(10.0, Number(fallDuration) || 2.0));
+        manualRiseSpeed = Math.max(10, Math.min(1000, Number(manualRiseSpeed) || 100));
         if (typeof applyKeyImages === 'function') applyKeyImages();
         
         // Apply complex settings
@@ -461,6 +476,10 @@ function executeReset() {
             globalVolume = 0.5;
             sustainMultiplier = 1.0;
             bpm = 120;
+            playbackRate = 1.0;
+            playbackTranspose = 0;
+            fallDuration = 2.0;
+            manualRiseSpeed = 100;
             mobileZoom = initIsMobile ? 1.30 : 0.65;
             stripHeight = initIsMobile ? 5 : 16;
             showMobileStrip = true;
@@ -482,6 +501,10 @@ function executeReset() {
                 'globalVolume',
                 'sustainMultiplier',
                 'bpm',
+                'playbackRate',
+                'playbackTranspose',
+                'fallDuration',
+                'manualRiseSpeed',
                 'mobileZoom',
                 'showMobileStrip',
                 'stripHeight',

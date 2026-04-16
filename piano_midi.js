@@ -104,26 +104,39 @@ function loadMidiFile(file) {
 }
 
 function convertMidiToEvents(midiData) {
-    // Access global variables from piano_core.js
     if (typeof stopPlayback === 'function' && isPlaying) stopPlayback();
-    
-    // We modify the global recordedEvents array
-    recordedEvents.length = 0; // Clear array
+
+    recordedEvents.length = 0;
     isRecording = false;
 
-    midiData.tracks.forEach(track => {
+    let trackCounter = 0;
+
+    midiData.tracks.forEach((track) => {
+        if (track.notes.length === 0) return;
+
         track.notes.forEach(note => {
-            // MIDI 48 = C3. Adjust offset based on BASE_NOTE_FREQ (C3)
             const semitoneOffset = note.midi - 48; 
             const freq = BASE_NOTE_FREQ * Math.pow(2, semitoneOffset / 12);
-            
-            recordedEvents.push({ type: 'on', freq: freq, time: note.time });
-            recordedEvents.push({ type: 'off', freq: freq, time: note.time + note.duration });
+
+            recordedEvents.push({
+                type: 'on',
+                freq: freq,
+                time: note.time,
+                trackIndex: trackCounter
+            });
+            recordedEvents.push({
+                type: 'off',
+                freq: freq,
+                time: note.time + note.duration,
+                trackIndex: trackCounter
+            });
         });
+
+        trackCounter++;
     });
 
     recordedEvents.sort((a, b) => a.time - b.time);
-    console.log(`MIDI Loaded: ${recordedEvents.length / 2} notes imported.`);
+    console.log(`MIDI Loaded: ${recordedEvents.length / 2} notes imported across ${trackCounter} tracks.`);
     
     if (typeof startPlayback === 'function') startPlayback();
     if (typeof updateUI === 'function') updateUI();

@@ -195,7 +195,7 @@ body {
 /* --- QUICK CONTROLS (ALWAYS VISIBLE) --- */
 #quick-controls {
   position: fixed;
-  top: 15px;
+  top: 30px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;

@@ -11,10 +11,6 @@ let fallingNotes = [];
 // --- VISUALIZER STATE ---
 let isVisualizerOn = true;
 
-// --- VISUALIZER SETTINGS ---
-const FALL_DURATION = 2.0;
-const MANUAL_RISE_SPEED_PPS = 100;
-
 // --- VISUALIZER CANVAS ---
 const canvas = document.getElementById("synthesia-canvas");
 const ctx = canvas.getContext("2d", { alpha: true });
@@ -24,7 +20,7 @@ let resizeTimeout;
 // --- VISUALIZER OBJECT POOLING ---
 function getNoteFromPool() {
     if (notePool.length > 0) return notePool.pop();
-    return { freq: 0, x: 0, width: 0, height: 0, y: 0, color: '', targetTime: 0, active: false };
+    return { freq: 0, x: 0, width: 0, height: 0, y: 0, color: '', targetTime: 0, duration: 0, active: false };
 }
 
 function recycleNote(note) {
@@ -70,7 +66,7 @@ function updateKeyCoordinates() {
 }
 
 // --- VISUALIZER STATE HELPERS ---
-function spawnFallingNote(freqStr, duration, targetTime) {
+function spawnFallingNote(freqStr, duration, targetTime, trackIndex = 0) {
     if (!canvas) return;
 
     if (Object.keys(keyCoordinates).length === 0 && typeof updateKeyCoordinates === 'function') {
@@ -81,16 +77,25 @@ function spawnFallingNote(freqStr, duration, targetTime) {
     const coords = keyCoordinates[freqFixed];
     if (!coords) return;
 
-    const effectiveFallDuration = FALL_DURATION / playbackRate;
-    const pixelsPerSecond = canvas.height / effectiveFallDuration;
-    const noteHeight = duration * pixelsPerSecond;
+    const pixelsPerSecond = canvas.height / fallDuration;
+    let noteColor = 'rgb(93, 0, 150)';
+
+    if (trackIndex === 0) {
+        noteColor = '#c87ad1';
+    } else if (trackIndex === 1) {
+        noteColor = '#00d2ff';
+    } else if (trackIndex > 1) {
+        const extraColors = ['#5cb85c', '#f0ad4e', '#d9534f'];
+        noteColor = extraColors[(trackIndex - 2) % extraColors.length];
+    }
 
     const note = getNoteFromPool();
     note.freq = freqFixed;
     note.x = coords.x;
     note.width = coords.width;
-    note.height = noteHeight;
-    note.color = 'rgb(93, 0, 150)';
+    note.duration = duration;
+    note.height = duration * pixelsPerSecond;
+    note.color = noteColor;
     note.targetTime = targetTime;
     note.active = true;
 
@@ -108,7 +113,10 @@ function startManualVisualNote(freqStr, color = 'rgb(61, 182, 67)') {
     if (!coords) return;
 
     for (let i = 0; i < visualNotes.length; i++) {
-        if (visualNotes[i].freq === freqStr && visualNotes[i].active) return;
+        if (visualNotes[i].freq === freqStr && visualNotes[i].active) {
+            visualNotes[i].refCount = (visualNotes[i].refCount || 1) + 1;
+            return;
+        }
     }
 
     const note = getNoteFromPool();
@@ -119,6 +127,7 @@ function startManualVisualNote(freqStr, color = 'rgb(61, 182, 67)') {
     note.height = 0;
     note.color = color;
     note.active = true;
+    note.refCount = 1;
 
     visualNotes.push(note);
 }
@@ -126,7 +135,10 @@ function startManualVisualNote(freqStr, color = 'rgb(61, 182, 67)') {
 function endManualVisualNote(freqStr) {
     for (let i = 0; i < visualNotes.length; i++) {
         if (visualNotes[i].freq === freqStr && visualNotes[i].active) {
-            visualNotes[i].active = false;
+            visualNotes[i].refCount = (visualNotes[i].refCount || 1) - 1;
+            if (visualNotes[i].refCount <= 0) {
+                visualNotes[i].active = false;
+            }
             return;
         }
     }
@@ -137,18 +149,17 @@ function updatePhysics(dt) {
 
     const currentAudioTime = isPaused ? pauseStartTimestamp : Tone.now();
     const effectiveTime = currentAudioTime - totalPausedTime;
-    const effectiveFallDuration = FALL_DURATION / playbackRate;
-    const pixelsPerSecond = canvas.height / effectiveFallDuration;
+    const pixelsPerSecond = canvas.height / fallDuration;
 
     if (isPlaying) {
         if (!isPaused) {
             while (visualEventIndex < currentPlaybackEvents.length) {
                 const evt = currentPlaybackEvents[visualEventIndex];
                 const hitTime = playbackStartTime + evt.time + totalPausedTime;
-                const spawnTime = hitTime - effectiveFallDuration;
+                const spawnTime = hitTime - fallDuration;
 
                 if (currentAudioTime >= spawnTime) {
-                    spawnFallingNote(evt.freq, evt.duration, hitTime);
+                    spawnFallingNote(evt.freq, evt.duration, hitTime, evt.trackIndex);
                     visualEventIndex++;
                 } else {
                     break;
@@ -160,6 +171,7 @@ function updatePhysics(dt) {
             const note = fallingNotes[i];
             const timeRemaining = note.targetTime - currentAudioTime;
 
+            note.height = note.duration * pixelsPerSecond;
             const y = canvas.height - (timeRemaining * pixelsPerSecond);
             note.drawY = y - note.height;
 
@@ -184,10 +196,10 @@ function updatePhysics(dt) {
     for (let i = visualNotes.length - 1; i >= 0; i--) {
         const note = visualNotes[i];
         if (note.active) {
-            note.height += MANUAL_RISE_SPEED_PPS * dt;
+            note.height += manualRiseSpeed * dt;
             note.y = canvas.height - note.height;
         } else {
-            note.y -= MANUAL_RISE_SPEED_PPS * dt;
+            note.y -= manualRiseSpeed * dt;
         }
 
         if (note.y + note.height < -50) {
@@ -224,14 +236,14 @@ function startVisualizerLoop() {
         ctx.lineWidth = 2;
 
         if (fallingNotes.length > 0) {
-            ctx.fillStyle = 'rgb(93, 0, 150)';
-            ctx.beginPath();
             for (let i = 0; i < fallingNotes.length; i++) {
                 const note = fallingNotes[i];
+                ctx.fillStyle = note.color;
+                ctx.beginPath();
                 ctx.roundRect(note.x | 0, note.drawY | 0, note.width | 0, note.height | 0, 4);
+                ctx.fill();
+                ctx.stroke();
             }
-            ctx.fill();
-            ctx.stroke();
         }
 
         for (let i = 0; i < visualNotes.length; i++) {
@@ -282,9 +294,7 @@ function startPlayback() {
   
   const now = Tone.now();
   
-  // NEW: Apply playback rate to the start time offset
-  const effectiveFallDuration = FALL_DURATION / playbackRate;
-  playbackStartTime = now + effectiveFallDuration; 
+  playbackStartTime = now + fallDuration;
   
   if(isMetronomeOn) {
       Tone.Transport.start();
@@ -344,6 +354,7 @@ function setVisualizerPause(paused) {
 
 function seekToTime(percent) {
     if (!isPlaying) return;
+    percent = Math.max(0, Math.min(100, percent));
     
     if (schedulerTimer) clearTimeout(schedulerTimer);
     if (typeof clearTimedSustainTrackers === 'function') clearTimedSustainTrackers(false);
@@ -372,12 +383,9 @@ function seekToTime(percent) {
     
     visualEventIndex = 0;
     
-    // NEW: Apply playback rate to the scrub/seek visual recalculation
-    const effectiveFallDuration = FALL_DURATION / playbackRate;
-    
     for (let i = 0; i < currentPlaybackEvents.length; i++) {
         const evt = currentPlaybackEvents[i];
-        const spawnTimeRel = evt.time - effectiveFallDuration; 
+        const spawnTimeRel = evt.time - fallDuration;
         
         if (spawnTimeRel > targetSeconds) {
             visualEventIndex = i;
@@ -386,7 +394,7 @@ function seekToTime(percent) {
         
         if (evt.time > targetSeconds) {
             const hitTimeAbs = playbackStartTime + evt.time; 
-            spawnFallingNote(evt.freq, evt.duration, hitTimeAbs);
+            spawnFallingNote(evt.freq, evt.duration, hitTimeAbs, evt.trackIndex);
         }
         
         if (i === currentPlaybackEvents.length - 1) {
@@ -403,15 +411,16 @@ function processRecordedEvents() {
     let active = {};
     let processed = [];
     let sorted = [...recordedEvents].sort((a, b) => a.time - b.time);
+    const freqMultiplier = Math.pow(2, playbackTranspose / 12);
 
     sorted.forEach(evt => {
         if (evt.type === 'on') {
-            // Create a new object to apply playback rate without mutating the original recording
             const newEvt = { 
                 type: 'on', 
-                freq: evt.freq, 
+                freq: evt.freq * freqMultiplier,
                 time: evt.time / playbackRate, 
-                duration: 0.5 / playbackRate 
+                duration: 0.5 / playbackRate,
+                trackIndex: evt.trackIndex
             };
             active[evt.freq] = newEvt;
             processed.push(newEvt);
@@ -426,6 +435,32 @@ function processRecordedEvents() {
     return processed;
 }
 
+function changePlaybackTranspose(delta) {
+    playbackTranspose += delta;
+
+    if (playbackTranspose < -50) playbackTranspose = -50;
+    if (playbackTranspose > 50) playbackTranspose = 50;
+
+    if (isPlaying) {
+        const currentAudioTime = isPaused ? pauseStartTimestamp : Tone.now();
+        const elapsed = currentAudioTime - totalPausedTime - playbackStartTime;
+        const currentPercent = playbackTotalDuration > 0 ? (elapsed / playbackTotalDuration) * 100 : 0;
+
+        currentPlaybackEvents = processRecordedEvents();
+
+        playbackTotalDuration = 0;
+        if (currentPlaybackEvents.length > 0) {
+            const last = currentPlaybackEvents[currentPlaybackEvents.length - 1];
+            playbackTotalDuration = last.time + last.duration;
+        }
+
+        seekToTime(Math.max(0, Math.min(100, currentPercent)));
+    }
+
+    if (typeof updateUI === 'function') updateUI();
+    if (typeof saveSettings === 'function') saveSettings();
+}
+
 function changePlaybackSpeed(delta) {
     playbackRate += delta;
     
@@ -437,7 +472,7 @@ function changePlaybackSpeed(delta) {
 
     if (isPlaying) {
         // Save the current elapsed percentage so we don't lose our place
-        const currentAudioTime = Tone.now();
+        const currentAudioTime = isPaused ? pauseStartTimestamp : Tone.now();
         const elapsed = currentAudioTime - totalPausedTime - playbackStartTime;
         const currentPercent = playbackTotalDuration > 0 ? (elapsed / playbackTotalDuration) * 100 : 0;
 
@@ -454,6 +489,36 @@ function changePlaybackSpeed(delta) {
         // Seek back to the saved percentage to seamlessly resume at the new speed
         seekToTime(currentPercent);
     }
+
+    if (typeof updateUI === 'function') updateUI();
+    if (typeof saveSettings === 'function') saveSettings();
+}
+
+function changeFallDuration(delta) {
+    fallDuration += delta;
+
+    if (fallDuration < 0.5) fallDuration = 0.5;
+    if (fallDuration > 10.0) fallDuration = 10.0;
+
+    if (isPlaying) {
+        const currentAudioTime = isPaused ? pauseStartTimestamp : Tone.now();
+        const elapsed = currentAudioTime - totalPausedTime - playbackStartTime;
+        const currentPercent = playbackTotalDuration > 0 ? (elapsed / playbackTotalDuration) * 100 : 0;
+        seekToTime(Math.max(0, Math.min(100, currentPercent)));
+    }
+
+    if (typeof updateUI === 'function') updateUI();
+    if (typeof saveSettings === 'function') saveSettings();
+}
+
+function changeManualRiseSpeed(delta) {
+    manualRiseSpeed += delta;
+
+    if (manualRiseSpeed < 10) manualRiseSpeed = 10;
+    if (manualRiseSpeed > 1000) manualRiseSpeed = 1000;
+
+    if (typeof updateUI === 'function') updateUI();
+    if (typeof saveSettings === 'function') saveSettings();
 }
 
 function schedulerLoop() {
