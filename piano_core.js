@@ -14,6 +14,7 @@ const initIsMobile = window.innerWidth <= 850 || window.matchMedia("(hover: none
 let transposeLeft = initIsMobile ? -22 : -3;
 let transposeRight = initIsMobile ? -22 : -3;
 let globalVolume = 0.5;
+let globalReverb = 0.3;
 let sustainMultiplier = 1.0;
 let sustainMode = 0; // 0 = Timed, 1 = Hold until released
 let isLoaded = false; 
@@ -46,18 +47,40 @@ const F_ROW_VARIANTS = [
   ["","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11"], 
   ["F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12"] 
 ];
-const F_KEY_LABELS = ["laptop","100r","100s","1-1"];
+const F_KEY_LABELS = ["laptop","100r","100s","1-1", "8-row"];
 
 // --- DATA MAPS ---
 let freqToKeyMap = {};
 
-const KEY_MAPS = [
-  F_ROW_VARIANTS[0], 
+const BASE_BOTTOM_ROWS = [
   ["Digit2","Digit3","Digit4","Digit5","Digit6","Digit7","Digit8","Digit9","Digit0","Minus","Equal","Backspace"],
   ["KeyQ","KeyW","KeyE","KeyR","KeyT","KeyY","KeyU","KeyI","KeyO","KeyP","BracketLeft","BracketRight"],
   ["KeyA","KeyS","KeyD","KeyF","KeyG","KeyH","KeyJ","KeyK","KeyL","Semicolon","Quote", "Enter"],
   ["ShiftLeft","KeyZ","KeyX","KeyC","KeyV","KeyB","KeyN","KeyM","Comma","Period","Slash","ShiftRight"]
 ];
+
+const SPECIAL_8_ROW_MAP = [
+  ["F7","F8","F9","F10","F11","F12","Numpad5","Numpad6","Numpad7","Numpad8","Numpad9","NumpadAdd"],
+  ["F1","F2","F3","F4","F5","F6","Numpad0","Numpad1","Numpad2","Numpad3","Numpad4","NumpadSubtract"],
+  ["Digit8", "Digit9", "Digit0", "Minus", "Equal", "Backspace","F7","F8","F9","F10","F11","F12"],
+  ["KeyU", "KeyI", "KeyO", "KeyP", "BracketLeft","BracketRight","F1","F2","F3","F4","F5","F6"],
+  ["Digit2", "Digit3", "Digit4", "Digit5", "Digit6","Digit7", "Digit8", "Digit9", "Digit0", "Minus", "Equal", "Backspace"],
+  ["KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP", "BracketLeft", "BracketRight"],
+  ["KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH","KeyJ", "KeyK", "KeyL", "Semicolon", "Quote", "Enter"],
+  ["ShiftLeft", "KeyZ", "KeyX", "KeyC", "KeyV", "KeyB",  "KeyN", "KeyM", "Comma", "Period", "Slash", "ShiftRight"]
+];
+
+let KEY_MAPS = [];
+
+function applyKeyMapMode() {
+    if (fKeyMode === 4) {
+        KEY_MAPS = [...SPECIAL_8_ROW_MAP];
+    } else {
+        KEY_MAPS = [F_ROW_VARIANTS[fKeyMode], ...BASE_BOTTOM_ROWS];
+    }
+}
+
+applyKeyMapMode();
 
 // --- RECORDER & PLAYBACK STATE ---
 let isRecording = false;
@@ -87,7 +110,7 @@ let nextVoiceId = 1;
 const reverb = new Tone.Reverb({
     decay: 2.5,
     preDelay: 0.01, 
-    wet: 0.3
+    wet: globalReverb
 }).toDestination();
 
 const sampler = new Tone.Sampler({
@@ -244,6 +267,7 @@ function saveSettings() {
         transposeLeft: transposeLeft,
         transposeRight: transposeRight,
         globalVolume: globalVolume,
+        globalReverb: globalReverb,
         sustainMultiplier: sustainMultiplier,
         sustainMode: sustainMode,
         bpm: bpm,
@@ -287,6 +311,7 @@ function loadSettings() {
         if (settings.transposeLeft !== undefined) transposeLeft = settings.transposeLeft;
         if (settings.transposeRight !== undefined) transposeRight = settings.transposeRight;
         if (settings.globalVolume !== undefined) globalVolume = settings.globalVolume;
+        if (settings.globalReverb !== undefined) globalReverb = settings.globalReverb;
         if (settings.sustainMultiplier !== undefined) sustainMultiplier = settings.sustainMultiplier;
         if (settings.sustainMode !== undefined) sustainMode = settings.sustainMode;
         if (settings.bpm !== undefined) bpm = settings.bpm;
@@ -341,15 +366,18 @@ function loadSettings() {
         playbackTranspose = Math.max(-50, Math.min(50, Math.round(Number(playbackTranspose) || 0)));
         fallDuration = Math.max(0.5, Math.min(10.0, Number(fallDuration) || 2.0));
         manualRiseSpeed = Math.max(10, Math.min(1000, Number(manualRiseSpeed) || 100));
+        globalReverb = Math.max(0, Math.min(1, Number(globalReverb) || 0));
+        fKeyMode = ((Math.round(Number(fKeyMode) || 0) % F_KEY_LABELS.length) + F_KEY_LABELS.length) % F_KEY_LABELS.length;
         if (typeof applyKeyImages === 'function') applyKeyImages();
         
         // Apply complex settings
         Tone.Destination.volume.value = Tone.gainToDb(globalVolume);
+        if (typeof reverb !== 'undefined') reverb.wet.value = globalReverb;
         Tone.Transport.bpm.value = bpm;
         
         // Update Mappings if F-Keys changed
-        if (typeof KEY_MAPS !== 'undefined' && typeof F_ROW_VARIANTS !== 'undefined') {
-             KEY_MAPS[0] = F_ROW_VARIANTS[fKeyMode];
+        if (typeof applyKeyMapMode === 'function') {
+             applyKeyMapMode();
         }
 
         console.log("Settings Loaded");
@@ -474,6 +502,7 @@ function executeReset() {
             boardOffsetX = 0;
             boardOffsetY = 0;
             globalVolume = 0.5;
+            globalReverb = 0.3;
             sustainMultiplier = 1.0;
             bpm = 120;
             playbackRate = 1.0;
@@ -499,6 +528,7 @@ function executeReset() {
                 'boardOffsetX',
                 'boardOffsetY',
                 'globalVolume',
+                'globalReverb',
                 'sustainMultiplier',
                 'bpm',
                 'playbackRate',
@@ -525,10 +555,12 @@ function executeReset() {
 
             if (typeof Tone !== 'undefined' && Tone.Destination) {
                 Tone.Destination.volume.value = Tone.gainToDb(globalVolume);
+                if (typeof reverb !== 'undefined') reverb.wet.value = globalReverb;
                 Tone.Transport.bpm.value = bpm;
             }
 
             // Re-apply layout and redraw everything
+            if (typeof applyKeyMapMode === 'function') applyKeyMapMode();
             if (typeof applyLayoutModeClass === 'function') applyLayoutModeClass();
             if (typeof applyMobileStripState === 'function') applyMobileStripState();
             if (typeof applyStripHeight === 'function') applyStripHeight();

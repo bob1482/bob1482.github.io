@@ -42,12 +42,7 @@ async function pressNote(freq, isAutomated = false, side = 'right', sourceElemen
       }
   }
 
-  if (sourceElement) {
-      sourceElement.classList.add("active");
-      if (sourceElement.classList.contains("key") && typeof createRipple === 'function') {
-          createRipple(sourceElement);
-      }
-  } else if (typeof getCachedKeys === 'function') {
+  if (typeof getCachedKeys === 'function') {
       const keys = getCachedKeys(freqStr);
       for (let i = 0; i < keys.length; i++) {
           keys[i].classList.add("active");
@@ -93,9 +88,7 @@ function releaseNote(freq, isAutomated = false, sourceElement = null) {
       }
   }
   
-  if (sourceElement) {
-      sourceElement.classList.remove("active");
-  } else if (typeof getCachedKeys === 'function') {
+  if (typeof getCachedKeys === 'function') {
       const keys = getCachedKeys(freqStr);
       for (let i = 0; i < keys.length; i++) keys[i].classList.remove("active");
   }
@@ -178,9 +171,35 @@ window.addEventListener('contextmenu', (e) => {
     e.preventDefault();
 });
 
+function togglePlaybackPauseState() {
+    if (isPlaying) {
+        if (isPaused) resumePlayback();
+        else pausePlayback();
+    } else {
+        startPlayback();
+    }
+}
+
+function seekPlaybackBySeconds(secondsDelta) {
+    if (!isPlaying || typeof seekToTime !== 'function' || !playbackTotalDuration) return;
+
+    const currentAudioTime = isPaused ? pauseStartTimestamp : Tone.now();
+    const elapsed = currentAudioTime - totalPausedTime - playbackStartTime;
+    let targetSeconds = elapsed + secondsDelta;
+
+    if (targetSeconds < 0) targetSeconds = 0;
+    if (targetSeconds > playbackTotalDuration) targetSeconds = playbackTotalDuration;
+
+    const targetPercent = (targetSeconds / playbackTotalDuration) * 100;
+    seekToTime(targetPercent);
+}
+
 window.addEventListener('mousedown', (e) => {
     if (e.button === 0) {
         window.isMouseDown = true;
+    } else if (e.button === 1) {
+        e.preventDefault();
+        togglePlaybackPauseState();
     } else if (e.button === 2) {
         previousSustainMode = sustainMode;
         sustainMode = 0;
@@ -211,6 +230,18 @@ window.addEventListener('mouseup', (e) => {
         console.log("Right-click released: Audio sustains killed, visuals kept.");
     }
 });
+
+// --- GLOBAL MOUSE SCROLL TRACKING (SEEKING) ---
+window.addEventListener('wheel', (e) => {
+    if (!isPlaying) return;
+
+    e.preventDefault();
+    if (e.deltaY === 0) return;
+
+    const seekAmount = 1;
+    const direction = e.deltaY < 0 ? 1 : -1;
+    seekPlaybackBySeconds(seekAmount * direction);
+}, { passive: false });
 
 // --- HIGHLIGHT RESET ---
 
@@ -494,6 +525,12 @@ function setDirectValue(type, value) {
                 Tone.Destination.volume.value = Tone.gainToDb(globalVolume);
             }
             break;
+        case 'reverb':
+            globalReverb = Math.max(0, Math.min(1, val / 100));
+            if (typeof reverb !== 'undefined') {
+                reverb.wet.value = globalReverb;
+            }
+            break;
         case 'sustain':
             sustainMultiplier = Math.max(0.1, Math.min(5.0, val));
             break;
@@ -674,6 +711,20 @@ function changeVolume(delta) {
     saveSettings();
 }
 
+function changeReverb(delta) {
+    globalReverb += delta;
+
+    if (globalReverb < 0) globalReverb = 0;
+    if (globalReverb > 1) globalReverb = 1;
+
+    if (typeof reverb !== 'undefined') {
+        reverb.wet.value = globalReverb;
+    }
+
+    updateUI();
+    saveSettings();
+}
+
 function changeSustain(delta) {
     sustainMultiplier += delta;
 
@@ -769,8 +820,8 @@ function cycleLayout() {
 
 function toggleFKeys() {
   releaseAllStuckNotes(); 
-  fKeyMode = (fKeyMode + 1) % 4;
-  KEY_MAPS[0] = F_ROW_VARIANTS[fKeyMode];
+  fKeyMode = (fKeyMode + 1) % F_KEY_LABELS.length;
+  applyKeyMapMode();
   renderBoard();
   updateUI();
   saveSettings();
@@ -900,61 +951,46 @@ window.addEventListener("keydown", (e) => {
   }
 
   // --- NUMPAD PLAYBACK CONTROLS ---
-  
-  // Numpad 5: Play / Pause
-  if (e.code === "Numpad5") {
-      e.preventDefault();
-      if (isPlaying) {
-          if (isPaused) resumePlayback();
-          else pausePlayback();
-      } else {
-          startPlayback();
+  if (fKeyMode !== 4) {
+      // Numpad 5: Play / Pause
+      if (e.code === "Numpad5") {
+          e.preventDefault();
+          togglePlaybackPauseState();
+          return;
       }
-      return;
-  }
 
-  // Numpad 0: Reset Highlights
-  if (e.code === "Numpad0") {
-      e.preventDefault();
-      if (typeof resetHighlights === 'function') resetHighlights();
-      return;
-  }
-
-  // Numpad 8 (Forward) & Numpad 2 (Backward): Seek 5 seconds
-  if (e.code === "Numpad8" || e.code === "Numpad2") {
-      e.preventDefault();
-      if (!isPlaying) return;
-      
-      const currentAudioTime = Tone.now();
-      const elapsed = currentAudioTime - totalPausedTime - playbackStartTime;
-      let targetSeconds = elapsed + (e.code === "Numpad8" ? 5 : -5);
-
-      // Clamp to beginning and end boundaries
-      if (targetSeconds < 0) targetSeconds = 0;
-      if (targetSeconds > playbackTotalDuration) targetSeconds = playbackTotalDuration;
-
-      const targetPercent = (targetSeconds / playbackTotalDuration) * 100;
-      seekToTime(targetPercent);
-      return;
-  }
-
-  // Numpad 6 (Faster) & Numpad 4 (Slower): Speed Control
-  if (e.code === "Numpad6" || e.code === "Numpad4") {
-      e.preventDefault();
-      const delta = (e.code === "Numpad6") ? 0.1 : -0.1;
-      changePlaybackSpeed(delta);
-      return;
-  }
-
-  // Numpad 7 (Pitch Up) & Numpad 1 (Pitch Down): Song Transpose
-  if (e.code === "Numpad7" || e.code === "Numpad1") {
-      e.preventDefault();
-      const delta = (e.code === "Numpad7") ? 1 : -1;
-
-      if (typeof changePlaybackTranspose === 'function') {
-          changePlaybackTranspose(delta);
+      // Numpad 0: Reset Highlights
+      if (e.code === "Numpad0") {
+          e.preventDefault();
+          if (typeof resetHighlights === 'function') resetHighlights();
+          return;
       }
-      return;
+
+      // Numpad 8 (Forward) & Numpad 2 (Backward): Seek 5 seconds
+      if (e.code === "Numpad8" || e.code === "Numpad2") {
+          e.preventDefault();
+          seekPlaybackBySeconds(e.code === "Numpad8" ? 5 : -5);
+          return;
+      }
+
+      // Numpad 6 (Faster) & Numpad 4 (Slower): Speed Control
+      if (e.code === "Numpad6" || e.code === "Numpad4") {
+          e.preventDefault();
+          const delta = (e.code === "Numpad6") ? 0.1 : -0.1;
+          changePlaybackSpeed(delta);
+          return;
+      }
+
+      // Numpad 7 (Pitch Up) & Numpad 1 (Pitch Down): Song Transpose
+      if (e.code === "Numpad7" || e.code === "Numpad1") {
+          e.preventDefault();
+          const delta = (e.code === "Numpad7") ? 1 : -1;
+
+          if (typeof changePlaybackTranspose === 'function') {
+              changePlaybackTranspose(delta);
+          }
+          return;
+      }
   }
 
   if (e.repeat) return;
@@ -1084,6 +1120,9 @@ function updateUI() {
 
   const dispVol = document.getElementById("disp-volume");
   if (dispVol) dispVol.value = Math.round(globalVolume * 100);
+
+  const dispRev = document.getElementById("disp-reverb");
+  if (dispRev) dispRev.value = Math.round(globalReverb * 100);
 
   const dispSus = document.getElementById("disp-sustain");
   if (dispSus) dispSus.value = sustainMultiplier.toFixed(1);

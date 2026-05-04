@@ -21,3 +21,14 @@ const KEY_MAPS = [
 ];
 const COLOR_LEFT = '#00d2ff'; 
 const COLOR_RIGHT = '#00d2ff';
+
+"F7","F8","F9","F10","F11","F12","Numpad5","Numpad6","Numpad7","Numpad8","Numpad9","NumpadAdd"
+"F1","F2","F3","F4","F5","F6","Numpad0","Numpad1","Numpad2","Numpad3","Numpad4","NumpadSubtract"
+"Digit8", "Digit9", "Digit0", "Minus", "Equal", "Backspace",  "F7","F8","F9","F10","F11","F12"
+"KeyU", "KeyI", "KeyO", "KeyP", "BracketLeft", "BracketRight",  "F1","F2","F3","F4","F5","F6"
+
+
+"Digit2", "Digit3", "Digit4", "Digit5", "Digit6","Digit7", "Digit8", "Digit9", "Digit0", "Minus", "Equal", "Backspace"
+"KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY",  "KeyN", "KeyU", "KeyI", "KeyO", "KeyP", "BracketLeft", "BracketRight"
+"KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "Digit2","KeyJ", "KeyK", "KeyL", "Semicolon", "Quote", "Enter"
+"ShiftLeft", "KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyQ",  "KeyN", "KeyM", "Comma", "Period", "Slash", "ShiftRight"

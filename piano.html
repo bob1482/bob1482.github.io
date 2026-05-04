@@ -186,6 +186,15 @@
       </div>
 
       <div class="control-group">
+        <span class="control-label">Reverb</span>
+        <div class="btn-row">
+          <button class="control-btn" onclick="changeReverb(-0.1)">-</button>
+          <input type="number" class="control-val-input" id="disp-reverb" value="30" onchange="setDirectValue('reverb', this.value)">
+          <button class="control-btn" onclick="changeReverb(0.1)">+</button>
+        </div>
+      </div>
+
+      <div class="control-group">
         <span class="control-label">Sustain</span>
         <div class="btn-row">
           <button class="control-btn" onclick="changeSustain(-0.5)">-</button>

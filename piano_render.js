@@ -9,7 +9,7 @@ const boardWrapper = document.getElementById("board-wrapper");
 
 // --- VISUAL SETTINGS ---
 const COLOR_LEFT = '#00d2ff'; 
-const COLOR_RIGHT = '#c87ad1';
+const COLOR_RIGHT = '#00d2ff';
 
 // --- CACHE ---
 let domKeyCache = {};   
@@ -119,7 +119,7 @@ function renderBoard() {
   const isMobile = typeof isMobileMode === 'function' ? isMobileMode() : false;
   
   // Dynamic dimensions based on screen mode
-  const currentRows = isMobile ? 8 : 5;
+  const currentRows = isMobile ? 8 : KEY_MAPS.length;
   const currentCols = 12;
   const SPLIT_COL = 6; // Always split at 6 columns for both desktop and mobile
 
