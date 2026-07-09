@@ -1,0 +1,16 @@
+{
+  "name": "web-piano",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --outfile=dist/bundle.js --minify",
+    "dev": "esbuild src/main.ts --bundle --outfile=dist/bundle.js --sourcemap --watch"
+  },
+  "dependencies": {
+    "pixi.js": "^7.3.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "esbuild": "^0.19.12"
+  }
+}
