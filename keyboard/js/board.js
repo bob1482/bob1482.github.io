@@ -3,13 +3,12 @@
 // ==========================================
 
 // --- DOM ELEMENTS ---
-const boardLeft = document.getElementById("board-left");
-const boardRight = document.getElementById("board-right");
+const board = document.getElementById("board");
 const boardWrapper = document.getElementById("board-wrapper"); 
 
 // --- VISUAL SETTINGS ---
-const COLOR_LEFT = '#00d2ff'; 
-const COLOR_RIGHT = '#00d2ff';
+const KEY_COLOR = '#00d2ff';
+const RIGHT_KEY_COLOR = '#c87ad1';
 
 // --- CACHE ---
 let domKeyCache = {};   
@@ -47,12 +46,20 @@ function hideLoading() {
 }
 
 // --- VISUAL HELPERS ---
-function highlightKey(freq) {
+function highlightKey(freq, color) {
   const freqStr = freq.toFixed(2);
   const keys = getCachedKeys(freqStr);
+  // Auto-detect color from the right-side class if not explicitly provided
+  if (color === undefined) {
+    let hasRightSide = false;
+    for (let i = 0; i < keys.length; i++) {
+      if (keys[i].classList.contains('right-side')) { hasRightSide = true; break; }
+    }
+    color = hasRightSide ? RIGHT_KEY_COLOR : KEY_COLOR;
+  }
   for (let i = 0; i < keys.length; i++) {
       keys[i].classList.add("active");
-      if (keys[i].classList.contains("key")) createRipple(keys[i]);
+      if (keys[i].classList.contains("key")) createRipple(keys[i], color);
   }
 }
 
@@ -62,12 +69,12 @@ function unhighlightKey(freq) {
   for (let i = 0; i < keys.length; i++) keys[i].classList.remove("active");
 }
 
-function createRipple(keyElement) {
+function createRipple(keyElement, color = KEY_COLOR) {
     const ripple = document.createElement('div');
     ripple.className = 'ripple';
 
     const parent = keyElement.closest('.wicki-board');
-    ripple.style.borderColor = parent && parent.id === 'board-left' ? COLOR_LEFT : COLOR_RIGHT;
+    ripple.style.borderColor = color;
 
     keyElement.appendChild(ripple);
 
@@ -102,40 +109,30 @@ function showBoard() {
 // ==========================================
 // GLOBALS FOR MAPPING (Window Scope)
 // ==========================================
-window.freqToKeyMapLeft = {};
-window.freqToKeyMapRight = {};
+window.freqToKeyMap = {};
 
 function renderBoard() {
-  boardLeft.innerHTML = "";
-  boardRight.innerHTML = "";
+  board.innerHTML = "";
   
   // Clear Maps
-  window.freqToKeyMapLeft = {}; 
-  window.freqToKeyMapRight = {};
+  window.freqToKeyMap = {};
   window.boardFrequencies = new Set(); // Track all frequencies currently on the Wicki board
   domKeyCache = {}; 
   
-  // Determine if we are on mobile
-  const isMobile = typeof isMobileMode === 'function' ? isMobileMode() : false;
-  
-  // Dynamic dimensions based on screen mode
-  const currentRows = isMobile ? 8 : KEY_MAPS.length;
+  // Always use desktop layout (5 rows)
+  const currentRows = KEY_MAPS.length;
   const currentCols = 12;
-  const SPLIT_COL = 6; // Always split at 6 columns for both desktop and mobile
 
   for (let r = 0; r < currentRows; r++) {
-    const rowDivL = document.createElement("div");
-    rowDivL.className = `row ${r % 2 === 0 ? 'even-row' : 'odd-row'}`;
-    
-    const rowDivR = document.createElement("div");
-    rowDivR.className = `row ${r % 2 === 0 ? 'even-row' : 'odd-row'}`;
+    const rowDiv = document.createElement("div");
+    rowDiv.className = `row ${r % 2 === 0 ? 'even-row' : 'odd-row'}`;
 
     for (let c = 0; c < currentCols; c++) {
       const mapRowIndex = currentRows - 1 - r;
       let keyCode = "";
       
-      // Only apply PC Keyboard mappings if we are NOT on mobile
-      if (!isMobile && KEY_MAPS[mapRowIndex] && KEY_MAPS[mapRowIndex][c]) {
+      // Apply PC Keyboard mappings
+      if (KEY_MAPS[mapRowIndex] && KEY_MAPS[mapRowIndex][c]) {
         keyCode = KEY_MAPS[mapRowIndex][c];
       }
 
@@ -144,10 +141,7 @@ function renderBoard() {
       
       rowManualShift = r + r % 2;
 
-      
-      
-      let activeTranspose = (c < SPLIT_COL) ? transposeLeft : transposeRight;
-      let semitoneOffset = r * 5 + c * 2 + activeTranspose + rowManualShift;
+      let semitoneOffset = r * 5 + c * 2 + transpose + rowManualShift;
       
       let freq = BASE_NOTE_FREQ * Math.pow(2, semitoneOffset / 12);
       let noteIndex = ((semitoneOffset % 12) + 12) % 12;
@@ -156,17 +150,14 @@ function renderBoard() {
       const freqStr = freq.toFixed(2);
       window.boardFrequencies.add(freqStr); // Save this note to our tracking set
       
-      // --- MAP KEYCODE TO SPECIFIC SIDE ---
+      // --- MAP KEYCODE TO FREQUENCY ---
       if (keyCode) {
-          if (c < SPLIT_COL) {
-              window.freqToKeyMapLeft[freqStr] = keyCode;
-          } else {
-              window.freqToKeyMapRight[freqStr] = keyCode;
-          }
+          window.freqToKeyMap[freqStr] = keyCode;
       }
 
+      const isRightSide = c >= 6;
       const key = document.createElement("div");
-      key.className = `key ${isNatural ? "natural" : "accidental"}`;
+      key.className = `key ${isNatural ? "natural" : "accidental"}${isRightSide ? " right-side" : ""}`;
       
       // Restore played marker if it exists in our memory
       if (typeof playedFrequencies !== 'undefined' && playedFrequencies.has(freqStr)) {
@@ -178,17 +169,13 @@ function renderBoard() {
 
       key.innerHTML = getLabelText(semitoneOffset, keyCode);
 
-      // Determine Side for Event Listeners
-      const isLeft = c < SPLIT_COL;
-      const side = isLeft ? 'left' : 'right';
-
       // Upgraded Mouse Events (Touch is now handled globally)
       key.addEventListener("mousedown", (e) => {
           if (e.button !== 0) return;
-          if(typeof pressNote === 'function') pressNote(freq, false, side, key);
+          if(typeof pressNote === 'function') pressNote(freq, false, key);
       });
       key.addEventListener("mouseenter", () => {
-          if(window.isMouseDown && typeof pressNote === 'function') pressNote(freq, false, side, key);
+          if(window.isMouseDown && typeof pressNote === 'function') pressNote(freq, false, key);
       });
       key.addEventListener("mouseleave", () => {
           if(typeof releaseNote === 'function') releaseNote(freq, false, key);
@@ -198,24 +185,14 @@ function renderBoard() {
           if(typeof releaseNote === 'function') releaseNote(freq, false, key);
       });
 
-      if (c < SPLIT_COL) {
-          rowDivL.appendChild(key);
-      } else {
-          rowDivR.appendChild(key);
-      }
+      rowDiv.appendChild(key);
     }
     
-    boardLeft.appendChild(rowDivL);
-    boardRight.appendChild(rowDivR);
+    board.appendChild(rowDiv);
   }
   
-  // Keep right board visible
-  boardRight.style.display = "flex";
-  
-  // Render bottom piano strip only if not mobile, OR if forced to show
-  if (!isMobile || showMobileStrip) {
-      renderTraditionalPiano();
-  }
+  // Render bottom piano strip
+  renderTraditionalPiano();
   
   if(typeof updateKeyCoordinates === 'function') updateKeyCoordinates();
 
@@ -255,64 +232,16 @@ function renderTraditionalPiano() {
       const freq = BASE_NOTE_FREQ * Math.pow(2, currentSemitone / 12);
       const freqStr = freq.toFixed(2);
       
-      // FIX: Calculate note index strictly relative to C (0 = C, 1 = C#, etc.)
       const noteIndex = ((currentSemitone % 12) + 12) % 12;
       
-      // FIX: Use standard C-based layout for white keys
       const isWhite = [0, 2, 4, 5, 7, 9, 11].includes(noteIndex);
 
       const key = document.createElement("div");
       key.setAttribute("data-note", freqStr);
       
-      // --- DUAL LABEL LOGIC ---
-      const leftCode = window.freqToKeyMapLeft[freqStr];
-      const rightCode = window.freqToKeyMapRight[freqStr];
+      // --- SINGLE LABEL LOGIC ---
+      const keyCode = window.freqToKeyMap[freqStr];
       
-      // Create Label Elements
-      if (leftCode && labelMode === 1) { // Mode 1 = KEYS
-          const lbl = document.createElement("div");
-          lbl.className = "key-label lbl-left";
-          lbl.innerText = getFriendlyKeyName(leftCode);
-          key.appendChild(lbl);
-      }
-      
-      if (rightCode && labelMode === 1) {
-          const lbl = document.createElement("div");
-          lbl.className = "key-label lbl-right";
-          lbl.innerText = getFriendlyKeyName(rightCode);
-          key.appendChild(lbl);
-      }
-      
-      // Fallback for Note Names mode
-      if (labelMode === 0) {
-           const lbl = document.createElement("div");
-           lbl.className = "key-label";
-           // Removed hardcoded grey so it inherits the high-contrast key colors
-           
-           const octave = Math.floor(currentSemitone / 12) + 3;
-           lbl.innerText = NOTE_NAMES[noteIndex] + octave;
-           
-           key.appendChild(lbl);
-      }
-
-      // Numeric Mode for Traditional Piano Strip
-      if (labelMode === 2) {
-           const lbl = document.createElement("div");
-           lbl.className = "key-label";
-           // Removed hardcoded grey so it inherits the high-contrast key colors
-           
-           const octave = Math.floor(currentSemitone / 12) + 3;
-           const numNames = ["1", "1#", "2", "2#", "3", "4", "4#", "5", "5#", "6", "6#", "7"];
-           const dotsTop = octave > 4 ? "•".repeat(octave - 4) : "";
-           const dotsBottom = octave < 4 ? "•".repeat(4 - octave) : "";
-           
-           lbl.innerHTML = `<div style="display:flex; flex-direction:column; align-items:center; line-height: 1;">
-                     <span style="font-size: 6px; height: 6px; display: block; letter-spacing: 1px;">${dotsTop}</span>
-                     <span>${numNames[noteIndex]}</span>
-                     <span style="font-size: 6px; height: 6px; display: block; letter-spacing: 1px;">${dotsBottom}</span>
-                  </div>`;
-           key.appendChild(lbl);
-      }
 
       if (isWhite) {
           key.className = "p-key white";
@@ -333,10 +262,10 @@ function renderTraditionalPiano() {
       // Upgraded Mouse Events (Touch is now handled globally)
       key.addEventListener("mousedown", (e) => {
           if (e.button !== 0) return;
-          pressNote(freq, false, 'right', key);
+          pressNote(freq, false, key);
       });
       key.addEventListener("mouseenter", () => {
-          if (window.isMouseDown) pressNote(freq, false, 'right', key);
+          if (window.isMouseDown) pressNote(freq, false, key);
       });
       key.addEventListener("mouseleave", () => releaseNote(freq, false, key));
       key.addEventListener("mouseup", (e) => {

@@ -146,17 +146,7 @@ body {
   font-size: 9px;
   font-weight: bold;
   line-height: 9px;
-  /* text-shadow removed for cleaner visuals */
-}
-
-/* Left Board Label (Cyan) */
-.key-label.lbl-left {
   color: #00d2ff;
-}
-
-/* Right Board Label (Pink) */
-.key-label.lbl-right {
-  color: #c87ad1;
 }
 
 /* Adjust Black Key text size slightly */
@@ -221,18 +211,47 @@ body {
   background: rgba(20, 20, 20, 0.98);
   border: 1px solid #444;
   border-radius: 16px;
-  padding: 30px;
+  padding: 25px;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 20px;
-  max-width: 80%;
+  gap: 15px;
+  max-width: 85%;
   z-index: 2500;
   max-height: 85dvh;
   overflow-y: auto;
   
   transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
   box-shadow: 0 10px 40px rgba(0,0,0,0.9);
+}
+
+/* --- SETTINGS SECTIONS --- */
+.settings-section {
+  background: rgba(30, 30, 30, 0.6);
+  border: 1px solid #333;
+  border-radius: 10px;
+  overflow: hidden;
+  min-width: 180px;
+  flex: 0 1 auto;
+}
+
+.settings-section-header {
+  background: rgba(50, 50, 50, 0.5);
+  padding: 6px 12px;
+  font-size: 10px;
+  font-weight: bold;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  border-bottom: 1px solid #333;
+}
+
+.settings-section-body {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
 }
 
 #settings-panel.settings-visible {
@@ -287,7 +306,6 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  /* Box shadow removed for performance */
 }
 
 .control-btn:active {
@@ -378,17 +396,6 @@ body {
   align-items: center;
 }
 
-#record-select {
-  background: rgba(0,0,0,0.5);
-  color: white;
-  border: 1px solid #444;
-  border-radius: 4px;
-  padding: 2px;
-  font-family: inherit;
-  font-size: 10px;
-  max-width: 120px;
-}
-
 /* --- VERTICAL PROGRESS BAR (RIGHT SIDE) --- */
 #progress-container {
   position: fixed;
@@ -462,21 +469,20 @@ body {
   display: flex;
   flex-direction: row;
   justify-content: center;
-  gap: 0px; 
   
   /* Centering */
   position: fixed;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) scale(0.85);
+  transform: translate(calc(-50% + 30px), -50%) scale(0.85);
   
   /* Layering: Lower than canvas (100) but visible */
   z-index: 50; 
   
-  pointer-events: none; /* contain: layout paint; is removed */
+  pointer-events: none;
 }
 
-#board-left, #board-right {
+#board {
   pointer-events: auto;
 }
 
@@ -544,147 +550,12 @@ body {
 .key.played-note {
   border-style: solid;
   border-width: 2px;
-}
-
-#board-left .key.played-note {
   border-color: #00d2ff;
-}
-
-#board-right .key.played-note {
-  border-color: #00d2ff;
-}
-
-/* ==========================================
-   MOBILE & TOUCH OVERRIDES
-   ========================================== */
-body.is-mobile .desktop-only {
-  display: none !important;
-}
-
-body.is-mobile #piano-strip {
-  display: none !important;
-}
-
-body.is-mobile #synthesia-canvas {
-  height: 100vh !important;
-  height: 100dvh !important;
-}
-
-body.is-mobile #progress-container {
-  height: 100vh !important;
-  height: 100dvh !important;
-}
-
-body.is-mobile #progress-bar {
-  width: calc(100vh - 10px) !important;
-  width: calc(100dvh - 10px) !important;
-}
-
-body.is-mobile #board-wrapper {
-  transform: translate(-50%, -50%) scale(0.65);
-}
-
-body.is-mobile ::-webkit-scrollbar {
-  display: none !important;
-}
-
-body.is-mobile {
-  -ms-overflow-style: none !important;
-  scrollbar-width: none !important;
-  overflow: hidden !important;
-  touch-action: none !important;
-}
-
-body.is-mobile #quick-controls {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  left: auto !important;
-  right: 20px !important;
-  transform: none !important;
-}
-
-/* Hide the fullscreen button on desktop mode */
-body:not(.is-mobile) .mobile-only {
-  display: none !important;
-}
-/* --- FORCE STRIP ON MOBILE --- */
-body.force-strip #piano-strip {
-  display: block !important;
-}
-body.force-strip #synthesia-canvas {
-  height: 83vh !important;
-  height: 83dvh !important;
-}
-body.force-strip #progress-container {
-  height: 83vh !important;
-  height: 83dvh !important;
-}
-body.force-strip #progress-bar {
-  width: calc(83vh - 10px) !important;
-  width: calc(83dvh - 10px) !important;
 }
 
 /* --- WICKI BOARD RANGE HIGHLIGHTING --- */
 .p-key.out-of-range:not(.active):not(:active) {
   filter: brightness(0.3);
-}
-
-/* --- RESET MODAL --- */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.85);
-  z-index: 4000; /* Highest z-index to sit above everything */
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
-}
-
-.modal-overlay.active {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.modal-content {
-  background: rgba(20, 20, 20, 0.98);
-  border: 1px solid #555;
-  border-radius: 12px;
-  padding: 25px;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  max-width: 90%;
-  width: 320px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.9);
-  transform: scale(0.95);
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.modal-overlay.active .modal-content {
-  transform: scale(1);
-}
-
-.reset-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  cursor: pointer;
-  color: #ccc;
-}
-
-.reset-option input[type="checkbox"] {
-  cursor: pointer;
-  width: 16px;
-  height: 16px;
 }
 
 /* --- SETTINGS PANEL CUSTOM SCROLLBAR --- */

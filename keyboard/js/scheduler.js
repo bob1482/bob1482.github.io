@@ -47,7 +47,8 @@ window.addEventListener('resize', () => {
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     const strip = document.getElementById("piano-strip");
-    const isMobile = strip && window.getComputedStyle(strip).display === "none";
+    const stripDisplay = strip ? window.getComputedStyle(strip).display : "";
+    const isMobile = stripDisplay === "none";
 
     const currentStripHeight = typeof stripHeight !== 'undefined' ? stripHeight : 17;
     const canvasViewportRatio = (100 - currentStripHeight) / 100;
@@ -89,12 +90,13 @@ function spawnFallingNote(freqStr, duration, targetTime, trackIndex = 0) {
         noteColor = extraColors[(trackIndex - 2) % extraColors.length];
     }
 
+    const safeDuration = (typeof duration === 'number' && duration > 0) ? duration : 0.5;
     const note = getNoteFromPool();
     note.freq = freqFixed;
     note.x = coords.x;
     note.width = coords.width;
-    note.duration = duration;
-    note.height = duration * pixelsPerSecond;
+    note.duration = safeDuration;
+    note.height = safeDuration * pixelsPerSecond;
     note.color = noteColor;
     note.targetTime = targetTime;
     note.active = true;
@@ -147,7 +149,7 @@ function endManualVisualNote(freqStr) {
 function updatePhysics(dt) {
     if (!canvas) return;
 
-    const currentAudioTime = isPaused ? pauseStartTimestamp : Tone.now();
+    const currentAudioTime = isPaused ? pauseStartTimestamp : (typeof audioCtx !== 'undefined' ? audioCtx.currentTime : 0);
     const effectiveTime = currentAudioTime - totalPausedTime;
     const pixelsPerSecond = canvas.height / fallDuration;
 
@@ -268,6 +270,7 @@ let playbackTotalDuration = 0;
 let nextEventIndex = 0;
 let visualEventIndex = 0;
 let currentPlaybackEvents = [];
+let rawPlaybackEvents = []; // Preserved original MIDI events (unprocessed)
 
 // PAUSE STATE TRACKING
 let pauseStartTimestamp = 0;
@@ -275,14 +278,19 @@ let totalPausedTime = 0;
 let seekedWhilePaused = false;
 
 function startPlayback() {
-  if (recordedEvents.length === 0) return;
+  if (currentPlaybackEvents.length === 0) {
+    // If no events loaded from MIDI, try recordedEvents (for backward compat)
+    if (typeof recordedEvents !== 'undefined' && recordedEvents.length > 0) {
+      currentPlaybackEvents = processRecordedEvents();
+    } else {
+      return;
+    }
+  }
   isPlaying = true;
   isPaused = false;
   totalPausedTime = 0;
-  seekedWhilePaused = false; 
+  seekedWhilePaused = false;
 
-  currentPlaybackEvents = processRecordedEvents();
-  
   playbackTotalDuration = 0;
   if(currentPlaybackEvents.length > 0) {
       const last = currentPlaybackEvents[currentPlaybackEvents.length-1];
@@ -292,14 +300,9 @@ function startPlayback() {
   nextEventIndex = 0;
   visualEventIndex = 0;
   
-  const now = Tone.now();
+  const now = typeof audioCtx !== 'undefined' ? audioCtx.currentTime : 0;
   
   playbackStartTime = now + fallDuration;
-  
-  if(isMetronomeOn) {
-      Tone.Transport.start();
-      metroLoop.start(0); 
-  }
   
   if (typeof updateUI === 'function') updateUI();
   schedulerLoop();
@@ -309,8 +312,6 @@ function stopPlayback() {
   isPlaying = false;
   isPaused = false;
   if (schedulerTimer) clearTimeout(schedulerTimer);
-  Tone.Transport.stop(); 
-  metroLoop.stop();
   
   if (typeof recycleAllNotes === 'function') recycleAllNotes(); 
   if (typeof clearAllHighlights === 'function') clearAllHighlights(); 
@@ -324,19 +325,17 @@ function stopPlayback() {
 
 function setVisualizerPause(paused) {
     if (paused) {
-        pauseStartTimestamp = Tone.now();
+        pauseStartTimestamp = typeof audioCtx !== 'undefined' ? audioCtx.currentTime : 0;
         if(schedulerTimer) clearTimeout(schedulerTimer);
-        Tone.Transport.pause();
         
         // Stop any notes currently ringing out to prevent hanging sounds
         if (typeof clearTimedSustainTrackers === 'function') clearTimedSustainTrackers(false);
-        if (typeof sampler !== 'undefined') sampler.releaseAll();
-        Tone.Draw.cancel(0);
+        if (typeof stopAllAudio === 'function') stopAllAudio();
 
         // Clear any currently active visual highlights so keys don't get stuck
         document.querySelectorAll('.active').forEach(key => key.classList.remove('active'));
     } else {
-        const now = Tone.now();
+        const now = typeof audioCtx !== 'undefined' ? audioCtx.currentTime : 0;
         const diff = now - pauseStartTimestamp;
         
         // ALWAYS accumulate pause time to prevent the "burst" catch-up bug
@@ -347,7 +346,6 @@ function setVisualizerPause(paused) {
             n.targetTime += diff;
         });
 
-        if(isMetronomeOn) Tone.Transport.start();
         schedulerLoop();
     }
 }
@@ -358,9 +356,8 @@ function seekToTime(percent) {
     
     if (schedulerTimer) clearTimeout(schedulerTimer);
     if (typeof clearTimedSustainTrackers === 'function') clearTimedSustainTrackers(false);
-    if (typeof sampler !== 'undefined') sampler.releaseAll();
-    activeVoices = []; 
-    Tone.Draw.cancel(0);
+    if (typeof stopAllAudio === 'function') stopAllAudio();
+    if (typeof activeVoices !== 'undefined') activeVoices = []; 
     
     document.querySelectorAll('.active').forEach(key => key.classList.remove('active'));
     
@@ -368,7 +365,7 @@ function seekToTime(percent) {
     
     if (typeof recycleAllNotes === 'function') recycleAllNotes();
     
-    const now = Tone.now();
+    const now = typeof audioCtx !== 'undefined' ? audioCtx.currentTime : 0;
     totalPausedTime = 0; 
     playbackStartTime = now - targetSeconds;
     
@@ -383,22 +380,25 @@ function seekToTime(percent) {
     
     visualEventIndex = 0;
     
+    // First pass: find the first event whose visual spawn time hasn't passed yet
     for (let i = 0; i < currentPlaybackEvents.length; i++) {
-        const evt = currentPlaybackEvents[i];
-        const spawnTimeRel = evt.time - fallDuration;
-        
+        const spawnTimeRel = currentPlaybackEvents[i].time - fallDuration;
         if (spawnTimeRel > targetSeconds) {
             visualEventIndex = i;
             break;
         }
-        
-        if (evt.time > targetSeconds) {
-            const hitTimeAbs = playbackStartTime + evt.time; 
-            spawnFallingNote(evt.freq, evt.duration, hitTimeAbs, evt.trackIndex);
-        }
-        
         if (i === currentPlaybackEvents.length - 1) {
             visualEventIndex = currentPlaybackEvents.length;
+        }
+    }
+    
+    // Second pass: spawn "in-air" falling notes for events between targetSeconds and visualEventIndex
+    // that have been visually spawned but haven't reached their hit time yet
+    for (let i = 0; i < visualEventIndex; i++) {
+        const evt = currentPlaybackEvents[i];
+        if (evt.time > targetSeconds) {
+            const hitTimeAbs = playbackStartTime + evt.time;
+            spawnFallingNote(evt.freq, evt.duration, hitTimeAbs, evt.trackIndex);
         }
     }
     
@@ -408,9 +408,11 @@ function seekToTime(percent) {
 }
 
 function processRecordedEvents() {
+    // Always process from raw events to prevent compounding errors
+    const sourceEvents = (rawPlaybackEvents.length > 0) ? rawPlaybackEvents : currentPlaybackEvents;
     let active = {};
     let processed = [];
-    let sorted = [...recordedEvents].sort((a, b) => a.time - b.time);
+    let sorted = [...sourceEvents].sort((a, b) => a.time - b.time);
     const freqMultiplier = Math.pow(2, playbackTranspose / 12);
 
     sorted.forEach(evt => {
@@ -419,7 +421,7 @@ function processRecordedEvents() {
                 type: 'on', 
                 freq: evt.freq * freqMultiplier,
                 time: evt.time / playbackRate, 
-                duration: 0.5 / playbackRate,
+                duration: evt.duration / playbackRate,
                 trackIndex: evt.trackIndex
             };
             active[evt.freq] = newEvt;
@@ -442,7 +444,7 @@ function changePlaybackTranspose(delta) {
     if (playbackTranspose > 50) playbackTranspose = 50;
 
     if (isPlaying) {
-        const currentAudioTime = isPaused ? pauseStartTimestamp : Tone.now();
+        const currentAudioTime = isPaused ? pauseStartTimestamp : (typeof audioCtx !== 'undefined' ? audioCtx.currentTime : 0);
         const elapsed = currentAudioTime - totalPausedTime - playbackStartTime;
         const currentPercent = playbackTotalDuration > 0 ? (elapsed / playbackTotalDuration) * 100 : 0;
 
@@ -471,22 +473,18 @@ function changePlaybackSpeed(delta) {
     console.log(`Playback Speed: ${playbackRate.toFixed(2)}x`);
 
     if (isPlaying) {
-        // Save the current elapsed percentage so we don't lose our place
-        const currentAudioTime = isPaused ? pauseStartTimestamp : Tone.now();
+        const currentAudioTime = isPaused ? pauseStartTimestamp : (typeof audioCtx !== 'undefined' ? audioCtx.currentTime : 0);
         const elapsed = currentAudioTime - totalPausedTime - playbackStartTime;
         const currentPercent = playbackTotalDuration > 0 ? (elapsed / playbackTotalDuration) * 100 : 0;
 
-        // Reprocess events with the new rate
         currentPlaybackEvents = processRecordedEvents();
         
-        // Recalculate total duration
         playbackTotalDuration = 0;
         if(currentPlaybackEvents.length > 0) {
             const last = currentPlaybackEvents[currentPlaybackEvents.length - 1];
             playbackTotalDuration = last.time + last.duration;
         }
 
-        // Seek back to the saved percentage to seamlessly resume at the new speed
         seekToTime(currentPercent);
     }
 
@@ -501,7 +499,7 @@ function changeFallDuration(delta) {
     if (fallDuration > 10.0) fallDuration = 10.0;
 
     if (isPlaying) {
-        const currentAudioTime = isPaused ? pauseStartTimestamp : Tone.now();
+        const currentAudioTime = isPaused ? pauseStartTimestamp : (typeof audioCtx !== 'undefined' ? audioCtx.currentTime : 0);
         const elapsed = currentAudioTime - totalPausedTime - playbackStartTime;
         const currentPercent = playbackTotalDuration > 0 ? (elapsed / playbackTotalDuration) * 100 : 0;
         seekToTime(Math.max(0, Math.min(100, currentPercent)));
@@ -525,7 +523,7 @@ function schedulerLoop() {
     if (!isPlaying || isPaused) return;
 
     const scheduleAheadTime = 0.1; 
-    const currentContextTime = Tone.now();
+    const currentContextTime = typeof audioCtx !== 'undefined' ? audioCtx.currentTime : 0;
     
     while (nextEventIndex < currentPlaybackEvents.length) {
         const event = currentPlaybackEvents[nextEventIndex];
@@ -533,36 +531,43 @@ function schedulerLoop() {
 
         if (triggerTime < currentContextTime + scheduleAheadTime) {
             
+            // Only process 'on' events (MIDI conversion now produces single events with duration)
+            if (event.type !== 'on') {
+                nextEventIndex++;
+                continue;
+            }
+            
+            const noteDuration = event.duration || 0.5;
+            
             // 1. Audio
             if (typeof triggerSound === 'function') {
                 if (typeof sustainMode !== 'undefined' && sustainMode === 0) {
                     triggerSound(event.freq, triggerTime, null);
                 } else {
-                    triggerSound(event.freq, triggerTime, event.duration);
+                    triggerSound(event.freq, triggerTime, noteDuration);
                 }
             }
 
-            // 2. UI Highlight (Note On)
-            Tone.Draw.schedule(() => {
+            // 2. UI Highlight (Note On) - schedule using setTimeout since no Tone.Draw
+            const highlightDelay = Math.max(0, (triggerTime - currentContextTime) * 1000);
+            window.setTimeout(() => {
                 if (typeof highlightKey === 'function') highlightKey(event.freq);
                 
-                // Add persistent marker to build the scale visually
                 const freqStr = event.freq.toFixed(2);
                 
-                // Save to memory so it survives transpose redraws
                 if (typeof playedFrequencies !== 'undefined') playedFrequencies.add(freqStr);
                 
                 if (typeof getCachedKeys === 'function') {
                     const keys = getCachedKeys(freqStr);
                     for (let i = 0; i < keys.length; i++) keys[i].classList.add("played-note");
                 }
-            }, triggerTime);
+            }, highlightDelay);
 
-            // 3. UI Un-Highlight (Note Off) - This releases the key!
-            const releaseTime = triggerTime + event.duration;
-            Tone.Draw.schedule(() => {
+            // 3. UI Un-Highlight (Note Off)
+            const releaseDelay = Math.max(0, (triggerTime + noteDuration - currentContextTime) * 1000);
+            window.setTimeout(() => {
                 if (typeof unhighlightKey === 'function') unhighlightKey(event.freq);
-            }, releaseTime);
+            }, releaseDelay);
 
             nextEventIndex++;
         } else {
@@ -573,7 +578,6 @@ function schedulerLoop() {
     schedulerTimer = setTimeout(schedulerLoop, 25);
     
     if (nextEventIndex >= currentPlaybackEvents.length) {
-        // Check for end of song
         const lastEvent = currentPlaybackEvents[currentPlaybackEvents.length - 1];
         const endTime = playbackStartTime + lastEvent.time + lastEvent.duration + 2.0 + totalPausedTime;
         if (currentContextTime > endTime) stopPlayback();

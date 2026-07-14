@@ -3,7 +3,7 @@ import { AudioEngine } from './AudioEngine';
 import { HexKey } from './HexKey';
 import { toNumberedNotation } from './NoteUtils';
 import { drawRoundedHexagon, keyId } from './HexUtils';
-import { buildGrid, updateLayoutPortrait, updateLayoutLandscape, LayoutResult } from './GridLayout';
+import { buildGrid, updateLayoutPortrait, updateLayoutLandscape, updateLayoutLandscapeSingle, LayoutResult } from './GridLayout';
 import { SettingsUI } from './SettingsUI';
 import { PointerHandler } from './PointerHandler';
 
@@ -21,6 +21,10 @@ export class WickiHeydenGrid {
   // Grid dimensions
   private readonly COLS = 10;
   private readonly ROWS = 4;
+  private readonly COLS_LANDSCAPE_SINGLE = 8;
+  private readonly ROWS_LANDSCAPE_SINGLE = 12;
+  private readonly COLS_PORTRAIT_WIDE = 12;
+  private readonly ROWS_PORTRAIT_WIDE = 6;
   private readonly BASE_MIDI = 36; // C2
 
   // Landscape mode
@@ -29,12 +33,20 @@ export class WickiHeydenGrid {
   private leftBoardKeyCount: number = 0;
   private hexSize: number = 30;
 
+  // Single board mode
+  private useSingleLandscapeBoard: boolean = false;
+
+  // Wide portrait mode (12x6)
+  private useWidePortrait: boolean = false;
+  private sampleNoteNames: Set<string>;
+
   constructor(
     container: HTMLElement,
     engine: AudioEngine,
     sampleNoteNames: Set<string>
   ) {
     this.engine = engine;
+    this.sampleNoteNames = sampleNoteNames;
 
     // Create Pixi application
     this.app = new PIXI.Application({
@@ -52,7 +64,17 @@ export class WickiHeydenGrid {
     this.app.stage.addChild(this.container);
 
     // Settings UI (manages its own PIXI objects on the stage)
-    this.settingsUI = new SettingsUI(this.app.stage);
+    // Forward reference: pointerHandler not yet created, so we store a callback
+    let setGlidingEnabled: (enabled: boolean) => void = () => {};
+    let setSingleBoardMode: (enabled: boolean) => void = () => {};
+    let setWidePortrait: (enabled: boolean) => void = () => {};
+    this.settingsUI = new SettingsUI(this.app.stage, (enabled: boolean) => {
+      setGlidingEnabled(enabled);
+    }, (enabled: boolean) => {
+      setSingleBoardMode(enabled);
+    }, (enabled: boolean) => {
+      setWidePortrait(enabled);
+    });
 
     // Build the grid data
     this.hexKeys = buildGrid(sampleNoteNames, this.COLS, this.ROWS, this.BASE_MIDI);
@@ -76,6 +98,24 @@ export class WickiHeydenGrid {
       }),
     );
 
+    // Wire up the gliding toggle now that pointerHandler exists
+    setGlidingEnabled = (enabled: boolean) => {
+      this.pointerHandler.setGlidingEnabled(enabled);
+      this.settingsUI.setGlidingEnabled(enabled);
+    };
+
+    // Wire up the single-board mode toggle
+    setSingleBoardMode = (enabled: boolean) => {
+      this.useSingleLandscapeBoard = enabled;
+      this.updateLayout();
+    };
+
+    // Wire up the wide portrait mode toggle
+    setWidePortrait = (enabled: boolean) => {
+      this.useWidePortrait = enabled;
+      this.updateLayout();
+    };
+
     this.updateLayout();
     this.pointerHandler.setupInteraction();
 
@@ -92,7 +132,25 @@ export class WickiHeydenGrid {
     this.isLandscape = width > height;
 
     let result: LayoutResult;
-    if (this.isLandscape) {
+    if (!this.isLandscape && this.useWidePortrait) {
+      // Wide portrait 12x6 grid
+      const wideKeys = buildGrid(
+        this.sampleNoteNames,
+        this.COLS_PORTRAIT_WIDE,
+        this.ROWS_PORTRAIT_WIDE,
+        this.BASE_MIDI
+      );
+      result = updateLayoutPortrait(width, height, wideKeys, this.COLS_PORTRAIT_WIDE);
+    } else if (this.isLandscape && this.useSingleLandscapeBoard) {
+      // Single 12x8 board spanning full width in landscape
+      const singleKeys = buildGrid(
+        this.sampleNoteNames,
+        this.COLS_LANDSCAPE_SINGLE,
+        this.ROWS_LANDSCAPE_SINGLE,
+        this.BASE_MIDI
+      );
+      result = updateLayoutLandscapeSingle(width, height, singleKeys, this.COLS_LANDSCAPE_SINGLE);
+    } else if (this.isLandscape) {
       result = updateLayoutLandscape(width, height, this.hexKeys, this.COLS);
     } else {
       result = updateLayoutPortrait(width, height, this.hexKeys, this.COLS);
@@ -102,8 +160,27 @@ export class WickiHeydenGrid {
     this.leftBoardKeyCount = result.leftBoardKeyCount;
     this.hexSize = result.hexSize;
 
+    // Compute settings button position: place it as the next hex on the bottom visual row
+    const sqrt3 = Math.sqrt(3);
+    // Find the bottom row (highest centerY) among active keys
+    // Use a small epsilon to group keys into rows
+    let bottomY = 0;
+    for (const key of this.activeKeys) {
+      if (key.centerY > bottomY) bottomY = key.centerY;
+    }
+    // Among keys at the bottom row, find the rightmost one
+    let rightmostX = 0;
+    for (const key of this.activeKeys) {
+      if (Math.abs(key.centerY - bottomY) < 1) {
+        if (key.centerX > rightmostX) rightmostX = key.centerX;
+      }
+    }
+    // Position the button at the next hex spot to the right of the rightmost bottom key
+    const buttonPosX = rightmostX + (3 / 4) * sqrt3 * this.hexSize;
+    const buttonPosY = bottomY - this.hexSize / 4;
+
     // Update settings UI position
-    this.settingsUI.updateLayout(width, height, this.hexSize);
+    this.settingsUI.updateLayout(width, height, this.hexSize, buttonPosX, buttonPosY);
 
     this.render();
   }
@@ -132,16 +209,30 @@ export class WickiHeydenGrid {
       const cy = key.centerY;
       const s = this.hexSize;
 
-      // Determine colors - all keys use the same light color
+      // Determine colors - accidental keys are dark, natural keys are light
+      const isAccidental = key.noteName.includes('#');
       let fillColor: number;
       let borderColor: number;
+      let textColor: number;
 
-      if (key.isPressed) {
-        fillColor = 0xdddddd;
-        borderColor = 0xbbbbbb;
+      if (isAccidental) {
+        if (key.isPressed) {
+          fillColor = 0x555555;
+          borderColor = 0x444444;
+        } else {
+          fillColor = 0x333333;
+          borderColor = 0x444444;
+        }
+        textColor = 0xffffff;
       } else {
-        fillColor = 0xf0f0f0;
-        borderColor = 0xcccccc;
+        if (key.isPressed) {
+          fillColor = 0xdddddd;
+          borderColor = 0xbbbbbb;
+        } else {
+          fillColor = 0xf0f0f0;
+          borderColor = 0xcccccc;
+        }
+        textColor = 0x666666;
       }
 
       // Draw rounded pointy-top hexagon
@@ -161,7 +252,7 @@ export class WickiHeydenGrid {
       const label = new PIXI.Text(info.degree, {
         fontFamily: 'Arial',
         fontSize: fontSize,
-        fill: 0x666666,
+        fill: textColor,
         align: 'center',
       });
       label.anchor.set(0.5, 0.5);
@@ -177,7 +268,7 @@ export class WickiHeydenGrid {
         const dotText = new PIXI.Text(dotChar, {
           fontFamily: 'Arial',
           fontSize: dotSize,
-          fill: 0x666666,
+          fill: textColor,
           align: 'center',
         });
         dotText.anchor.set(0.5, 0.5);
@@ -193,7 +284,7 @@ export class WickiHeydenGrid {
         const dotText = new PIXI.Text(dotChar, {
           fontFamily: 'Arial',
           fontSize: dotSize,
-          fill: 0x666666,
+          fill: textColor,
           align: 'center',
         });
         dotText.anchor.set(0.5, 0.5);

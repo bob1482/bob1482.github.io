@@ -204,3 +204,65 @@ export function updateLayoutLandscape(
     hexSize,
   };
 }
+
+/**
+ * Layout for a single wide board in landscape mode.
+ * Uses a 12×8 hex grid spanning the full width of the screen.
+ */
+export function updateLayoutLandscapeSingle(
+  width: number,
+  height: number,
+  hexKeys: HexKey[],
+  cols: number,
+): LayoutResult {
+  const sqrt3 = Math.sqrt(3);
+
+  const padding = 0;
+  const availW = width - 2 * padding;
+  const availH = height - 2 * padding;
+
+  // Rotated coordinates: 90° CCW (same as portrait)
+  let minXU = Infinity, maxXU = -Infinity;
+  let minYU = Infinity, maxYU = -Infinity;
+
+  for (const key of hexKeys) {
+    const rcol = key.row;
+    const rrow = cols - 1 - key.col;
+    const xu = rcol * sqrt3 - (rrow % 2 === 1 ? sqrt3 / 2 : 0);
+    const yu = rrow * 1.5;
+    if (xu < minXU) minXU = xu;
+    if (xu > maxXU) maxXU = xu;
+    if (yu < minYU) minYU = yu;
+    if (yu > maxYU) maxYU = yu;
+  }
+
+  const unitW = (maxXU - minXU) + sqrt3;
+  const unitH = (maxYU - minYU) + 2;
+
+  const hexSize = Math.min(availW / unitW, availH / unitH);
+
+  const gridW = unitW * hexSize;
+  const gridH_ = unitH * hexSize;
+  const offsetX = (width - gridW) / 2 + (sqrt3 / 2) * hexSize;
+  const offsetY = (height - gridH_) / 2 + hexSize;
+
+  const positionedKeys: HexKey[] = [];
+
+  for (const key of hexKeys) {
+    const rcol = key.row;
+    const rrow = cols - 1 - key.col;
+    const stagger = (rrow % 2 === 1) ? sqrt3 / 2 * hexSize : 0;
+    positionedKeys.push({
+      ...key,
+      isPressed: false,
+      centerX: offsetX + rcol * sqrt3 * hexSize - stagger,
+      centerY: offsetY + rrow * 1.5 * hexSize,
+    });
+  }
+
+  return {
+    activeKeys: positionedKeys,
+    leftBoardKeyCount: 0,
+    hexSize,
+  };
+}

@@ -16,6 +16,15 @@ export class SettingsUI {
 
   private _settingsTitle: PIXI.Text | null = null;
   private _settingsCloseBtn: PIXI.Text | null = null;
+  private _glideToggleLabel: PIXI.Text | null = null;
+  private _glideToggleBtn: PIXI.Graphics | null = null;
+  private _glideToggleBtnLabel: PIXI.Text | null = null;
+  private _singleBoardToggleLabel: PIXI.Text | null = null;
+  private _singleBoardToggleBtn: PIXI.Graphics | null = null;
+  private _singleBoardToggleBtnLabel: PIXI.Text | null = null;
+  private _widePortraitToggleLabel: PIXI.Text | null = null;
+  private _widePortraitToggleBtn: PIXI.Graphics | null = null;
+  private _widePortraitToggleBtnLabel: PIXI.Text | null = null;
 
   private pressStartTime: number = 0;
   private pressPointerId: number = -1;
@@ -24,7 +33,23 @@ export class SettingsUI {
   private screenWidth: number = 0;
   private screenHeight: number = 0;
 
-  constructor(stage: PIXI.Container) {
+  private glidingEnabled: boolean = true;
+  private useSingleLandscapeBoard: boolean = false;
+  private useWidePortrait: boolean = false;
+  private onToggleGliding: (enabled: boolean) => void;
+  private onToggleSingleBoard: (enabled: boolean) => void;
+  private onToggleWidePortrait: (enabled: boolean) => void;
+
+  constructor(
+    stage: PIXI.Container,
+    onToggleGliding: (enabled: boolean) => void,
+    onToggleSingleBoard: (enabled: boolean) => void,
+    onToggleWidePortrait: (enabled: boolean) => void,
+  ) {
+    this.onToggleGliding = onToggleGliding;
+    this.onToggleSingleBoard = onToggleSingleBoard;
+    this.onToggleWidePortrait = onToggleWidePortrait;
+
     this.button = new PIXI.Graphics();
     this.buttonLabel = new PIXI.Text('⚙', {
       fontFamily: 'Arial',
@@ -92,6 +117,14 @@ export class SettingsUI {
     return this.windowOpen;
   }
 
+  /** Set the current gliding state so the toggle renders correctly */
+  setGlidingEnabled(enabled: boolean): void {
+    this.glidingEnabled = enabled;
+    if (this.windowOpen) {
+      this.renderWindow(this.screenWidth, this.screenHeight);
+    }
+  }
+
   /** Handle a general pointer down on the overlay (close if clicking outside panel) */
   handleOverlayPointerDown(x: number, y: number): void {
     if (!this.windowOpen) return;
@@ -107,12 +140,18 @@ export class SettingsUI {
   }
 
   /** Update layout (called by the grid on resize) */
-  updateLayout(width: number, height: number, hexSize: number): void {
+  updateLayout(width: number, height: number, hexSize: number, buttonPosX?: number, buttonPosY?: number): void {
     this.screenWidth = width;
     this.screenHeight = height;
     this.buttonHalfSize = hexSize / 2;
-    this.buttonX = width - this.buttonHalfSize;
-    this.buttonY = height - this.buttonHalfSize;
+    if (buttonPosX !== undefined && buttonPosY !== undefined) {
+      this.buttonX = buttonPosX;
+      this.buttonY = buttonPosY;
+    } else {
+      // Fallback: bottom-right corner
+      this.buttonX = width - this.buttonHalfSize;
+      this.buttonY = height - this.buttonHalfSize;
+    }
     this.renderButton();
 
     if (this.windowOpen) {
@@ -211,6 +250,200 @@ export class SettingsUI {
     }
     this.content.addChild(closeBtn);
     this._settingsCloseBtn = closeBtn;
+
+    // Remove old toggle elements if they exist
+    if (this._glideToggleLabel) {
+      this.content.removeChild(this._glideToggleLabel);
+      this._glideToggleLabel = null;
+    }
+    if (this._glideToggleBtn) {
+      this.content.removeChild(this._glideToggleBtn);
+      this._glideToggleBtn = null;
+    }
+    if (this._glideToggleBtnLabel) {
+      this.content.removeChild(this._glideToggleBtnLabel);
+      this._glideToggleBtnLabel = null;
+    }
+
+    // --- Gliding Notes toggle ---
+    const toggleY = panelY + 75;
+
+    // Label
+    const toggleLabel = new PIXI.Text('Gliding Notes', {
+      fontFamily: 'Arial',
+      fontSize: 18,
+      fill: 0xcccccc,
+      align: 'left',
+    });
+    toggleLabel.anchor.set(0, 0.5);
+    toggleLabel.x = panelX + 25;
+    toggleLabel.y = toggleY;
+    this.content.addChild(toggleLabel);
+    this._glideToggleLabel = toggleLabel;
+
+    // Toggle button (rounded rect)
+    const toggleBtnWidth = 60;
+    const toggleBtnHeight = 30;
+    const toggleBtnX = panelX + panelW - 25 - toggleBtnWidth;
+    const toggleBtnY = toggleY - toggleBtnHeight / 2;
+
+    const toggleBtn = new PIXI.Graphics();
+    const toggleColor = this.glidingEnabled ? 0x4caf50 : 0x666666;
+    toggleBtn.beginFill(toggleColor, 1.0);
+    toggleBtn.lineStyle(1, 0x555555, 1.0);
+    toggleBtn.drawRoundedRect(0, 0, toggleBtnWidth, toggleBtnHeight, 6);
+    toggleBtn.endFill();
+    toggleBtn.x = toggleBtnX;
+    toggleBtn.y = toggleBtnY;
+    toggleBtn.interactive = true;
+    toggleBtn.cursor = 'pointer';
+    toggleBtn.on('pointerdown', () => {
+      this.glidingEnabled = !this.glidingEnabled;
+      this.onToggleGliding(this.glidingEnabled);
+      this.renderWindow(width, height); // Re-render to update toggle visual
+    });
+    this.content.addChild(toggleBtn);
+    this._glideToggleBtn = toggleBtn;
+
+    // Toggle label (ON / OFF)
+    const toggleBtnLabel = new PIXI.Text(this.glidingEnabled ? 'ON' : 'OFF', {
+      fontFamily: 'Arial',
+      fontSize: 14,
+      fill: 0xffffff,
+      align: 'center',
+      fontWeight: 'bold',
+    });
+    toggleBtnLabel.anchor.set(0.5, 0.5);
+    toggleBtnLabel.x = toggleBtnX + toggleBtnWidth / 2;
+    toggleBtnLabel.y = toggleBtnY + toggleBtnHeight / 2;
+    this.content.addChild(toggleBtnLabel);
+    this._glideToggleBtnLabel = toggleBtnLabel;
+
+    // Remove old single-board toggle elements if they exist
+    if (this._singleBoardToggleLabel) {
+      this.content.removeChild(this._singleBoardToggleLabel);
+      this._singleBoardToggleLabel = null;
+    }
+    if (this._singleBoardToggleBtn) {
+      this.content.removeChild(this._singleBoardToggleBtn);
+      this._singleBoardToggleBtn = null;
+    }
+    if (this._singleBoardToggleBtnLabel) {
+      this.content.removeChild(this._singleBoardToggleBtnLabel);
+      this._singleBoardToggleBtnLabel = null;
+    }
+
+    // --- Single Board (Landscape) toggle ---
+    const singleToggleY = panelY + 125;
+
+    const singleToggleLabel = new PIXI.Text('Single Board (Landscape)', {
+      fontFamily: 'Arial',
+      fontSize: 18,
+      fill: 0xcccccc,
+      align: 'left',
+    });
+    singleToggleLabel.anchor.set(0, 0.5);
+    singleToggleLabel.x = panelX + 25;
+    singleToggleLabel.y = singleToggleY;
+    this.content.addChild(singleToggleLabel);
+    this._singleBoardToggleLabel = singleToggleLabel;
+
+    const singleToggleBtnX = panelX + panelW - 25 - toggleBtnWidth;
+    const singleToggleBtnY = singleToggleY - toggleBtnHeight / 2;
+
+    const singleToggleBtn = new PIXI.Graphics();
+    const singleToggleColor = this.useSingleLandscapeBoard ? 0x4caf50 : 0x666666;
+    singleToggleBtn.beginFill(singleToggleColor, 1.0);
+    singleToggleBtn.lineStyle(1, 0x555555, 1.0);
+    singleToggleBtn.drawRoundedRect(0, 0, toggleBtnWidth, toggleBtnHeight, 6);
+    singleToggleBtn.endFill();
+    singleToggleBtn.x = singleToggleBtnX;
+    singleToggleBtn.y = singleToggleBtnY;
+    singleToggleBtn.interactive = true;
+    singleToggleBtn.cursor = 'pointer';
+    singleToggleBtn.on('pointerdown', () => {
+      this.useSingleLandscapeBoard = !this.useSingleLandscapeBoard;
+      this.onToggleSingleBoard(this.useSingleLandscapeBoard);
+      this.renderWindow(width, height); // Re-render to update toggle visual
+    });
+    this.content.addChild(singleToggleBtn);
+    this._singleBoardToggleBtn = singleToggleBtn;
+
+    const singleToggleBtnLabel = new PIXI.Text(this.useSingleLandscapeBoard ? 'ON' : 'OFF', {
+      fontFamily: 'Arial',
+      fontSize: 14,
+      fill: 0xffffff,
+      align: 'center',
+      fontWeight: 'bold',
+    });
+    singleToggleBtnLabel.anchor.set(0.5, 0.5);
+    singleToggleBtnLabel.x = singleToggleBtnX + toggleBtnWidth / 2;
+    singleToggleBtnLabel.y = singleToggleBtnY + toggleBtnHeight / 2;
+    this.content.addChild(singleToggleBtnLabel);
+    this._singleBoardToggleBtnLabel = singleToggleBtnLabel;
+
+    // Remove old wide portrait toggle elements if they exist
+    if (this._widePortraitToggleLabel) {
+      this.content.removeChild(this._widePortraitToggleLabel);
+      this._widePortraitToggleLabel = null;
+    }
+    if (this._widePortraitToggleBtn) {
+      this.content.removeChild(this._widePortraitToggleBtn);
+      this._widePortraitToggleBtn = null;
+    }
+    if (this._widePortraitToggleBtnLabel) {
+      this.content.removeChild(this._widePortraitToggleBtnLabel);
+      this._widePortraitToggleBtnLabel = null;
+    }
+
+    // --- Wide Portrait (12x6) toggle ---
+    const wideToggleY = panelY + 175;
+
+    const wideToggleLabel = new PIXI.Text('Wide Portrait (12×6)', {
+      fontFamily: 'Arial',
+      fontSize: 18,
+      fill: 0xcccccc,
+      align: 'left',
+    });
+    wideToggleLabel.anchor.set(0, 0.5);
+    wideToggleLabel.x = panelX + 25;
+    wideToggleLabel.y = wideToggleY;
+    this.content.addChild(wideToggleLabel);
+    this._widePortraitToggleLabel = wideToggleLabel;
+
+    const wideToggleBtnX = panelX + panelW - 25 - toggleBtnWidth;
+    const wideToggleBtnY = wideToggleY - toggleBtnHeight / 2;
+
+    const wideToggleBtn = new PIXI.Graphics();
+    const wideToggleColor = this.useWidePortrait ? 0x4caf50 : 0x666666;
+    wideToggleBtn.beginFill(wideToggleColor, 1.0);
+    wideToggleBtn.lineStyle(1, 0x555555, 1.0);
+    wideToggleBtn.drawRoundedRect(0, 0, toggleBtnWidth, toggleBtnHeight, 6);
+    wideToggleBtn.endFill();
+    wideToggleBtn.x = wideToggleBtnX;
+    wideToggleBtn.y = wideToggleBtnY;
+    wideToggleBtn.interactive = true;
+    wideToggleBtn.cursor = 'pointer';
+    wideToggleBtn.on('pointerdown', () => {
+      this.useWidePortrait = !this.useWidePortrait;
+      this.onToggleWidePortrait(this.useWidePortrait);
+      this.renderWindow(width, height); // Re-render to update toggle visual
+    });
+    this.content.addChild(wideToggleBtn);
+    this._widePortraitToggleBtn = wideToggleBtn;
+
+    const wideToggleBtnLabel = new PIXI.Text(this.useWidePortrait ? 'ON' : 'OFF', {
+      fontFamily: 'Arial',
+      fontSize: 14,
+      fill: 0xffffff,
+      align: 'center',
+      fontWeight: 'bold',
+    });
+    wideToggleBtnLabel.anchor.set(0.5, 0.5);
+    wideToggleBtnLabel.x = wideToggleBtnX + toggleBtnWidth / 2;
+    wideToggleBtnLabel.y = wideToggleBtnY + toggleBtnHeight / 2;
+    this.content.addChild(wideToggleBtnLabel);
+    this._widePortraitToggleBtnLabel = wideToggleBtnLabel;
   }
 
   /** Check if a point hits the settings button */

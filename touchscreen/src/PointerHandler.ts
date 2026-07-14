@@ -15,6 +15,8 @@ export class PointerHandler {
   private pointerToKeyMap: Map<number, HexKey> = new Map();
   private pressedKeys: Set<number> = new Set();
 
+  private glidingEnabled: boolean = true;
+
   private getActiveKeys: () => HexKey[];
   private getHexSize: () => number;
   private getSettingsUI: () => {
@@ -51,6 +53,10 @@ export class PointerHandler {
     this.getActiveKeys = getActiveKeys;
     this.getHexSize = getHexSize;
     this.getSettingsUI = getSettingsUI;
+  }
+
+  setGlidingEnabled(enabled: boolean): void {
+    this.glidingEnabled = enabled;
   }
 
   setupInteraction(): void {
@@ -143,25 +149,28 @@ export class PointerHandler {
     const currentKey = this.pointerToKeyMap.get(pointerId);
     const key = this.hitTest(x, y);
 
-    if (key && (!currentKey || key !== currentKey)) {
-      // Release old key if different
-      if (currentKey) {
-        currentKey.isPressed = false;
-        this.pressedKeys.delete(currentKey.midi);
-        this.updateKeyVisual(currentKey);
-      }
-      // Press new key
-      key.isPressed = true;
-      this.pressedKeys.add(key.midi);
-      this.pointerToKeyMap.set(pointerId, key);
-      this.engine.playNoteWithFallback(key.noteName, 0.8);
-      this.updateKeyVisual(key);
-    } else if (!key && currentKey) {
+    if (!key && currentKey) {
       // Moved off grid - release
       currentKey.isPressed = false;
       this.pressedKeys.delete(currentKey.midi);
       this.updateKeyVisual(currentKey);
       this.pointerToKeyMap.delete(pointerId);
+    } else if (key && (!currentKey || key !== currentKey)) {
+      // Only switch keys if gliding is enabled
+      if (this.glidingEnabled) {
+        // Release old key if different
+        if (currentKey) {
+          currentKey.isPressed = false;
+          this.pressedKeys.delete(currentKey.midi);
+          this.updateKeyVisual(currentKey);
+        }
+        // Press new key
+        key.isPressed = true;
+        this.pressedKeys.add(key.midi);
+        this.pointerToKeyMap.set(pointerId, key);
+        this.engine.playNoteWithFallback(key.noteName, 0.8);
+        this.updateKeyVisual(key);
+      }
     }
   }
 
@@ -213,15 +222,26 @@ export class PointerHandler {
     const hexSize = this.getHexSize();
     const s = hexSize;
 
+    const isAccidental = key.noteName.includes('#');
     let fillColor: number;
     let borderColor: number;
 
-    if (key.isPressed) {
-      fillColor = 0xdddddd;
-      borderColor = 0xbbbbbb;
+    if (isAccidental) {
+      if (key.isPressed) {
+        fillColor = 0x555555;
+        borderColor = 0x444444;
+      } else {
+        fillColor = 0x333333;
+        borderColor = 0x444444;
+      }
     } else {
-      fillColor = 0xf0f0f0;
-      borderColor = 0xcccccc;
+      if (key.isPressed) {
+        fillColor = 0xdddddd;
+        borderColor = 0xbbbbbb;
+      } else {
+        fillColor = 0xf0f0f0;
+        borderColor = 0xcccccc;
+      }
     }
 
     g.beginFill(fillColor, 1.0);

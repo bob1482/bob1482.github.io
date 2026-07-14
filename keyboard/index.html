@@ -3,12 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Split Classical Piano (Wicki-Hayden)</title>
+    <title>Piano (Wicki-Hayden)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎹</text></svg>">
     
-    <link rel="stylesheet" href="piano.css">
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/@tonejs/midi"></script>
   </head>
   <body>
@@ -17,10 +15,9 @@
     </div>
     
     <div id="quick-controls">
-      <div class="control-group" id="group-recorder">
-        <span class="control-label">Recorder</span>
+      <div class="control-group" id="group-playback">
+        <span class="control-label">Playback</span>
         <div class="btn-row">
-          <button class="control-btn" id="btn-record" onclick="toggleRecording()" title="Record">●</button>
           <button class="control-btn" id="btn-play" onclick="togglePlayback()" title="Play">▶</button>
           <button class="control-btn" id="btn-pause" onclick="pausePlayback()" title="Pause" disabled>II</button>
         </div>
@@ -28,17 +25,10 @@
       </div>
 
       <div class="control-group playback-controls" id="group-memory">
-         <span class="control-label">Memory</span>
-         <div class="btn-row" style="width: 100%; padding: 0; background: transparent;">
-           <select id="record-select" onchange="changeRecording(this.value)" style="flex-grow: 1;">
-             <option value="-1">No Records</option>
-           </select>
-           <button class="control-btn" onclick="deleteCurrentRecording()" title="Delete Recording" style="background-color: #d9534f; width: 25px;">X</button>
-         </div>
+         <span class="control-label">MIDI File</span>
          <div style="display: flex; gap: 5px; width: 100%; margin-top: 5px;">
            <input type="file" id="midi-upload" accept=".mid,.midi" style="display: none;" onchange="handleMidiUpload(event)">
            <button class="control-btn" onclick="document.getElementById('midi-upload').click()" title="Load MIDI File" style="width: 100%; font-size: 10px;">LOAD</button>
-           <button class="control-btn" id="btn-download-midi" onclick="downloadCurrentMidi()" title="Download MIDI" style="width: 100%; font-size: 10px;">SAVE</button>
          </div>
       </div>
 
@@ -48,30 +38,16 @@
       </div>
 
       <div class="control-group" id="group-pedal">
-        <button class="control-btn" id="btn-pedal" onclick="toggleSustainMode()" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;" title="Left-Click to Toggle Sustain">
+        <button class="control-btn" id="btn-pedal" onclick="toggleSustainMode()" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;" title="Click to Toggle Sustain">
           <span id="pedal-light" style="width: 12px; height: 12px; border-radius: 50%; background-color: #555; transition: all 0.2s;"></span>
         </button>
       </div>
 
-      <div class="control-group desktop-only" id="group-transpose">
-        <div id="trans-unified" style="display: flex;">
-          <div class="btn-col">
-            <input type="number" class="control-val-input" id="disp-trans-unified" value="0" onchange="setDirectValue('trans-unified', this.value)" title="Global Transpose (Left & Right Synced)">
-          </div>
+      <div class="control-group" id="group-transpose">
+        <span class="control-label">Transpose</span>
+        <div class="btn-row" style="display: flex;">
+          <input type="number" class="control-val-input" id="disp-trans" value="0" onchange="setDirectValue('trans', this.value)" title="Transpose">
         </div>
-        <div id="trans-split" style="display: none; gap: 10px;">
-          <div class="btn-col">
-            <input type="number" class="control-val-input" id="disp-trans-l" value="0" onchange="setDirectValue('trans-l', this.value)" title="Left Transpose">
-          </div>
-          <div class="btn-col">
-            <input type="number" class="control-val-input" id="disp-trans-r" value="0" onchange="setDirectValue('trans-r', this.value)" title="Right Transpose">
-          </div>
-        </div>
-      </div>
-
-      <div class="control-group" id="group-layout">
-        <span class="control-label">Layout</span>
-        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="cycleLayout()" id="btn-layout">AUTO</button>
       </div>
 
       <div class="control-group" id="group-settings-btn">
@@ -80,150 +56,64 @@
     </div>
 
     <div id="settings-panel">
-      <div class="control-group" id="group-transpose-settings">
-        <span class="control-label">Transpose</span>
-        <div style="display: flex; gap: 10px;">
-          <div style="display:flex; flex-direction:column; align-items:center;">
-            <span class="side-label">LEFT</span>
+      <!-- ===== SECTION: KEYBOARD ===== -->
+      <div class="settings-section">
+        <div class="settings-section-header">Keyboard</div>
+        <div class="settings-section-body">
+          <div class="control-group">
+            <span class="control-label">Transpose</span>
             <div class="btn-row">
-              <button class="control-btn" onclick="changeTranspose('left', -1)">-</button>
-              <input type="number" class="control-val-input" id="disp-trans-l-set" value="0" onchange="setDirectValue('trans-l', this.value)">
-              <button class="control-btn" onclick="changeTranspose('left', 1)">+</button>
+              <button class="control-btn" onclick="changeTranspose(-1)">-</button>
+              <input type="number" class="control-val-input" id="disp-trans-set" value="0" onchange="setDirectValue('trans', this.value)">
+              <button class="control-btn" onclick="changeTranspose(1)">+</button>
             </div>
           </div>
-          <div style="display:flex; flex-direction:column; align-items:center;">
-            <span class="side-label">RIGHT</span>
-            <div class="btn-row">
-              <button class="control-btn" onclick="changeTranspose('right', -1)">-</button>
-              <input type="number" class="control-val-input" id="disp-trans-r-set" value="0" onchange="setDirectValue('trans-r', this.value)">
-              <button class="control-btn" onclick="changeTranspose('right', 1)">+</button>
-            </div>
+
+          <div class="control-group">
+            <span class="control-label">F-Keys</span>
+            <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleFKeys()" id="btn-fkeys">F3-F12</button>
           </div>
-        </div>
-      </div>
 
-      <div class="control-group desktop-only">
-        <span class="control-label">Board</span>
-        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleBoard()" id="btn-board">HIDE</button>
-      </div>
-      
-      <div class="control-group desktop-only">
-        <span class="control-label">F-Keys</span>
-        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleFKeys()" id="btn-fkeys">F3-F12</button>
-      </div>
-
-      <div class="control-group desktop-only">
-        <span class="control-label">Metronome</span>
-        <div class="btn-row">
-          <button class="control-btn" id="btn-metro" onclick="toggleMetronome()" title="Toggle Click">M</button>
-          <input type="number" id="input-bpm" value="120" onchange="updateBPM(this.value)"
-                 style="width: 40px; background: rgba(111,111,111,0.3); border: none; color: white; border-radius: 4px; padding: 4px; font-weight: bold; text-align: center;">
-        </div>
-      </div>
-
-      <div class="control-group desktop-only" style="width: 100%; max-width: 280px;">
-        <span class="control-label">Transpose Sequence (Spacebar)</span>
-        <input type="text" id="input-sequence" 
-               value="5:5 12:12 -17:-17" 
-               onchange="updateSequence(this.value)"
-               style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.5); color: white; border: 1px solid #444; border-radius: 4px; padding: 6px; font-size: 12px; font-family: monospace; text-align: center;">
-      </div>
-
-      <div class="control-group desktop-only">
-        <span class="control-label">Visuals</span>
-        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleVisuals()" id="btn-visuals">ON</button>
-      </div>
-
-      <div class="control-group">
-        <span class="control-label">Background</span>
-        <div class="btn-row">
-          <input type="file" id="bg-upload" accept="image/*" style="display: none;" onchange="handleBackgroundUpload(event)">
-          <button class="control-btn" style="width: 60px; font-size: 11px;" onclick="document.getElementById('bg-upload').click()">UPLOAD</button>
-          <button class="control-btn" style="width: 25px; font-size: 11px; background-color: #d9534f;" onclick="clearBackground()" title="Clear Background">X</button>
-        </div>
-      </div>
-
-      <div class="control-group">
-        <span class="control-label">Wicki Keys</span>
-        <div class="btn-row">
-          <input type="file" id="key-idle-upload" accept="image/*" style="display: none;" onchange="handleKeyImageUpload(event, 'idle')">
-          <input type="file" id="key-press-upload" accept="image/*" style="display: none;" onchange="handleKeyImageUpload(event, 'press')">
-          <button class="control-btn" style="width: 40px; font-size: 10px;" onclick="document.getElementById('key-idle-upload').click()">IDLE</button>
-          <button class="control-btn" style="width: 40px; font-size: 10px;" onclick="document.getElementById('key-press-upload').click()">PRESS</button>
-          <button class="control-btn" style="width: 25px; font-size: 11px; background-color: #d9534f;" onclick="clearKeyImages()" title="Clear Key Images">X</button>
-        </div>
-      </div>
-
-      <div class="control-group">
-        <span class="control-label">Position</span>
-        <div style="display: flex; gap: 10px;">
-          <div style="display:flex; flex-direction:column; align-items:center;">
-            <span class="side-label">X-AXIS</span>
-            <div class="btn-row">
-              <button class="control-btn" onclick="changeBoardOffset('x', -10)">-</button>
-              <input type="number" class="control-val-input" id="disp-board-x" value="0" onchange="setDirectValue('board-x', this.value)">
-              <button class="control-btn" onclick="changeBoardOffset('x', 10)">+</button>
-            </div>
-          </div>
-          <div style="display:flex; flex-direction:column; align-items:center;">
-            <span class="side-label">Y-AXIS</span>
-            <div class="btn-row">
-              <button class="control-btn" onclick="changeBoardOffset('y', -10)">-</button>
-              <input type="number" class="control-val-input" id="disp-board-y" value="0" onchange="setDirectValue('board-y', this.value)">
-              <button class="control-btn" onclick="changeBoardOffset('y', 10)">+</button>
-            </div>
+          <div class="control-group">
+            <span class="control-label">Board</span>
+            <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleBoard()" id="btn-board">HIDE</button>
           </div>
         </div>
       </div>
 
-      <div class="control-group">
-        <span class="control-label">Volume</span>
-        <div class="btn-row">
-          <button class="control-btn" onclick="changeVolume(-0.1)">-</button>
-          <input type="number" class="control-val-input" id="disp-volume" value="50" onchange="setDirectValue('volume', this.value)">
-          <button class="control-btn" onclick="changeVolume(0.1)">+</button>
-        </div>
-      </div>
+      <!-- ===== SECTION: PLAYBACK ===== -->
+      <div class="settings-section">
+        <div class="settings-section-header">Playback</div>
+        <div class="settings-section-body">
+          <div class="control-group">
+            <span class="control-label">Song Transpose</span>
+            <div class="btn-row">
+              <button class="control-btn" onclick="changePlaybackTranspose(-1)">-</button>
+              <input type="number" class="control-val-input" id="disp-play-trans" value="0" onchange="setDirectValue('play-trans', this.value)">
+              <button class="control-btn" onclick="changePlaybackTranspose(1)">+</button>
+            </div>
+          </div>
 
-      <div class="control-group">
-        <span class="control-label">Reverb</span>
-        <div class="btn-row">
-          <button class="control-btn" onclick="changeReverb(-0.1)">-</button>
-          <input type="number" class="control-val-input" id="disp-reverb" value="30" onchange="setDirectValue('reverb', this.value)">
-          <button class="control-btn" onclick="changeReverb(0.1)">+</button>
-        </div>
-      </div>
-
-      <div class="control-group">
-        <span class="control-label">Sustain</span>
-        <div class="btn-row">
-          <button class="control-btn" onclick="changeSustain(-0.5)">-</button>
-          <input type="number" step="0.1" class="control-val-input" id="disp-sustain" value="1.0" onchange="setDirectValue('sustain', this.value)">
-          <button class="control-btn" onclick="changeSustain(0.5)">+</button>
-        </div>
-      </div>
-
-      <div class="control-group">
-        <span class="control-label">Speed & Fall</span>
-        <div style="display: flex; gap: 10px;">
-          <div style="display:flex; flex-direction:column; align-items:center;">
-            <span class="side-label">PLAYBACK</span>
+          <div class="control-group">
+            <span class="control-label">Speed</span>
             <div class="btn-row">
               <button class="control-btn" onclick="changePlaybackSpeed(-0.1)">-</button>
               <input type="number" step="0.1" class="control-val-input" id="disp-speed" value="1.0" onchange="setDirectValue('speed', this.value)">
               <button class="control-btn" onclick="changePlaybackSpeed(0.1)">+</button>
             </div>
           </div>
-          <div style="display:flex; flex-direction:column; align-items:center;">
-            <span class="side-label">NOTE FALL</span>
+
+          <div class="control-group">
+            <span class="control-label">Note Fall</span>
             <div class="btn-row">
               <button class="control-btn" onclick="changeFallDuration(-0.5)">-</button>
               <input type="number" step="0.5" class="control-val-input" id="disp-fall" value="2.0" onchange="setDirectValue('fall', this.value)">
               <button class="control-btn" onclick="changeFallDuration(0.5)">+</button>
             </div>
           </div>
-          <div style="display:flex; flex-direction:column; align-items:center;">
-            <span class="side-label">MANUAL SPEED</span>
+
+          <div class="control-group">
+            <span class="control-label">Manual Speed</span>
             <div class="btn-row">
               <button class="control-btn" onclick="changeManualRiseSpeed(-10)">-</button>
               <input type="number" step="10" class="control-val-input" id="disp-manual-speed" value="100" onchange="setDirectValue('manual-speed', this.value)">
@@ -233,73 +123,65 @@
         </div>
       </div>
 
-      <div class="control-group">
-        <span class="control-label">Song Transpose</span>
-        <div class="btn-row">
-          <button class="control-btn" onclick="changePlaybackTranspose(-1)">-</button>
-          <input type="number" class="control-val-input" id="disp-play-trans" value="0" onchange="setDirectValue('play-trans', this.value)">
-          <button class="control-btn" onclick="changePlaybackTranspose(1)">+</button>
-        </div>
-      </div>
-
-      <div class="control-group">
-        <span class="control-label">Strip Range</span>
-        <div style="display: flex; gap: 10px;">
-          <div style="display:flex; flex-direction:column; align-items:center;">
-            <span class="side-label">LEFT</span>
-            <div class="btn-row">
-              <button class="control-btn" onclick="changeStripRange('left', -1)">-</button>
-              <input type="number" class="control-val-input" id="disp-strip-l" value="-27" onchange="setDirectValue('strip-l', this.value)">
-              <button class="control-btn" onclick="changeStripRange('left', 1)">+</button>
-            </div>
+      <!-- ===== SECTION: VISUALS ===== -->
+      <div class="settings-section">
+        <div class="settings-section-header">Visuals</div>
+        <div class="settings-section-body">
+          <div class="control-group">
+            <span class="control-label">Visualizer</span>
+            <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleVisuals()" id="btn-visuals">ON</button>
           </div>
-          <div style="display:flex; flex-direction:column; align-items:center;">
-            <span class="side-label">RIGHT</span>
-            <div class="btn-row">
-              <button class="control-btn" onclick="changeStripRange('right', -1)">-</button>
-              <input type="number" class="control-val-input" id="disp-strip-r" value="60" onchange="setDirectValue('strip-r', this.value)">
-              <button class="control-btn" onclick="changeStripRange('right', 1)">+</button>
-            </div>
+
+          <div class="control-group">
+            <span class="control-label">Screen</span>
+            <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleFullScreen()" id="btn-fullscreen">FULL</button>
           </div>
         </div>
       </div>
 
-      <div class="control-group">
-        <span class="control-label">Strip H</span>
-        <div class="btn-row">
-          <button class="control-btn" onclick="changeStripHeight(-1)">-</button>
-          <input type="number" class="control-val-input" id="disp-strip-height" value="5" onchange="setDirectValue('strip-height', this.value)">
-          <button class="control-btn" onclick="changeStripHeight(1)">+</button>
+      <!-- ===== SECTION: PIANO STRIP ===== -->
+      <div class="settings-section">
+        <div class="settings-section-header">Piano Strip</div>
+        <div class="settings-section-body">
+          <div class="control-group">
+            <span class="control-label">Range</span>
+            <div style="display: flex; gap: 10px;">
+              <div style="display:flex; flex-direction:column; align-items:center;">
+                <span class="side-label">LEFT</span>
+                <div class="btn-row">
+                  <button class="control-btn" onclick="changeStripRange('left', -1)">-</button>
+                  <input type="number" class="control-val-input" id="disp-strip-l" value="-27" onchange="setDirectValue('strip-l', this.value)">
+                  <button class="control-btn" onclick="changeStripRange('left', 1)">+</button>
+                </div>
+              </div>
+              <div style="display:flex; flex-direction:column; align-items:center;">
+                <span class="side-label">RIGHT</span>
+                <div class="btn-row">
+                  <button class="control-btn" onclick="changeStripRange('right', -1)">-</button>
+                  <input type="number" class="control-val-input" id="disp-strip-r" value="60" onchange="setDirectValue('strip-r', this.value)">
+                  <button class="control-btn" onclick="changeStripRange('right', 1)">+</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">Height</span>
+            <div class="btn-row">
+              <button class="control-btn" onclick="changeStripHeight(-1)">-</button>
+              <input type="number" class="control-val-input" id="disp-strip-height" value="5" onchange="setDirectValue('strip-height', this.value)">
+              <button class="control-btn" onclick="changeStripHeight(1)">+</button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="control-group">
-        <span class="control-label">Screen</span>
-        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleFullScreen()" id="btn-fullscreen">FULL</button>
-      </div>
-
-      <div class="control-group">
-        <span class="control-label">Zoom</span>
-        <div class="btn-row">
-          <button class="control-btn" onclick="changeZoom(-0.05)">-</button>
-          <input type="number" class="control-val-input" id="disp-zoom" value="65" onchange="setDirectValue('zoom', this.value)">
-          <button class="control-btn" onclick="changeZoom(0.05)">+</button>
-        </div>
-      </div>
-
-      <div class="control-group">
-        <span class="control-label">System</span>
-        <div style="display: flex; gap: 5px;">
-          <button id="btn-reset-memory" class="control-btn" title="Reset Browser Memory">RESET</button>
-        </div>
-      </div>
     </div>
 
     <canvas id="synthesia-canvas"></canvas>
 
     <div id="board-wrapper">
-      <div class="wicki-board" id="board-left"></div>
-      <div class="wicki-board" id="board-right"></div>
+      <div class="wicki-board" id="board"></div>
     </div>
 
     <div id="piano-strip"></div>
@@ -307,57 +189,18 @@
     <div id="progress-container">
       <input type="range" id="progress-bar" min="0" max="100" value="0" oninput="scrubProgress(this.value)">
     </div>
-
-    <div id="reset-modal" class="modal-overlay">
-      <div class="modal-content">
-        <h3 style="margin-top: 0; text-align: center; color: #ff4444;">Reset Options</h3>
-
-        <label class="reset-option">
-          <input type="checkbox" id="reset-recs" class="sub-reset">
-          <span>Clear All Recordings</span>
-        </label>
-
-        <label class="reset-option">
-          <input type="checkbox" id="reset-media" class="sub-reset">
-          <span>Clear Custom Images (Background & Keys)</span>
-        </label>
-
-        <label class="reset-option">
-          <input type="checkbox" id="reset-prefs" class="sub-reset" checked>
-          <span>Reset UI & Preferences (Zoom, Layout, Transpose, etc.)</span>
-        </label>
-
-        <hr style="border: 0; border-top: 1px solid #444; width: 100%; margin: 5px 0;">
-
-        <label class="reset-option" style="color: #ff6666; font-weight: bold;">
-          <input type="checkbox" id="reset-full" onchange="toggleFullReset(this.checked)">
-          <span>FULL FACTORY RESET</span>
-        </label>
-
-        <div style="display: flex; gap: 10px; margin-top: 20px;">
-          <button class="control-btn" onclick="executeReset()" style="background: linear-gradient(to bottom, #ff4444, #cc0000); width: 100%;">CONFIRM</button>
-          <button class="control-btn" onclick="closeResetModal()" style="width: 100%;">CANCEL</button>
-        </div>
-      </div>
-    </div>
     
-    <script src="piano_core.js"></script>
-    <script src="playback_engine.js"></script>
-    <script src="piano_render.js"></script> 
-    <script src="piano_interaction.js"></script>
-    <script src="piano_midi.js"></script>
-    <script src="piano_mobile.js"></script>
-    
-    <script>
-      // Wait for scripts to load, then initialize
-      window.addEventListener('DOMContentLoaded', () => {
-          // 1. Load saved settings immediately
-          if (typeof loadSettings === 'function') loadSettings();
-          
-          // 2. Render board with loaded settings
-          if (typeof renderBoard === 'function') renderBoard();
-          if (typeof updateUI === 'function') updateUI();
-      });
-    </script>
+    <!-- ===== FILE ORGANIZATION =====
+         js/core/   state.js        - Constants, state, audio engine, settings
+         js/playback/scheduler.js   - Playback engine, visualizer, scheduling
+         js/ui/     board.js        - Wicki board & piano strip rendering, DOM caching
+         js/input/  controls.js     - Mouse/touch/keyboard events, control functions, UI updates
+         js/input/  midi.js         - Web MIDI API, MIDI file loading
+    ================================ -->
+    <script src="js/state.js"></script>
+    <script src="js/scheduler.js"></script>
+    <script src="js/board.js"></script>
+    <script src="js/controls.js"></script>
+    <script src="js/midi.js"></script>
   </body>
 </html>
