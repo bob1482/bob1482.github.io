@@ -22,7 +22,7 @@ export class SettingsUI {
   private screenWidth: number = 0;
   private screenHeight: number = 0;
 
-  private glidingEnabled: boolean = true;
+  private glidingEnabled: boolean = false;
   private useSingleLandscapeBoard: boolean = false;
   private useWidePortrait: boolean = false;
   private onToggleGliding: (enabled: boolean) => void;

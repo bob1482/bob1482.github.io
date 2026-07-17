@@ -15,7 +15,7 @@ export class PointerHandler {
   private pointerToKeyMap: Map<number, HexKey> = new Map();
   private pressedKeys: Set<number> = new Set();
 
-  private glidingEnabled: boolean = true;
+  private glidingEnabled: boolean = false;
 
   private getActiveKeys: () => HexKey[];
   private getHexSize: () => number;

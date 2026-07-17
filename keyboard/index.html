@@ -139,6 +139,25 @@
         </div>
       </div>
 
+      <!-- ===== SECTION: REVERB ===== -->
+      <div class="settings-section">
+        <div class="settings-section-header">Reverb</div>
+        <div class="settings-section-body">
+          <div class="control-group">
+            <span class="control-label">Reverb</span>
+            <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleReverb()" id="btn-reverb">ON</button>
+          </div>
+          <div class="control-group">
+            <span class="control-label">Wet Mix</span>
+            <div class="btn-row">
+              <button class="control-btn" onclick="changeReverb(-0.05)">-</button>
+              <input type="number" class="control-val-input" id="disp-reverb" value="30" onchange="setDirectValue('reverb', this.value)">
+              <button class="control-btn" onclick="changeReverb(0.05)">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ===== SECTION: PIANO STRIP ===== -->
       <div class="settings-section">
         <div class="settings-section-header">Piano Strip</div>

@@ -18,8 +18,10 @@ function releaseManualHoldFreq(freqStr) {
       return false;
   }
 
-  // Stop the source
-  if (heldVoice.source) {
+  // Stop the source with smooth release
+  if (heldVoice.source && typeof stopVoiceSmoothly === 'function') {
+    stopVoiceSmoothly(heldVoice, 500);
+  } else if (heldVoice.source) {
     try { heldVoice.source.stop(); } catch(e) {}
     try { heldVoice.source.disconnect(); } catch(e) {}
   }
@@ -41,9 +43,8 @@ async function pressNote(freq, isAutomated = false, sourceElement = null) {
 
   if (!isAutomated) {
       manualFreqRefCounts[freqStr] = (manualFreqRefCounts[freqStr] || 0) + 1;
-      if (sustainMode === 1) {
-          manualHoldFreqs[freqStr] = true;
-      }
+      // Track held freqs in both modes so right-click can kill them
+      manualHoldFreqs[freqStr] = true;
   }
 
   if (typeof getCachedKeys === 'function') {
@@ -79,17 +80,21 @@ function releaseNote(freq, isAutomated = false, sourceElement = null) {
 
   if (shouldReleaseAudio && !isAutomated) {
       const voice = activeVoices.find((activeVoice) => activeVoice.freq.toFixed(2) === freqStr);
-      const isInfiniteHold = voice && voice.timedTrackerKey === undefined;
 
-      if (sustainMode === 1 || (manualHoldFreqs[freqStr] && isInfiniteHold)) {
-          // Stop the source
+      if (sustainMode === 1) {
+          // Hold mode: stop the note on key release with smooth release
           if (voice && voice.source) {
-            try { voice.source.stop(); } catch(e) {}
-            try { voice.source.disconnect(); } catch(e) {}
+            if (typeof stopVoiceSmoothly === 'function') {
+                stopVoiceSmoothly(voice, 500);
+            } else {
+                try { voice.source.stop(); } catch(e) {}
+                try { voice.source.disconnect(); } catch(e) {}
+            }
           }
           activeVoices = activeVoices.filter((activeVoice) => activeVoice.freq.toFixed(2) !== freqStr);
           delete manualHoldFreqs[freqStr];
       }
+      // Sustain mode (0): note continues playing after key release
   }
   
   if (typeof getCachedKeys === 'function') {
@@ -235,16 +240,17 @@ window.addEventListener('mouseup', (e) => {
 
 function resetHighlights() {
     // 1. Release any physically stuck notes (stops audio and removes the base 'active' class)
-    if (typeof releaseAllStuckNotes === 'function') {
-        releaseAllStuckNotes();
-    }
+    releaseAllStuckNotes();
     
-    // 2. Clear all persistent scale markers (the blue/pink borders)
+    // 2. Stop all remaining audio (sustained notes that don't belong to active keys)
+    if (typeof stopAllAudio === 'function') stopAllAudio();
+    
+    // 3. Clear all persistent scale markers (the blue/pink borders)
     if (typeof clearAllHighlights === 'function') {
         clearAllHighlights();
     }
     
-    // 3. Clear manual visual notes rising on the canvas
+    // 4. Clear manual visual notes rising on the canvas
     if (typeof visualNotes !== 'undefined' && typeof recycleNote === 'function') {
         for (let i = visualNotes.length - 1; i >= 0; i--) {
             recycleNote(visualNotes[i]);
@@ -426,6 +432,14 @@ function setDirectValue(type, value) {
             }
             return;
         }
+        case 'reverb': {
+            const newReverb = Math.max(0, Math.min(100, parseFloat(value) || 0));
+            reverbWet = newReverb / 100;
+            reverbGain.gain.value = reverbEnabled ? reverbWet : 0;
+            updateUI();
+            saveSettings();
+            return;
+        }
         case 'strip-l':
             releaseAllStuckNotes();
             stripRangeLeft = Math.max(-50, Math.min(0, Math.round(val)));
@@ -500,8 +514,24 @@ function changeStripHeight(delta) {
 
 // --- AUDIO CONTROLS ---
 
+function toggleReverb() {
+    reverbEnabled = !reverbEnabled;
+    reverbGain.gain.value = reverbEnabled ? reverbWet : 0;
+    updateUI();
+    saveSettings();
+}
+
+function changeReverb(delta) {
+    reverbWet = Math.max(0, Math.min(1, reverbWet + delta));
+    reverbGain.gain.value = reverbEnabled ? reverbWet : 0;
+    updateUI();
+    saveSettings();
+}
+
 function toggleSustainMode() {
     releaseAllStuckNotes();
+    // Stop all audio since releaseNote won't stop notes in sustain mode
+    if (typeof stopAllAudio === 'function') stopAllAudio();
     sustainMode = (sustainMode === 0) ? 1 : 0;
 
     if (sustainMode === 1) {
@@ -754,6 +784,15 @@ function updateUI() {
 
   const dispManual = document.getElementById("disp-manual-speed");
   if (dispManual) dispManual.value = manualRiseSpeed;
+
+  // Reverb UI
+  const btnReverb = document.getElementById("btn-reverb");
+  if (btnReverb) {
+    btnReverb.innerText = reverbEnabled ? "ON" : "OFF";
+    btnReverb.style.color = reverbEnabled ? "white" : "#888";
+  }
+  const dispReverb = document.getElementById("disp-reverb");
+  if (dispReverb) dispReverb.value = (reverbWet * 100).toFixed(0);
 
   const btnPlay = document.getElementById("btn-play");
   const btnPause = document.getElementById("btn-pause");

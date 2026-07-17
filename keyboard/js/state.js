@@ -9,8 +9,7 @@ const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", 
 
 // --- GLOBAL SETTINGS STATE ---
 let transpose = -3;
-let sustainMultiplier = 1.0;
-let sustainMode = 0; // 0 = Timed only
+let sustainMode = 0; // 0 = Sustain (notes hold after release), 1 = Hold (notes stop on release)
 let isLoaded = false;
 let bpm = 120;
 let mobileZoom = 1.0;
@@ -82,6 +81,39 @@ const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 // Master gain node
 const masterGain = audioCtx.createGain();
 masterGain.gain.value = 0.5;
+
+// --- REVERB (convolution reverb with synthetic impulse response) ---
+let reverbEnabled = true;
+let reverbWet = 0.3;       // 0.0 to 1.0
+
+function generateImpulseResponse(duration = 1.5, decay = 2.0) {
+    const sampleRate = audioCtx.sampleRate;
+    const length = sampleRate * duration;
+    const buffer = audioCtx.createBuffer(2, length, sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+        const data = buffer.getChannelData(ch);
+        for (let i = 0; i < length; i++) {
+            // White noise with exponential decay to simulate room reflections
+            const env = Math.exp(-decay * i / length);
+            data[i] = (Math.random() * 2 - 1) * env;
+        }
+    }
+    return buffer;
+}
+
+const convolverNode = audioCtx.createConvolver();
+convolverNode.buffer = generateImpulseResponse(1.5, 2.0);
+convolverNode.normalize = true;
+
+const reverbGain = audioCtx.createGain();
+reverbGain.gain.value = reverbWet;
+
+// Routing: masterGain -> convolver -> reverbGain -> destination
+masterGain.connect(convolverNode);
+convolverNode.connect(reverbGain);
+reverbGain.connect(audioCtx.destination);
+
+// Also connect masterGain directly for the dry signal
 masterGain.connect(audioCtx.destination);
 
 // Global volume constant (can still be set but no UI for it)
@@ -223,15 +255,30 @@ function clearTimedSustainTrackers(releaseAudio = true) {
   });
 }
 
-// Helper to stop a specific frequency's active source
-function stopSampleByFreq(freq) {
-  // Find any playing source Node for this freq and stop it
+// Smooth release: ramps gain to 0 over releaseTimeMs, then stops and cleans up
+function stopVoiceSmoothly(voice, releaseTimeMs = 500) {
+  if (!voice || !voice.source) return;
+  const now = audioCtx.currentTime;
+  const releaseSec = releaseTimeMs / 1000;
+  // Get current gain value and ramp to 0
+  voice.envGain.gain.cancelScheduledValues(now);
+  voice.envGain.gain.setValueAtTime(voice.envGain.gain.value, now);
+  voice.envGain.gain.linearRampToValueAtTime(0.001, now + releaseSec);
+  // Stop source after ramp completes
+  try { voice.source.stop(now + releaseSec + 0.01); } catch(e) {}
+  // Schedule cleanup after ramp
+  setTimeout(() => {
+    try { voice.source.disconnect(); } catch(e) {}
+    removeActiveVoiceById(voice.id);
+  }, (releaseSec + 0.05) * 1000);
+}
+
+// Helper to stop a specific frequency's active source with smooth release
+function stopSampleByFreq(freq, releaseTimeMs = 500) {
+  // Find any playing source Node for this freq and stop it smoothly
   for (let i = activeVoices.length - 1; i >= 0; i--) {
     if (Math.abs(activeVoices[i].freq - freq) < 0.001) {
-      if (activeVoices[i].source) {
-        try { activeVoices[i].source.stop(); } catch(e) {}
-        try { activeVoices[i].source.disconnect(); } catch(e) {}
-      }
+      stopVoiceSmoothly(activeVoices[i], releaseTimeMs);
     }
   }
 }
@@ -291,7 +338,7 @@ function triggerSound(frequency, when = 0, forceDuration = null) {
   activeVoices.push(voice);
 
   if (forceDuration !== null) {
-    // Schedule release after forceDuration
+    // Schedule release after forceDuration (used by MIDI playback)
     source.stop(Math.max(when, when + forceDuration));
     envGain.gain.setValueAtTime(1.0, when);
     envGain.gain.linearRampToValueAtTime(0, when + forceDuration);
@@ -300,53 +347,20 @@ function triggerSound(frequency, when = 0, forceDuration = null) {
       removeActiveVoiceById(voiceId);
       try { source.disconnect(); } catch(e) {}
     }, cleanupDelay + 50);
-  } else if (sustainMode === 1) {
-    // Hold mode - keep playing until released
-    // (no auto-release scheduled)
   } else {
-    // Timed sustain mode
-    const baseDuration = 2;
-    const duration = Math.min(baseDuration * sustainMultiplier, 5);
-    const releaseDelay = Math.max(0, ((when - audioCtx.currentTime) + duration) * 1000);
-    const trackerKey = getTimedSustainTrackerKey(frequency);
-
-    clearTimedSustainTrackerByKey(trackerKey, false, when);
-
-    const timeoutId = window.setTimeout(() => {
-      const tracker = timedSustainTrackers[trackerKey];
-      if (!tracker || tracker.voiceId !== voiceId) return;
-
-      // Fade out
-      try {
-        const now = audioCtx.currentTime;
-        envGain.gain.setValueAtTime(envGain.gain.value, now);
-        envGain.gain.linearRampToValueAtTime(0, now + 0.05);
-        source.stop(now + 0.05);
-      } catch(e) {}
-
-      removeActiveVoiceById(voiceId);
-      delete timedSustainTrackers[trackerKey];
-      try { source.disconnect(); } catch(e) {}
-    }, releaseDelay);
-
-    voice.timedTrackerKey = trackerKey;
-    timedSustainTrackers[trackerKey] = {
-      timeoutId,
-      freq: frequency,
-      voiceId
-    };
+    // Sustain / Hold mode: play indefinitely until explicitly stopped
+    // (no auto-release scheduled)
   }
 }
 
-function stopAllAudio() {
+function stopAllAudio(releaseTimeMs = 500) {
+  // Use smooth release for all active voices
   for (let i = activeVoices.length - 1; i >= 0; i--) {
-    const v = activeVoices[i];
-    if (v.source) {
-      try { v.source.stop(); } catch(e) {}
-      try { v.source.disconnect(); } catch(e) {}
-    }
+    stopVoiceSmoothly(activeVoices[i], releaseTimeMs);
   }
+  // Clear activeVoices array
   activeVoices = [];
+  // Clear sustain trackers
   Object.keys(timedSustainTrackers).forEach(key => {
     clearTimeout(timedSustainTrackers[key].timeoutId);
     delete timedSustainTrackers[key];
@@ -374,7 +388,9 @@ function saveSettings() {
         playbackRate: playbackRate,
         playbackTranspose: playbackTranspose,
         fallDuration: fallDuration,
-        manualRiseSpeed: manualRiseSpeed
+        manualRiseSpeed: manualRiseSpeed,
+        reverbEnabled: reverbEnabled,
+        reverbWet: reverbWet
     };
 
     try {
@@ -409,6 +425,9 @@ function loadSettings() {
         if (settings.playbackTranspose !== undefined) playbackTranspose = settings.playbackTranspose;
         if (settings.fallDuration !== undefined) fallDuration = settings.fallDuration;
         if (settings.manualRiseSpeed !== undefined) manualRiseSpeed = settings.manualRiseSpeed;
+        if (settings.reverbEnabled !== undefined) reverbEnabled = settings.reverbEnabled;
+        if (settings.reverbWet !== undefined) reverbWet = settings.reverbWet;
+        reverbGain.gain.value = reverbEnabled ? reverbWet : 0;
         playbackRate = Math.max(0.25, Math.min(3.0, Number(playbackRate) || 1.0));
         playbackTranspose = Math.max(-50, Math.min(50, Math.round(Number(playbackTranspose) || 0)));
         fallDuration = Math.max(0.5, Math.min(10.0, Number(fallDuration) || 2.0));

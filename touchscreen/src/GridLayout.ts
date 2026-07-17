@@ -171,12 +171,13 @@ export function updateLayoutLandscape(
     const rrow = 7 - key.col;
     const stagger = (rrow % 2 === 1) ? sqrt3 / 2 * hexSize : 0;
 
-    // Left board key (anchored to left edge)
+    // Left board key (anchored to left edge) - tuned one octave lower
+    const leftMidi = key.midi - 12;
     const leftKey: HexKey = {
       col: key.col,
       row: key.row,
-      midi: key.midi,
-      noteName: key.noteName,
+      midi: leftMidi,
+      noteName: midiToNoteName(leftMidi),
       hasSample: key.hasSample,
       isPressed: false,
       centerX: leftOffsetX + rcol * sqrt3 * hexSize - stagger,
