@@ -24,7 +24,6 @@ export class PointerHandler {
     handlePointerDown: (x: number, y: number, pointerId: number) => boolean;
     handlePointerMove: (x: number, y: number, pointerId: number) => void;
     handlePointerUp: (x: number, y: number, pointerId: number) => boolean;
-    handleOverlayPointerDown: (x: number, y: number) => void;
     cancelPress: () => void;
   };
 
@@ -41,7 +40,6 @@ export class PointerHandler {
       handlePointerDown: (x: number, y: number, pointerId: number) => boolean;
       handlePointerMove: (x: number, y: number, pointerId: number) => void;
       handlePointerUp: (x: number, y: number, pointerId: number) => boolean;
-      handleOverlayPointerDown: (x: number, y: number) => void;
       cancelPress: () => void;
     },
   ) {
@@ -69,9 +67,10 @@ export class PointerHandler {
       const pos = this.getLocalPosition(e);
       const settingsUI = this.getSettingsUI();
 
-      // Check if settings window is open
+      // When settings window is open via DOM overlay, canvas pointer events
+      // naturally don't reach the overlay (DOM handles it). We simply skip
+      // grid interaction while the overlay is visible.
       if (settingsUI.isOpen) {
-        settingsUI.handleOverlayPointerDown(pos.x, pos.y);
         return;
       }
 

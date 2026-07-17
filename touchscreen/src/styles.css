@@ -68,3 +68,92 @@ html, body {
   font-size: 0.85rem;
   color: #555;
 }
+
+/* Settings overlay - DOM-based, no PIXI objects */
+.settings-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.settings-panel {
+  position: relative;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 12px;
+  padding: 20px 24px;
+  min-width: 280px;
+  max-width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  z-index: 1;
+}
+
+.settings-title {
+  font-size: 22px;
+  font-weight: bold;
+  color: #ccc;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.settings-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  font-size: 20px;
+  color: #888;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.settings-close:hover {
+  color: #fff;
+}
+
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+}
+
+.settings-toggle-label {
+  font-size: 18px;
+  color: #ccc;
+}
+
+.settings-toggle-btn {
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  font-weight: bold;
+  padding: 6px 18px;
+  border: 1px solid #555;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  background: #666;
+  color: #fff;
+  transition: background 0.15s ease;
+}
+
+.settings-toggle-btn.active {
+  background: #4caf50;
+  border-color: #388e3c;
+}

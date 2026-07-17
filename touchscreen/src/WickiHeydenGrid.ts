@@ -93,7 +93,6 @@ export class WickiHeydenGrid {
         handlePointerDown: (x, y, id) => this.settingsUI.handlePointerDown(x, y, id),
         handlePointerMove: (x, y, id) => this.settingsUI.handlePointerMove(x, y, id),
         handlePointerUp: (x, y, id) => this.settingsUI.handlePointerUp(x, y, id),
-        handleOverlayPointerDown: (x, y) => this.settingsUI.handleOverlayPointerDown(x, y),
         cancelPress: () => this.settingsUI.cancelPress(),
       }),
     );
@@ -186,12 +185,14 @@ export class WickiHeydenGrid {
   }
 
   private render(): void {
-    // Remove old hex graphics and labels
+    // Remove old hex graphics and labels, destroying to free GPU memory
     for (const [, g] of this.hexGraphics) {
       this.container.removeChild(g);
+      g.destroy();
     }
     for (const [, t] of this.labelTexts) {
       this.container.removeChild(t);
+      t.destroy();
     }
     this.hexGraphics.clear();
     this.labelTexts.clear();
@@ -297,6 +298,17 @@ export class WickiHeydenGrid {
 
   /** Clean up resources */
   destroy(): void {
+    // Destroy all hex graphics and labels to free GPU memory
+    for (const [, g] of this.hexGraphics) {
+      this.container.removeChild(g);
+      g.destroy();
+    }
+    for (const [, t] of this.labelTexts) {
+      this.container.removeChild(t);
+      t.destroy();
+    }
+    this.hexGraphics.clear();
+    this.labelTexts.clear();
     this.settingsUI.destroy();
     this.pointerHandler.reset();
     this.app.destroy(true, { children: true });
