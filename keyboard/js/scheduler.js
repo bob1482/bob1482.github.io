@@ -396,12 +396,16 @@ function seekToTime(percent) {
     // that have been visually spawned but haven't reached their hit time yet
     for (let i = 0; i < visualEventIndex; i++) {
         const evt = currentPlaybackEvents[i];
-        if (evt.time > targetSeconds) {
+        if (evt.time >= targetSeconds-1) {
             const hitTimeAbs = playbackStartTime + evt.time;
             spawnFallingNote(evt.freq, evt.duration, hitTimeAbs, evt.trackIndex);
         }
     }
     
+    // Update progress bar even when paused
+    const bar = document.getElementById('progress-bar');
+    if (bar) bar.value = percent;
+
     if (!isPaused) {
         schedulerLoop();
     }

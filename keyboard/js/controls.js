@@ -596,6 +596,17 @@ function toggleFKeys() {
 
 // --- SETTINGS PANEL TOGGLE ---
 
+function switchSettingsTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.settings-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+    // Update tab content
+    document.querySelectorAll('.settings-tab-content').forEach(content => {
+        content.classList.toggle('active', content.id === 'tab-' + tabName);
+    });
+}
+
 function toggleSettings() {
     const panel = document.getElementById('settings-panel');
     if (panel) {
@@ -604,6 +615,9 @@ function toggleSettings() {
             panel.style.transition = '';
             panel.style.boxShadow = '';
             panel.style.transform = '';
+        } else {
+            // Reset to first tab when opening
+            switchSettingsTab('keyboard');
         }
     }
 }
@@ -755,6 +769,13 @@ renderBoard();
 updateUI();
 
 function updateUI() {
+  // Toggle quick controls visibility based on pointer lock state (mouse disabled)
+  const quickControls = document.getElementById("quick-controls");
+  if (quickControls) {
+    const isPointerLocked = getPointerLockElement() === document.body;
+    quickControls.classList.toggle("sustain-active", isPointerLocked);
+  }
+
   const pedalLight = document.getElementById("pedal-light");
   if (pedalLight) {
       if (sustainMode === 0) {
@@ -837,3 +858,80 @@ function updateUI() {
   const dispStripR = document.getElementById("disp-strip-r");
   if (dispStripR) dispStripR.value = stripRangeRight;
 }
+
+// ==========================================
+// LOADOUT CONTROLS
+// ==========================================
+
+function refreshLoadoutDropdown() {
+    const select = document.getElementById('loadout-select');
+    if (!select) return;
+    
+    const currentValue = select.value;
+    select.innerHTML = '<option value="">-- Select Loadout --</option>';
+    
+    const names = typeof getLoadoutNames === 'function' ? getLoadoutNames() : [];
+    names.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        select.appendChild(opt);
+    });
+    
+    // Restore selection if it still exists
+    if (currentValue && names.includes(currentValue)) {
+        select.value = currentValue;
+    }
+}
+
+function saveCurrentLoadout() {
+    const input = document.getElementById('loadout-name-input');
+    if (!input) return;
+    
+    const name = input.value.trim();
+    if (!name) {
+        console.warn("Please enter a loadout name.");
+        return;
+    }
+    
+    if (typeof saveLoadout === 'function') {
+        const success = saveLoadout(name);
+        if (success) {
+            input.value = '';
+            refreshLoadoutDropdown();
+            // Select the newly saved loadout
+            const select = document.getElementById('loadout-select');
+            if (select) select.value = name;
+        }
+    }
+}
+
+function applySelectedLoadout() {
+    const select = document.getElementById('loadout-select');
+    if (!select || !select.value) {
+        console.warn("Please select a loadout to apply.");
+        return;
+    }
+    
+    if (typeof loadLoadout === 'function') {
+        loadLoadout(select.value);
+        refreshLoadoutDropdown();
+    }
+}
+
+function deleteSelectedLoadout() {
+    const select = document.getElementById('loadout-select');
+    if (!select || !select.value) {
+        console.warn("Please select a loadout to delete.");
+        return;
+    }
+    
+    if (typeof deleteLoadout === 'function') {
+        deleteLoadout(select.value);
+        select.value = '';
+        refreshLoadoutDropdown();
+    }
+}
+
+// Populate loadout dropdown on page load
+refreshLoadoutDropdown();

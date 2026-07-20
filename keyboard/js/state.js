@@ -443,5 +443,133 @@ function loadSettings() {
     }
 }
 
+// ==========================================
+// LOADOUTS (PRESET SNAPSHOTS)
+// ==========================================
+
+const LOADOUTS_STORAGE_KEY = 'wickiPianoLoadouts';
+
+function getAllLoadouts() {
+    try {
+        const data = localStorage.getItem(LOADOUTS_STORAGE_KEY);
+        return data ? JSON.parse(data) : {};
+    } catch (e) {
+        console.warn("Failed to read loadouts:", e);
+        return {};
+    }
+}
+
+function getLoadoutNames() {
+    return Object.keys(getAllLoadouts());
+}
+
+function saveLoadout(name) {
+    if (!name || name.trim().length === 0) return false;
+    const trimmed = name.trim();
+    const loadouts = getAllLoadouts();
+    
+    const snapshot = {
+        transpose: transpose,
+        labelMode: labelMode,
+        fKeyMode: fKeyMode,
+        isVisualizerOn: typeof isVisualizerOn !== 'undefined' ? isVisualizerOn : true,
+        mobileZoom: mobileZoom,
+        stripHeight: stripHeight,
+        stripRangeLeft: stripRangeLeft,
+        stripRangeRight: stripRangeRight,
+        playbackRate: playbackRate,
+        playbackTranspose: playbackTranspose,
+        fallDuration: fallDuration,
+        manualRiseSpeed: manualRiseSpeed,
+        reverbEnabled: reverbEnabled,
+        reverbWet: reverbWet
+    };
+    
+    loadouts[trimmed] = snapshot;
+    
+    try {
+        localStorage.setItem(LOADOUTS_STORAGE_KEY, JSON.stringify(loadouts));
+        console.log(`Loadout "${trimmed}" saved.`);
+        return true;
+    } catch (e) {
+        console.warn("Storage full, could not save loadout:", e);
+        return false;
+    }
+}
+
+function loadLoadout(name) {
+    const loadouts = getAllLoadouts();
+    const snapshot = loadouts[name];
+    if (!snapshot) {
+        console.warn(`Loadout "${name}" not found.`);
+        return false;
+    }
+    
+    // Apply all settings from the snapshot
+    if (snapshot.transpose !== undefined) transpose = snapshot.transpose;
+    if (snapshot.labelMode !== undefined) labelMode = snapshot.labelMode;
+    if (snapshot.fKeyMode !== undefined) fKeyMode = snapshot.fKeyMode;
+    if (snapshot.mobileZoom !== undefined) mobileZoom = snapshot.mobileZoom;
+    if (snapshot.stripHeight !== undefined) stripHeight = snapshot.stripHeight;
+    stripHeight = parseFloat(stripHeight);
+    if (Number.isNaN(stripHeight)) stripHeight = 16;
+    if (stripHeight < 0) stripHeight = 0;
+    if (stripHeight > 50) stripHeight = 50;
+    if (snapshot.isVisualizerOn !== undefined && typeof isVisualizerOn !== 'undefined') {
+        isVisualizerOn = snapshot.isVisualizerOn;
+    }
+    if (snapshot.stripRangeLeft !== undefined) stripRangeLeft = snapshot.stripRangeLeft;
+    if (snapshot.stripRangeRight !== undefined) stripRangeRight = snapshot.stripRangeRight;
+    if (snapshot.playbackRate !== undefined) playbackRate = snapshot.playbackRate;
+    if (snapshot.playbackTranspose !== undefined) playbackTranspose = snapshot.playbackTranspose;
+    if (snapshot.fallDuration !== undefined) fallDuration = snapshot.fallDuration;
+    if (snapshot.manualRiseSpeed !== undefined) manualRiseSpeed = snapshot.manualRiseSpeed;
+    if (snapshot.reverbEnabled !== undefined) reverbEnabled = snapshot.reverbEnabled;
+    if (snapshot.reverbWet !== undefined) reverbWet = snapshot.reverbWet;
+    
+    // Clamp values
+    playbackRate = Math.max(0.25, Math.min(3.0, Number(playbackRate) || 1.0));
+    playbackTranspose = Math.max(-50, Math.min(50, Math.round(Number(playbackTranspose) || 0)));
+    fallDuration = Math.max(0.5, Math.min(10.0, Number(fallDuration) || 2.0));
+    manualRiseSpeed = Math.max(10, Math.min(1000, Number(manualRiseSpeed) || 100));
+    fKeyMode = ((Math.round(Number(fKeyMode) || 0) % F_KEY_LABELS.length) + F_KEY_LABELS.length) % F_KEY_LABELS.length;
+    
+    // Apply reverb
+    if (typeof reverbGain !== 'undefined') {
+        reverbGain.gain.value = reverbEnabled ? reverbWet : 0;
+    }
+    
+    // Apply key map mode
+    if (typeof applyKeyMapMode === 'function') applyKeyMapMode();
+    
+    // Re-render board
+    if (typeof renderBoard === 'function') renderBoard();
+    
+    // Update UI
+    if (typeof updateUI === 'function') updateUI();
+    
+    // Save as current settings
+    if (typeof saveSettings === 'function') saveSettings();
+    
+    console.log(`Loadout "${name}" applied.`);
+    return true;
+}
+
+function deleteLoadout(name) {
+    const loadouts = getAllLoadouts();
+    if (!loadouts[name]) return false;
+    
+    delete loadouts[name];
+    
+    try {
+        localStorage.setItem(LOADOUTS_STORAGE_KEY, JSON.stringify(loadouts));
+        console.log(`Loadout "${name}" deleted.`);
+        return true;
+    } catch (e) {
+        console.warn("Failed to delete loadout:", e);
+        return false;
+    }
+}
+
 // Start loading samples
 loadAllSamples();
