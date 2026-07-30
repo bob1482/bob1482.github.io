@@ -67,7 +67,10 @@ export class AudioEngine {
     const gainNode = this.ctx.createGain();
     const vel = Math.max(0.01, Math.min(1.0, velocity));
     // Scale velocity to a nice dynamic range
-    gainNode.gain.setValueAtTime(0.3 + vel * 0.7, now);
+    const initialGain = 0.3 + vel * 0.7;
+    gainNode.gain.setValueAtTime(initialGain, now);
+    // Sustain: decay to silence over 5 seconds
+    gainNode.gain.linearRampToValueAtTime(0, now + 5.0);
 
     // Connect: source -> gain -> destination
     source.connect(gainNode);
@@ -138,7 +141,10 @@ export class AudioEngine {
 
     const gainNode = this.ctx.createGain();
     const vel = Math.max(0.01, Math.min(1.0, velocity));
-    gainNode.gain.setValueAtTime(0.3 + vel * 0.7, now);
+    const initialGain = 0.3 + vel * 0.7;
+    gainNode.gain.setValueAtTime(initialGain, now);
+    // Sustain: decay to silence over 5 seconds
+    gainNode.gain.linearRampToValueAtTime(0, now + 5.0);
 
     source.connect(gainNode);
     gainNode.connect(this.ctx.destination);

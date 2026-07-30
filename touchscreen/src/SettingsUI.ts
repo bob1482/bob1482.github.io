@@ -23,29 +23,25 @@ export class SettingsUI {
   private screenHeight: number = 0;
 
   private glidingEnabled: boolean = false;
-  private useSingleLandscapeBoard: boolean = false;
-  private useWidePortrait: boolean = false;
   private onToggleGliding: (enabled: boolean) => void;
-  private onToggleSingleBoard: (enabled: boolean) => void;
-  private onToggleWidePortrait: (enabled: boolean) => void;
+  private onChangeLandscapeLayout: (index: number) => void;
+  private landscapeLayoutIndex: number = 0;
 
   // DOM elements for the settings overlay
   private overlayEl: HTMLElement;
   private backdropEl: HTMLElement;
   private panelEl: HTMLElement;
   private glideToggleEl: HTMLElement;
-  private singleBoardToggleEl: HTMLElement;
-  private widePortraitToggleEl: HTMLElement;
+  private layout1Btn: HTMLElement;
+  private layout2Btn: HTMLElement;
 
   constructor(
     stage: PIXI.Container,
     onToggleGliding: (enabled: boolean) => void,
-    onToggleSingleBoard: (enabled: boolean) => void,
-    onToggleWidePortrait: (enabled: boolean) => void,
+    onChangeLandscapeLayout: (index: number) => void,
   ) {
     this.onToggleGliding = onToggleGliding;
-    this.onToggleSingleBoard = onToggleSingleBoard;
-    this.onToggleWidePortrait = onToggleWidePortrait;
+    this.onChangeLandscapeLayout = onChangeLandscapeLayout;
 
     // --- PIXI Settings Button (stays in PIXI for hexagon styling) ---
     this.button = new PIXI.Graphics();
@@ -90,6 +86,33 @@ export class SettingsUI {
     closeEl.addEventListener('click', () => this.close());
     this.panelEl.appendChild(closeEl);
 
+    // --- Landscape Layout selector ---
+    const layoutLabel = document.createElement('div');
+    layoutLabel.className = 'settings-section-label';
+    layoutLabel.textContent = 'Landscape Layout';
+    this.panelEl.appendChild(layoutLabel);
+
+    const layoutRow = document.createElement('div');
+    layoutRow.className = 'settings-layout-row';
+
+    this.layout1Btn = document.createElement('button');
+    this.layout1Btn.className = 'settings-layout-btn';
+    this.layout1Btn.textContent = 'Layout 1 (8×12)';
+    this.layout1Btn.addEventListener('click', () => {
+      this.onChangeLandscapeLayout(0);
+    });
+
+    this.layout2Btn = document.createElement('button');
+    this.layout2Btn.className = 'settings-layout-btn';
+    this.layout2Btn.textContent = 'Layout 2 (5×10)';
+    this.layout2Btn.addEventListener('click', () => {
+      this.onChangeLandscapeLayout(1);
+    });
+
+    layoutRow.appendChild(this.layout1Btn);
+    layoutRow.appendChild(this.layout2Btn);
+    this.panelEl.appendChild(layoutRow);
+
     // --- Gliding Notes toggle ---
     const glideRow = document.createElement('div');
     glideRow.className = 'settings-toggle-row';
@@ -110,52 +133,20 @@ export class SettingsUI {
     glideRow.appendChild(this.glideToggleEl);
     this.panelEl.appendChild(glideRow);
 
-    // --- Single Board (Landscape) toggle ---
-    const singleRow = document.createElement('div');
-    singleRow.className = 'settings-toggle-row';
-
-    const singleLabel = document.createElement('span');
-    singleLabel.className = 'settings-toggle-label';
-    singleLabel.textContent = 'Single Board (Landscape)';
-
-    this.singleBoardToggleEl = document.createElement('button');
-    this.singleBoardToggleEl.className = 'settings-toggle-btn';
-    this.singleBoardToggleEl.addEventListener('click', () => {
-      this.useSingleLandscapeBoard = !this.useSingleLandscapeBoard;
-      this.onToggleSingleBoard(this.useSingleLandscapeBoard);
-      this.updateToggleVisuals();
-    });
-
-    singleRow.appendChild(singleLabel);
-    singleRow.appendChild(this.singleBoardToggleEl);
-    this.panelEl.appendChild(singleRow);
-
-    // --- Wide Portrait (12×6) toggle ---
-    const wideRow = document.createElement('div');
-    wideRow.className = 'settings-toggle-row';
-
-    const wideLabel = document.createElement('span');
-    wideLabel.className = 'settings-toggle-label';
-    wideLabel.textContent = 'Wide Portrait (12×6)';
-
-    this.widePortraitToggleEl = document.createElement('button');
-    this.widePortraitToggleEl.className = 'settings-toggle-btn';
-    this.widePortraitToggleEl.addEventListener('click', () => {
-      this.useWidePortrait = !this.useWidePortrait;
-      this.onToggleWidePortrait(this.useWidePortrait);
-      this.updateToggleVisuals();
-    });
-
-    wideRow.appendChild(wideLabel);
-    wideRow.appendChild(this.widePortraitToggleEl);
-    this.panelEl.appendChild(wideRow);
-
     // Append overlay to the piano container
     const pianoContainer = document.getElementById('piano-container');
     if (pianoContainer) {
       pianoContainer.appendChild(this.overlayEl);
     } else {
       document.body.appendChild(this.overlayEl);
+    }
+  }
+
+  /** Set the current landscape layout index and update button visuals */
+  setLandscapeLayoutIndex(index: number): void {
+    this.landscapeLayoutIndex = index;
+    if (this._windowOpen) {
+      this.updateLayoutButtonVisuals();
     }
   }
 
@@ -240,6 +231,7 @@ export class SettingsUI {
     this._windowOpen = true;
     this.overlayEl.style.display = '';
     this.updateToggleVisuals();
+    this.updateLayoutButtonVisuals();
   }
 
   /** Close the settings window */
@@ -251,8 +243,12 @@ export class SettingsUI {
   /** Update only the toggle button visuals (no object creation) */
   private updateToggleVisuals(): void {
     this.updateToggleBtnEl(this.glideToggleEl, this.glidingEnabled);
-    this.updateToggleBtnEl(this.singleBoardToggleEl, this.useSingleLandscapeBoard);
-    this.updateToggleBtnEl(this.widePortraitToggleEl, this.useWidePortrait);
+  }
+
+  /** Update the layout button visuals to highlight the active layout */
+  private updateLayoutButtonVisuals(): void {
+    this.layout1Btn.className = 'settings-layout-btn' + (this.landscapeLayoutIndex === 0 ? ' active' : '');
+    this.layout2Btn.className = 'settings-layout-btn' + (this.landscapeLayoutIndex === 1 ? ' active' : '');
   }
 
   private updateToggleBtnEl(el: HTMLElement, enabled: boolean): void {

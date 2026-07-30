@@ -3,9 +3,10 @@ import { AudioEngine } from './AudioEngine';
 import { HexKey } from './HexKey';
 import { toNumberedNotation } from './NoteUtils';
 import { drawRoundedHexagon, keyId } from './HexUtils';
-import { buildGrid, updateLayoutPortrait, updateLayoutLandscape, updateLayoutLandscapeSingle, LayoutResult } from './GridLayout';
+import { buildGrid, updateLayoutPortrait, updateLayoutLandscapeSingle, LayoutResult } from './GridLayout';
 import { SettingsUI } from './SettingsUI';
 import { PointerHandler } from './PointerHandler';
+import { KeyboardHandler } from './KeyboardHandler';
 
 export class WickiHeydenGrid {
   private app: PIXI.Application;
@@ -21,23 +22,43 @@ export class WickiHeydenGrid {
   // Grid dimensions
   private readonly COLS = 10;
   private readonly ROWS = 4;
-  private readonly COLS_LANDSCAPE_SINGLE = 8;
-  private readonly ROWS_LANDSCAPE_SINGLE = 12;
-  private readonly COLS_PORTRAIT_WIDE = 12;
-  private readonly ROWS_PORTRAIT_WIDE = 6;
+  private readonly COLS_LANDSCAPE_1 = 8;
+  private readonly ROWS_LANDSCAPE_1 = 12;
+  private readonly COLS_LANDSCAPE_2 = 5;
+  private readonly ROWS_LANDSCAPE_2 = 10;
   private readonly BASE_MIDI = 36; // C2
+  private readonly BASE_MIDI_LANDSCAPE_2 = 48; // C3 (one octave up for 5x10 layout)
 
   // Landscape mode
   private isLandscape: boolean = false;
   private activeKeys: HexKey[] = [];
-  private leftBoardKeyCount: number = 0;
   private hexSize: number = 30;
+  private landscapeLayoutIndex: number = 0; // 0 = layout 1 (8x12), 1 = layout 2 (5x10)
 
-  // Single board mode
-  private useSingleLandscapeBoard: boolean = false;
+  // Keyboard handler
+  private keyboardHandler: KeyboardHandler;
 
-  // Wide portrait mode (12x6)
-  private useWidePortrait: boolean = false;
+  // Keyboard layout 1: 8 rows × 12 columns
+  private static readonly KEYBOARD_LAYOUT_1: string[][] = [
+    [],
+    ["F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12"],
+    ["Digit2","Digit3","Digit4","Digit5","Digit6","Digit7","Digit8","Digit9","Digit0","Minus","Equal","Backspace"],
+    ["KeyQ","KeyW","KeyE","KeyR","KeyT","KeyY","KeyU","KeyI","KeyO","KeyP","BracketLeft","BracketRight"],
+    ["KeyA","KeyS","KeyD","KeyF","KeyG","KeyH","KeyJ","KeyK","KeyL","Semicolon","Quote", "Enter"],
+    ["ShiftLeft","KeyZ","KeyX","KeyC","KeyV","KeyB","KeyN","KeyM","Comma","Period","Slash","ShiftRight"],
+    [],
+    [],
+  ];
+
+  // Keyboard layout 2: 5 rows × 12 columns
+  private static readonly KEYBOARD_LAYOUT_2: string[][] = [
+    ["F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12"],
+    ["Digit3","Digit4","Digit5","Digit6","Digit7","Digit8","Digit9","Digit0","Minus","Equal","Backspace"],
+    ["KeyW","KeyE","KeyR","KeyT","KeyY","KeyU","KeyI","KeyO","KeyP","BracketLeft","BracketRight"],
+    ["KeyS","KeyD","KeyF","KeyG","KeyH","KeyJ","KeyK","KeyL","Semicolon","Quote", "Enter"],
+    ["KeyZ","KeyX","KeyC","KeyV","KeyB","KeyN","KeyM","Comma","Period","Slash","ShiftRight"],
+  ];
+
   private sampleNoteNames: Set<string>;
 
   constructor(
@@ -66,14 +87,10 @@ export class WickiHeydenGrid {
     // Settings UI (manages its own PIXI objects on the stage)
     // Forward reference: pointerHandler not yet created, so we store a callback
     let setGlidingEnabled: (enabled: boolean) => void = () => {};
-    let setSingleBoardMode: (enabled: boolean) => void = () => {};
-    let setWidePortrait: (enabled: boolean) => void = () => {};
     this.settingsUI = new SettingsUI(this.app.stage, (enabled: boolean) => {
       setGlidingEnabled(enabled);
-    }, (enabled: boolean) => {
-      setSingleBoardMode(enabled);
-    }, (enabled: boolean) => {
-      setWidePortrait(enabled);
+    }, (index: number) => {
+      this.setLandscapeLayout(index);
     });
 
     // Build the grid data
@@ -103,17 +120,14 @@ export class WickiHeydenGrid {
       this.settingsUI.setGlidingEnabled(enabled);
     };
 
-    // Wire up the single-board mode toggle
-    setSingleBoardMode = (enabled: boolean) => {
-      this.useSingleLandscapeBoard = enabled;
-      this.updateLayout();
-    };
-
-    // Wire up the wide portrait mode toggle
-    setWidePortrait = (enabled: boolean) => {
-      this.useWidePortrait = enabled;
-      this.updateLayout();
-    };
+    // Keyboard handler
+    this.keyboardHandler = new KeyboardHandler(
+      this.engine,
+      () => this.activeKeys,
+      this.hexGraphics,
+      this.labelTexts,
+      () => this.hexSize,
+    );
 
     this.updateLayout();
     this.pointerHandler.setupInteraction();
@@ -125,39 +139,46 @@ export class WickiHeydenGrid {
     });
   }
 
+  private setLandscapeLayout(index: number): void {
+    if (index === this.landscapeLayoutIndex) return;
+    this.landscapeLayoutIndex = index;
+    this.updateLayout();
+  }
+
   private updateLayout(): void {
     const width = this.app.screen.width;
     const height = this.app.screen.height;
     this.isLandscape = width > height;
 
     let result: LayoutResult;
-    if (!this.isLandscape && this.useWidePortrait) {
-      // Wide portrait 12x6 grid
-      const wideKeys = buildGrid(
-        this.sampleNoteNames,
-        this.COLS_PORTRAIT_WIDE,
-        this.ROWS_PORTRAIT_WIDE,
-        this.BASE_MIDI
-      );
-      result = updateLayoutPortrait(width, height, wideKeys, this.COLS_PORTRAIT_WIDE);
-    } else if (this.isLandscape && this.useSingleLandscapeBoard) {
-      // Single 12x8 board spanning full width in landscape
+    if (this.isLandscape) {
+      const cols = this.landscapeLayoutIndex === 0 ? this.COLS_LANDSCAPE_1 : this.COLS_LANDSCAPE_2;
+      const rows = this.landscapeLayoutIndex === 0 ? this.ROWS_LANDSCAPE_1 : this.ROWS_LANDSCAPE_2;
+      const baseMidi = this.landscapeLayoutIndex === 1 ? this.BASE_MIDI_LANDSCAPE_2 : this.BASE_MIDI;
       const singleKeys = buildGrid(
         this.sampleNoteNames,
-        this.COLS_LANDSCAPE_SINGLE,
-        this.ROWS_LANDSCAPE_SINGLE,
-        this.BASE_MIDI
+        cols,
+        rows,
+        baseMidi,
+        false
       );
-      result = updateLayoutLandscapeSingle(width, height, singleKeys, this.COLS_LANDSCAPE_SINGLE);
-    } else if (this.isLandscape) {
-      result = updateLayoutLandscape(width, height, this.hexKeys, this.COLS);
+      const shift = this.landscapeLayoutIndex === 1; // only Layout 2 uses the odd-column shift
+      result = updateLayoutLandscapeSingle(width, height, singleKeys, cols, shift);
     } else {
       result = updateLayoutPortrait(width, height, this.hexKeys, this.COLS);
     }
 
     this.activeKeys = result.activeKeys;
-    this.leftBoardKeyCount = result.leftBoardKeyCount;
     this.hexSize = result.hexSize;
+
+    // Manage keyboard handler based on orientation
+    if (this.isLandscape) {
+      const layout = this.landscapeLayoutIndex === 0 ? WickiHeydenGrid.KEYBOARD_LAYOUT_1 : WickiHeydenGrid.KEYBOARD_LAYOUT_2;
+      this.keyboardHandler.setLayout(layout);
+      this.keyboardHandler.setup();
+    } else {
+      this.keyboardHandler.destroy();
+    }
 
     // Compute settings button position: place it as the next hex on the bottom visual row
     const sqrt3 = Math.sqrt(3);
@@ -178,8 +199,9 @@ export class WickiHeydenGrid {
     const buttonPosX = rightmostX + (3 / 4) * sqrt3 * this.hexSize;
     const buttonPosY = bottomY - this.hexSize / 4;
 
-    // Update settings UI position
+    // Update settings UI position and landscape layout state
     this.settingsUI.updateLayout(width, height, this.hexSize, buttonPosX, buttonPosY);
+    this.settingsUI.setLandscapeLayoutIndex(this.landscapeLayoutIndex);
 
     this.render();
   }
@@ -311,6 +333,7 @@ export class WickiHeydenGrid {
     this.labelTexts.clear();
     this.settingsUI.destroy();
     this.pointerHandler.reset();
+    this.keyboardHandler.destroy();
     this.app.destroy(true, { children: true });
   }
 }
