@@ -141,6 +141,7 @@ export class PointerHandler {
       this.pointerToKeyMap.set(pointerId, key);
       this.engine.playNoteWithFallback(key.noteName, 0.8);
       this.updateKeyVisual(key);
+      this.app.render();
     }
   }
 
@@ -154,6 +155,7 @@ export class PointerHandler {
       this.pressedKeys.delete(currentKey.midi);
       this.updateKeyVisual(currentKey);
       this.pointerToKeyMap.delete(pointerId);
+      this.app.render();
     } else if (key && (!currentKey || key !== currentKey)) {
       // Only switch keys if gliding is enabled
       if (this.glidingEnabled) {
@@ -169,6 +171,7 @@ export class PointerHandler {
         this.pointerToKeyMap.set(pointerId, key);
         this.engine.playNoteWithFallback(key.noteName, 0.8);
         this.updateKeyVisual(key);
+        this.app.render();
       }
     }
   }
@@ -180,6 +183,7 @@ export class PointerHandler {
       this.pressedKeys.delete(key.midi);
       this.updateKeyVisual(key);
       this.pointerToKeyMap.delete(pointerId);
+      this.app.render();
     }
   }
 

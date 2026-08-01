@@ -33,10 +33,12 @@ export class WickiHeydenGrid {
   private isLandscape: boolean = false;
   private activeKeys: HexKey[] = [];
   private hexSize: number = 30;
-  private landscapeLayoutIndex: number = 0; // 0 = layout 1 (8x12), 1 = layout 2 (5x10)
 
   // Keyboard handler
   private keyboardHandler: KeyboardHandler;
+
+  // Resize debounce timer
+  private resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Keyboard layout 1: 8 rows × 12 columns
   private static readonly KEYBOARD_LAYOUT_1: string[][] = [
@@ -69,13 +71,14 @@ export class WickiHeydenGrid {
     this.engine = engine;
     this.sampleNoteNames = sampleNoteNames;
 
-    // Create Pixi application
+    // Create Pixi application with autoStart: false to stop the 60fps idle loop
     this.app = new PIXI.Application({
       resizeTo: container,
       backgroundColor: 0x1a1a1a,
       antialias: true,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
       autoDensity: true,
+      autoStart: false,
     });
 
     container.appendChild(this.app.view as HTMLCanvasElement);
@@ -89,8 +92,6 @@ export class WickiHeydenGrid {
     let setGlidingEnabled: (enabled: boolean) => void = () => {};
     this.settingsUI = new SettingsUI(this.app.stage, (enabled: boolean) => {
       setGlidingEnabled(enabled);
-    }, (index: number) => {
-      this.setLandscapeLayout(index);
     });
 
     // Build the grid data
@@ -120,29 +121,30 @@ export class WickiHeydenGrid {
       this.settingsUI.setGlidingEnabled(enabled);
     };
 
-    // Keyboard handler
+    // Keyboard handler with render callback
     this.keyboardHandler = new KeyboardHandler(
       this.engine,
       () => this.activeKeys,
       this.hexGraphics,
       this.labelTexts,
       () => this.hexSize,
+      () => this.app.render(), // render callback for keyboard visual updates
     );
 
     this.updateLayout();
     this.pointerHandler.setupInteraction();
 
-    // Handle resize
+    // Handle resize with debounce
     window.addEventListener('resize', () => {
-      this.app.resize();
-      this.updateLayout();
+      if (this.resizeTimer !== null) {
+        clearTimeout(this.resizeTimer);
+      }
+      this.resizeTimer = setTimeout(() => {
+        this.resizeTimer = null;
+        this.app.resize();
+        this.updateLayout();
+      }, 150);
     });
-  }
-
-  private setLandscapeLayout(index: number): void {
-    if (index === this.landscapeLayoutIndex) return;
-    this.landscapeLayoutIndex = index;
-    this.updateLayout();
   }
 
   private updateLayout(): void {
@@ -150,11 +152,15 @@ export class WickiHeydenGrid {
     const height = this.app.screen.height;
     this.isLandscape = width > height;
 
+    // Auto-select landscape layout based on aspect ratio:
+    // If width is >= 2× height, use Layout 2 (5×10), otherwise use Layout 1 (8×12)
+    const landscapeLayoutIndex = this.isLandscape ? (width >= 2 * height ? 1 : 0) : 0;
+
     let result: LayoutResult;
     if (this.isLandscape) {
-      const cols = this.landscapeLayoutIndex === 0 ? this.COLS_LANDSCAPE_1 : this.COLS_LANDSCAPE_2;
-      const rows = this.landscapeLayoutIndex === 0 ? this.ROWS_LANDSCAPE_1 : this.ROWS_LANDSCAPE_2;
-      const baseMidi = this.landscapeLayoutIndex === 1 ? this.BASE_MIDI_LANDSCAPE_2 : this.BASE_MIDI;
+      const cols = landscapeLayoutIndex === 0 ? this.COLS_LANDSCAPE_1 : this.COLS_LANDSCAPE_2;
+      const rows = landscapeLayoutIndex === 0 ? this.ROWS_LANDSCAPE_1 : this.ROWS_LANDSCAPE_2;
+      const baseMidi = landscapeLayoutIndex === 1 ? this.BASE_MIDI_LANDSCAPE_2 : this.BASE_MIDI;
       const singleKeys = buildGrid(
         this.sampleNoteNames,
         cols,
@@ -162,7 +168,7 @@ export class WickiHeydenGrid {
         baseMidi,
         false
       );
-      const shift = this.landscapeLayoutIndex === 1; // only Layout 2 uses the odd-column shift
+      const shift = landscapeLayoutIndex === 1; // only Layout 2 uses the odd-column shift
       result = updateLayoutLandscapeSingle(width, height, singleKeys, cols, shift);
     } else {
       result = updateLayoutPortrait(width, height, this.hexKeys, this.COLS);
@@ -173,7 +179,7 @@ export class WickiHeydenGrid {
 
     // Manage keyboard handler based on orientation
     if (this.isLandscape) {
-      const layout = this.landscapeLayoutIndex === 0 ? WickiHeydenGrid.KEYBOARD_LAYOUT_1 : WickiHeydenGrid.KEYBOARD_LAYOUT_2;
+      const layout = landscapeLayoutIndex === 0 ? WickiHeydenGrid.KEYBOARD_LAYOUT_1 : WickiHeydenGrid.KEYBOARD_LAYOUT_2;
       this.keyboardHandler.setLayout(layout);
       this.keyboardHandler.setup();
     } else {
@@ -199,40 +205,51 @@ export class WickiHeydenGrid {
     const buttonPosX = rightmostX + (3 / 4) * sqrt3 * this.hexSize;
     const buttonPosY = bottomY - this.hexSize / 4;
 
-    // Update settings UI position and landscape layout state
+    // Update settings UI position
     this.settingsUI.updateLayout(width, height, this.hexSize, buttonPosX, buttonPosY);
-    this.settingsUI.setLandscapeLayoutIndex(this.landscapeLayoutIndex);
 
     this.render();
+    this.app.render();
   }
 
   private render(): void {
-    // Remove old hex graphics and labels, destroying to free GPU memory
-    for (const [, g] of this.hexGraphics) {
-      this.container.removeChild(g);
-      g.destroy();
+    // Build set of current key IDs for quick lookup
+    const currentKeyIds = new Set<string>();
+    for (let i = 0; i < this.activeKeys.length; i++) {
+      currentKeyIds.add(keyId(this.activeKeys[i].midi, i));
     }
-    for (const [, t] of this.labelTexts) {
-      this.container.removeChild(t);
-      t.destroy();
-    }
-    this.hexGraphics.clear();
-    this.labelTexts.clear();
 
-    // Re-add settings button and label to ensure proper z-order
+    // Remove graphics for keys that no longer exist
+    for (const [id, g] of this.hexGraphics) {
+      if (!currentKeyIds.has(id)) {
+        this.container.removeChild(g);
+        g.destroy();
+        this.hexGraphics.delete(id);
+      }
+    }
+    // Remove labels for keys that no longer exist
+    for (const [id, t] of this.labelTexts) {
+      if (!currentKeyIds.has(id)) {
+        this.container.removeChild(t);
+        t.destroy();
+        this.labelTexts.delete(id);
+      }
+    }
+
+    // Remove all children from container so we can re-add in correct order
     while (this.container.children.length > 0) {
       this.container.removeChildAt(0);
     }
 
-    // Draw all active hexagons
+    // Draw all active hexagons, reusing or creating graphics/text objects
     for (let i = 0; i < this.activeKeys.length; i++) {
       const key = this.activeKeys[i];
-      const g = new PIXI.Graphics();
+      const id = keyId(key.midi, i);
       const cx = key.centerX;
       const cy = key.centerY;
       const s = this.hexSize;
 
-      // Determine colors - accidental keys are dark, natural keys are light
+      // Determine colors
       const isAccidental = key.noteName.includes('#');
       let fillColor: number;
       let borderColor: number;
@@ -258,6 +275,14 @@ export class WickiHeydenGrid {
         textColor = 0x666666;
       }
 
+      // Reuse or create Graphics object
+      let g = this.hexGraphics.get(id);
+      if (!g) {
+        g = new PIXI.Graphics();
+        this.hexGraphics.set(id, g);
+      }
+      g.clear();
+
       // Draw rounded pointy-top hexagon
       g.beginFill(fillColor, 1.0);
       g.lineStyle(1, borderColor, 1.0);
@@ -265,55 +290,95 @@ export class WickiHeydenGrid {
       g.endFill();
 
       this.container.addChild(g);
-      this.hexGraphics.set(keyId(key.midi, i), g);
 
       // Label for all keys (numbered musical notation)
       const fontSize = Math.max(10, Math.min(20, this.hexSize * 0.5));
       const info = toNumberedNotation(key.midi);
 
-      // Base degree text
-      const label = new PIXI.Text(info.degree, {
-        fontFamily: 'Arial',
-        fontSize: fontSize,
-        fill: textColor,
-        align: 'center',
-      });
-      label.anchor.set(0.5, 0.5);
+      // Reuse or create label text
+      let label = this.labelTexts.get(id + '_label');
+      if (!label) {
+        label = new PIXI.Text(info.degree, {
+          fontFamily: 'Arial',
+          fontSize: fontSize,
+          fill: textColor,
+          align: 'center',
+        });
+        label.anchor.set(0.5, 0.5);
+        this.labelTexts.set(id + '_label', label);
+      }
+      label.text = info.degree;
+      label.style.fontSize = fontSize;
+      label.style.fill = textColor;
       label.x = cx;
       label.y = cy;
       this.container.addChild(label);
-      this.labelTexts.set(keyId(key.midi, i), label);
 
-      // Dots above (rendered as separate text, positioned higher)
+      // Remove old dot texts if they exist (they'll be recreated if needed)
+      // Dot text objects are handled separately below
+      const dotAboveId = id + '_dot_above';
+      const dotBelowId = id + '_dot_below';
+      
+      // Handle dots above
       if (info.dotsAbove > 0) {
         const dotChar = info.dotsAbove === 1 ? '\u2022' : '\u2022\u2022';
         const dotSize = fontSize * 0.7;
-        const dotText = new PIXI.Text(dotChar, {
-          fontFamily: 'Arial',
-          fontSize: dotSize,
-          fill: textColor,
-          align: 'center',
-        });
-        dotText.anchor.set(0.5, 0.5);
+        let dotText = this.labelTexts.get(dotAboveId);
+        if (!dotText) {
+          dotText = new PIXI.Text(dotChar, {
+            fontFamily: 'Arial',
+            fontSize: dotSize,
+            fill: textColor,
+            align: 'center',
+          });
+          dotText.anchor.set(0.5, 0.5);
+          this.labelTexts.set(dotAboveId, dotText);
+        }
+        dotText.text = dotChar;
+        dotText.style.fontSize = dotSize;
+        dotText.style.fill = textColor;
         dotText.x = cx;
         dotText.y = cy - fontSize * 0.75;
         this.container.addChild(dotText);
+      } else {
+        // Remove dot above if it exists
+        const existing = this.labelTexts.get(dotAboveId);
+        if (existing) {
+          this.container.removeChild(existing);
+          existing.destroy();
+          this.labelTexts.delete(dotAboveId);
+        }
       }
 
-      // Dots below (rendered as separate text, positioned lower)
+      // Handle dots below
       if (info.dotsBelow > 0) {
         const dotChar = info.dotsBelow === 1 ? '\u2022' : '\u2022\u2022';
         const dotSize = fontSize * 0.7;
-        const dotText = new PIXI.Text(dotChar, {
-          fontFamily: 'Arial',
-          fontSize: dotSize,
-          fill: textColor,
-          align: 'center',
-        });
-        dotText.anchor.set(0.5, 0.5);
+        let dotText = this.labelTexts.get(dotBelowId);
+        if (!dotText) {
+          dotText = new PIXI.Text(dotChar, {
+            fontFamily: 'Arial',
+            fontSize: dotSize,
+            fill: textColor,
+            align: 'center',
+          });
+          dotText.anchor.set(0.5, 0.5);
+          this.labelTexts.set(dotBelowId, dotText);
+        }
+        dotText.text = dotChar;
+        dotText.style.fontSize = dotSize;
+        dotText.style.fill = textColor;
         dotText.x = cx;
         dotText.y = cy + fontSize * 0.75;
         this.container.addChild(dotText);
+      } else {
+        // Remove dot below if it exists
+        const existing = this.labelTexts.get(dotBelowId);
+        if (existing) {
+          this.container.removeChild(existing);
+          existing.destroy();
+          this.labelTexts.delete(dotBelowId);
+        }
       }
     }
   }
@@ -334,6 +399,13 @@ export class WickiHeydenGrid {
     this.settingsUI.destroy();
     this.pointerHandler.reset();
     this.keyboardHandler.destroy();
+
+    // Clean up resize timer
+    if (this.resizeTimer !== null) {
+      clearTimeout(this.resizeTimer);
+      this.resizeTimer = null;
+    }
+
     this.app.destroy(true, { children: true });
   }
 }

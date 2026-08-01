@@ -14,11 +14,12 @@ export class KeyboardHandler {
   private hexGraphics: Map<string, PIXI.Graphics>;
   private labelTexts: Map<string, PIXI.Text>;
   private getHexSize: () => number;
+  private requestRender: () => void;
 
   private keyMap: Map<string, { col: number; row: number }> = new Map();
   private pressedKeys: Set<string> = new Set();
   private keyToHexKey: Map<string, HexKey> = new Map();
-  private eventListeners: { type: string; handler: EventListener }[] = [];
+  private eventListeners: { type: string; handler: EventListener; options?: AddEventListenerOptions }[] = [];
   private isSetup: boolean = false;
 
   constructor(
@@ -27,12 +28,14 @@ export class KeyboardHandler {
     hexGraphics: Map<string, PIXI.Graphics>,
     labelTexts: Map<string, PIXI.Text>,
     getHexSize: () => number,
+    requestRender: () => void,
   ) {
     this.engine = engine;
     this.getActiveKeys = getActiveKeys;
     this.hexGraphics = hexGraphics;
     this.labelTexts = labelTexts;
     this.getHexSize = getHexSize;
+    this.requestRender = requestRender;
   }
 
   /**
@@ -71,6 +74,14 @@ export class KeyboardHandler {
 
     const keydownHandler = (e: Event) => {
       const event = e as KeyboardEvent;
+
+      // Prevent browser default actions for known problematic keys:
+      // Firefox's Quick Find (/, '), page refresh (F5, F6, F7), DevTools (F12)
+      const problemKeys = new Set(['F5', 'F6', 'F7', 'F12', 'Quote', 'Slash']);
+      if (problemKeys.has(event.code)) {
+        event.preventDefault();
+      }
+
       if (event.repeat) return;
 
       const mapping = this.keyMap.get(event.code);
@@ -89,6 +100,7 @@ export class KeyboardHandler {
       this.keyToHexKey.set(event.code, hexKey);
       this.engine.playNoteWithFallback(hexKey.noteName, 0.8);
       this.updateKeyVisual(hexKey);
+      this.requestRender();
     };
 
     const keyupHandler = (e: Event) => {
@@ -105,14 +117,15 @@ export class KeyboardHandler {
         this.pressedKeys.delete(event.code);
         this.keyToHexKey.delete(event.code);
         this.updateKeyVisual(hexKey);
+        this.requestRender();
       }
     };
 
-    document.addEventListener('keydown', keydownHandler);
+    document.addEventListener('keydown', keydownHandler, { capture: true });
     document.addEventListener('keyup', keyupHandler);
 
     this.eventListeners = [
-      { type: 'keydown', handler: keydownHandler as EventListener },
+      { type: 'keydown', handler: keydownHandler as EventListener, options: { capture: true } },
       { type: 'keyup', handler: keyupHandler as EventListener },
     ];
   }
@@ -130,8 +143,8 @@ export class KeyboardHandler {
     this.keyToHexKey.clear();
 
     // Remove event listeners
-    for (const { type, handler } of this.eventListeners) {
-      document.removeEventListener(type, handler);
+    for (const { type, handler, options } of this.eventListeners) {
+      document.removeEventListener(type, handler, options);
     }
     this.eventListeners = [];
     this.isSetup = false;
