@@ -4,19 +4,26 @@
 
 const ROWS = 5;
 const COLS = 12;
-const BASE_NOTE_FREQ = 130.81; // Approx C3
+const BASE_NOTE_FREQ = 440 * Math.pow(2, -21 / 12); // Exact C3 (130.8127826502993)
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 // --- GLOBAL SETTINGS STATE ---
-let transpose = -3;
+let transpose = -2;
 let sustainMode = 0; // 0 = Sustain (notes hold after release), 1 = Hold (notes stop on release)
 let isLoaded = false;
 let bpm = 120;
-let mobileZoom = 1.0;
-let stripHeight = 16;
-let stripRangeLeft = -27;
-let stripRangeRight = 60;
+let mobileZoom = 1;
+let stripHeight = 18;
+let stripRangeLeft = -24;
+let stripRangeRight = 59;
 let sequenceIndex = 0;
+let isBoardHidden = false;
+let isQuickSettingsHidden = false;
+
+// --- MIDI SETTINGS STATE ---
+let selectedMidiDevice = 'all';
+let selectedMidiChannel = 'all';
+let autoConnectMidi = true;
 
 // --- PHYSICAL KEY TRACKING ---
 let activePhysicalKeys = {};
@@ -24,7 +31,7 @@ let activePhysicalKeys = {};
 let labelMode = 1; // 0 = Notes, 1 = Keys, 2 = Numeric, 3 = None
 const LABEL_MODES = ["NOTES", "KEYS", "NUMERIC", "NONE"];
 
-let fKeyMode = 0;
+let fKeyMode = 3;
 const F_ROW_VARIANTS = [
   ["F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12","PrintScreen"],
   ["F1","F2","F3","F4","","F5","F6","F7","F8","F9","F10","F11"],
@@ -73,7 +80,7 @@ let isPaused = false;
 let playbackRate = 1.0;
 let playbackTranspose = 0; // Transpose for MIDI files in semitones
 let fallDuration = 5.0;
-let manualRiseSpeed = 70; // Speed in pixels per second
+let manualRiseSpeed = 200; // Speed in pixels per second
 
 // --- WEB AUDIO API ENGINE ---
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -84,7 +91,7 @@ masterGain.gain.value = 0.5;
 
 // --- REVERB (convolution reverb with synthetic impulse response) ---
 let reverbEnabled = true;
-let reverbWet = 0.3;       // 0.0 to 1.0
+let reverbWet = 0.5;       // 0.0 to 1.0
 
 function generateImpulseResponse(duration = 1.5, decay = 2.0) {
     const sampleRate = audioCtx.sampleRate;
@@ -130,14 +137,14 @@ const SAMPLE_MAP = {
   "A5":  { note: "A5", freq: 880 },
   "A6":  { note: "A6", freq: 1760 },
   "A7":  { note: "A7", freq: 3520 },
-  "C1":  { note: "C1", freq: 32.703 },
-  "C2":  { note: "C2", freq: 65.406 },
-  "C3":  { note: "C3", freq: 130.81 },
-  "C4":  { note: "C4", freq: 261.63 },
-  "C5":  { note: "C5", freq: 523.25 },
-  "C6":  { note: "C6", freq: 1046.5 },
-  "C7":  { note: "C7", freq: 2093.0 },
-  "C8":  { note: "C8", freq: 4186.0 },
+  "C1":  { note: "C1", freq: 32.703195 },
+  "C2":  { note: "C2", freq: 65.406391 },
+  "C3":  { note: "C3", freq: 130.81278 },
+  "C4":  { note: "C4", freq: 261.62557 },
+  "C5":  { note: "C5", freq: 523.25113 },
+  "C6":  { note: "C6", freq: 1046.50226 },
+  "C7":  { note: "C7", freq: 2093.00452 },
+  "C8":  { note: "C8", freq: 4186.00904 },
   "Ds1": { note: "Ds1", freq: 38.891 },
   "Ds2": { note: "Ds2", freq: 77.782 },
   "Ds3": { note: "Ds3", freq: 155.56 },
@@ -182,32 +189,62 @@ function findClosestSample(freq) {
   return { buffer: sampleBuffers[closestName].buffer, baseFreq: closestFreq };
 }
 
+const SALAMANDER_BASE_URL = "https://tonejs.github.io/audio/salamander/";
+
+function decodeAudioDataPromise(arrayBuffer) {
+  return new Promise((resolve, reject) => {
+    try {
+      const promise = audioCtx.decodeAudioData(
+        arrayBuffer,
+        buffer => resolve(buffer),
+        err => reject(err)
+      );
+      if (promise && typeof promise.then === 'function') {
+        promise.then(resolve).catch(reject);
+      }
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
 function loadAllSamples() {
   const entries = Object.entries(SAMPLE_MAP);
   let loaded = 0;
   let total = entries.length;
 
+  const checkProgress = () => {
+    loaded++;
+    if (loaded >= total) {
+      onSamplesLoaded();
+    }
+  };
+
   entries.forEach(([name, data]) => {
-    const url = `sample/${name}.mp3`;
-    fetch(url)
+    const localUrl = `sample/${name}.mp3`;
+    const salamanderUrl = `${SALAMANDER_BASE_URL}${name}.mp3`;
+
+    fetch(localUrl)
       .then(response => {
-        if (!response.ok) throw new Error(`Failed to load ${url}`);
+        if (!response.ok) throw new Error(`Local sample not found (${response.status})`);
         return response.arrayBuffer();
       })
-      .then(arrayBuffer => audioCtx.decodeAudioData(arrayBuffer))
+      .catch(err => {
+        console.warn(`Local sample '${name}' failed to load. Falling back to Tone.js Salamander Grand Piano sample (${salamanderUrl})...`);
+        return fetch(salamanderUrl).then(response => {
+          if (!response.ok) throw new Error(`Salamander sample not found (${response.status})`);
+          return response.arrayBuffer();
+        });
+      })
+      .then(arrayBuffer => decodeAudioDataPromise(arrayBuffer))
       .then(audioBuffer => {
         sampleBuffers[name] = { buffer: audioBuffer, freq: data.freq };
-        loaded++;
-        if (loaded >= total) {
-          onSamplesLoaded();
-        }
       })
       .catch(err => {
-        console.error(`Error loading sample ${name}:`, err);
-        loaded++;
-        if (loaded >= total) {
-          onSamplesLoaded();
-        }
+        console.error(`Failed to load sample '${name}' from both local and Tone.js Salamander sources:`, err);
+      })
+      .finally(() => {
+        checkProgress();
       });
   });
 }
@@ -283,7 +320,7 @@ function stopSampleByFreq(freq, releaseTimeMs = 500) {
   }
 }
 
-function triggerSound(frequency, when = 0, forceDuration = null) {
+function triggerSound(frequency, when = 0, forceDuration = null, velocity = null) {
   if (when === 0) when = audioCtx.currentTime;
   const voiceId = nextVoiceId++;
 
@@ -299,9 +336,10 @@ function triggerSound(frequency, when = 0, forceDuration = null) {
   source.buffer = sampleData.buffer;
   source.playbackRate.value = playbackRate;
 
-  // Create gain envelope
+  // Create gain envelope with optional velocity scaling
   const envGain = audioCtx.createGain();
-  envGain.gain.setValueAtTime(1.0, when);
+  const baseVolume = (velocity !== null && velocity > 0) ? Math.max(0.05, Math.min(1.0, velocity / 127)) : 1.0;
+  envGain.gain.setValueAtTime(baseVolume, when);
 
   // Connect: source -> envGain -> masterGain -> destination
   source.connect(envGain);
@@ -381,6 +419,8 @@ function saveSettings() {
         labelMode: labelMode,
         fKeyMode: fKeyMode,
         isVisualizerOn: typeof isVisualizerOn !== 'undefined' ? isVisualizerOn : true,
+        isBoardHidden: typeof isBoardHidden !== 'undefined' ? isBoardHidden : false,
+        isQuickSettingsHidden: typeof isQuickSettingsHidden !== 'undefined' ? isQuickSettingsHidden : false,
         mobileZoom: mobileZoom,
         stripHeight: stripHeight,
         stripRangeLeft: stripRangeLeft,
@@ -390,7 +430,10 @@ function saveSettings() {
         fallDuration: fallDuration,
         manualRiseSpeed: manualRiseSpeed,
         reverbEnabled: reverbEnabled,
-        reverbWet: reverbWet
+        reverbWet: reverbWet,
+        selectedMidiDevice: selectedMidiDevice,
+        selectedMidiChannel: selectedMidiChannel,
+        autoConnectMidi: autoConnectMidi
     };
 
     try {
@@ -413,11 +456,19 @@ function loadSettings() {
         if (settings.mobileZoom !== undefined) mobileZoom = settings.mobileZoom;
         if (settings.stripHeight !== undefined) stripHeight = settings.stripHeight;
         stripHeight = parseFloat(stripHeight);
-        if (Number.isNaN(stripHeight)) stripHeight = 16;
+        if (Number.isNaN(stripHeight)) stripHeight = 18;
         if (stripHeight < 0) stripHeight = 0;
         if (stripHeight > 50) stripHeight = 50;
         if (settings.isVisualizerOn !== undefined && typeof isVisualizerOn !== 'undefined') {
             isVisualizerOn = settings.isVisualizerOn;
+        }
+        if (settings.isBoardHidden !== undefined) {
+            isBoardHidden = !!settings.isBoardHidden;
+        } else if (settings.hideBoard !== undefined) {
+            isBoardHidden = !!settings.hideBoard;
+        }
+        if (settings.isQuickSettingsHidden !== undefined) {
+            isQuickSettingsHidden = !!settings.isQuickSettingsHidden;
         }
         if (settings.stripRangeLeft !== undefined) stripRangeLeft = settings.stripRangeLeft;
         if (settings.stripRangeRight !== undefined) stripRangeRight = settings.stripRangeRight;
@@ -427,11 +478,14 @@ function loadSettings() {
         if (settings.manualRiseSpeed !== undefined) manualRiseSpeed = settings.manualRiseSpeed;
         if (settings.reverbEnabled !== undefined) reverbEnabled = settings.reverbEnabled;
         if (settings.reverbWet !== undefined) reverbWet = settings.reverbWet;
+        if (settings.selectedMidiDevice !== undefined) selectedMidiDevice = settings.selectedMidiDevice;
+        if (settings.selectedMidiChannel !== undefined) selectedMidiChannel = settings.selectedMidiChannel;
+        if (settings.autoConnectMidi !== undefined) autoConnectMidi = settings.autoConnectMidi;
         reverbGain.gain.value = reverbEnabled ? reverbWet : 0;
         playbackRate = Math.max(0.25, Math.min(3.0, Number(playbackRate) || 1.0));
         playbackTranspose = Math.max(-50, Math.min(50, Math.round(Number(playbackTranspose) || 0)));
-        fallDuration = Math.max(0.5, Math.min(10.0, Number(fallDuration) || 2.0));
-        manualRiseSpeed = Math.max(10, Math.min(1000, Number(manualRiseSpeed) || 100));
+        fallDuration = Math.max(0.5, Math.min(10.0, Number(fallDuration) || 5.0));
+        manualRiseSpeed = Math.max(10, Math.min(1000, Number(manualRiseSpeed) || 200));
         fKeyMode = ((Math.round(Number(fKeyMode) || 0) % F_KEY_LABELS.length) + F_KEY_LABELS.length) % F_KEY_LABELS.length;
         
         if (typeof applyKeyMapMode === 'function') applyKeyMapMode();
@@ -440,134 +494,6 @@ function loadSettings() {
         
     } catch (e) {
         console.error("Failed to load settings:", e);
-    }
-}
-
-// ==========================================
-// LOADOUTS (PRESET SNAPSHOTS)
-// ==========================================
-
-const LOADOUTS_STORAGE_KEY = 'wickiPianoLoadouts';
-
-function getAllLoadouts() {
-    try {
-        const data = localStorage.getItem(LOADOUTS_STORAGE_KEY);
-        return data ? JSON.parse(data) : {};
-    } catch (e) {
-        console.warn("Failed to read loadouts:", e);
-        return {};
-    }
-}
-
-function getLoadoutNames() {
-    return Object.keys(getAllLoadouts());
-}
-
-function saveLoadout(name) {
-    if (!name || name.trim().length === 0) return false;
-    const trimmed = name.trim();
-    const loadouts = getAllLoadouts();
-    
-    const snapshot = {
-        transpose: transpose,
-        labelMode: labelMode,
-        fKeyMode: fKeyMode,
-        isVisualizerOn: typeof isVisualizerOn !== 'undefined' ? isVisualizerOn : true,
-        mobileZoom: mobileZoom,
-        stripHeight: stripHeight,
-        stripRangeLeft: stripRangeLeft,
-        stripRangeRight: stripRangeRight,
-        playbackRate: playbackRate,
-        playbackTranspose: playbackTranspose,
-        fallDuration: fallDuration,
-        manualRiseSpeed: manualRiseSpeed,
-        reverbEnabled: reverbEnabled,
-        reverbWet: reverbWet
-    };
-    
-    loadouts[trimmed] = snapshot;
-    
-    try {
-        localStorage.setItem(LOADOUTS_STORAGE_KEY, JSON.stringify(loadouts));
-        console.log(`Loadout "${trimmed}" saved.`);
-        return true;
-    } catch (e) {
-        console.warn("Storage full, could not save loadout:", e);
-        return false;
-    }
-}
-
-function loadLoadout(name) {
-    const loadouts = getAllLoadouts();
-    const snapshot = loadouts[name];
-    if (!snapshot) {
-        console.warn(`Loadout "${name}" not found.`);
-        return false;
-    }
-    
-    // Apply all settings from the snapshot
-    if (snapshot.transpose !== undefined) transpose = snapshot.transpose;
-    if (snapshot.labelMode !== undefined) labelMode = snapshot.labelMode;
-    if (snapshot.fKeyMode !== undefined) fKeyMode = snapshot.fKeyMode;
-    if (snapshot.mobileZoom !== undefined) mobileZoom = snapshot.mobileZoom;
-    if (snapshot.stripHeight !== undefined) stripHeight = snapshot.stripHeight;
-    stripHeight = parseFloat(stripHeight);
-    if (Number.isNaN(stripHeight)) stripHeight = 16;
-    if (stripHeight < 0) stripHeight = 0;
-    if (stripHeight > 50) stripHeight = 50;
-    if (snapshot.isVisualizerOn !== undefined && typeof isVisualizerOn !== 'undefined') {
-        isVisualizerOn = snapshot.isVisualizerOn;
-    }
-    if (snapshot.stripRangeLeft !== undefined) stripRangeLeft = snapshot.stripRangeLeft;
-    if (snapshot.stripRangeRight !== undefined) stripRangeRight = snapshot.stripRangeRight;
-    if (snapshot.playbackRate !== undefined) playbackRate = snapshot.playbackRate;
-    if (snapshot.playbackTranspose !== undefined) playbackTranspose = snapshot.playbackTranspose;
-    if (snapshot.fallDuration !== undefined) fallDuration = snapshot.fallDuration;
-    if (snapshot.manualRiseSpeed !== undefined) manualRiseSpeed = snapshot.manualRiseSpeed;
-    if (snapshot.reverbEnabled !== undefined) reverbEnabled = snapshot.reverbEnabled;
-    if (snapshot.reverbWet !== undefined) reverbWet = snapshot.reverbWet;
-    
-    // Clamp values
-    playbackRate = Math.max(0.25, Math.min(3.0, Number(playbackRate) || 1.0));
-    playbackTranspose = Math.max(-50, Math.min(50, Math.round(Number(playbackTranspose) || 0)));
-    fallDuration = Math.max(0.5, Math.min(10.0, Number(fallDuration) || 2.0));
-    manualRiseSpeed = Math.max(10, Math.min(1000, Number(manualRiseSpeed) || 100));
-    fKeyMode = ((Math.round(Number(fKeyMode) || 0) % F_KEY_LABELS.length) + F_KEY_LABELS.length) % F_KEY_LABELS.length;
-    
-    // Apply reverb
-    if (typeof reverbGain !== 'undefined') {
-        reverbGain.gain.value = reverbEnabled ? reverbWet : 0;
-    }
-    
-    // Apply key map mode
-    if (typeof applyKeyMapMode === 'function') applyKeyMapMode();
-    
-    // Re-render board
-    if (typeof renderBoard === 'function') renderBoard();
-    
-    // Update UI
-    if (typeof updateUI === 'function') updateUI();
-    
-    // Save as current settings
-    if (typeof saveSettings === 'function') saveSettings();
-    
-    console.log(`Loadout "${name}" applied.`);
-    return true;
-}
-
-function deleteLoadout(name) {
-    const loadouts = getAllLoadouts();
-    if (!loadouts[name]) return false;
-    
-    delete loadouts[name];
-    
-    try {
-        localStorage.setItem(LOADOUTS_STORAGE_KEY, JSON.stringify(loadouts));
-        console.log(`Loadout "${name}" deleted.`);
-        return true;
-    } catch (e) {
-        console.warn("Failed to delete loadout:", e);
-        return false;
     }
 }
 

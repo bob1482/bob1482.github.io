@@ -7,6 +7,7 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎹</text></svg>">
     
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://unpkg.com/@tonejs/midi"></script>
   </head>
   <body>
@@ -15,45 +16,70 @@
     </div>
     
     <div id="quick-controls">
+      <!-- Playback group -->
       <div class="control-group hidden-in-sustain" id="group-playback">
-        <span class="control-label">Playback</span>
         <div class="btn-row">
-          <button class="control-btn" id="btn-play" onclick="togglePlayback()" title="Play">▶</button>
-          <button class="control-btn" id="btn-pause" onclick="pausePlayback()" title="Pause" disabled>II</button>
+          <button class="control-btn quick-btn" id="btn-play" onclick="togglePlayback()" data-tooltip="Play">
+            <img src="icon/play.png" class="btn-icon" alt="Play">
+          </button>
+          <button class="control-btn quick-btn" id="btn-pause" onclick="pausePlayback()" data-tooltip="Pause" disabled>
+            <img src="icon/pause.png" class="btn-icon" alt="Pause">
+          </button>
+          <button class="control-btn quick-btn" id="btn-clear" onclick="resetHighlights()" data-tooltip="Clear Keys">
+            <img src="icon/clear.png" class="btn-icon" alt="Clear">
+          </button>
         </div>
-        <button class="control-btn" onclick="resetHighlights()" title="Clear Active Notes" style="width: 100%; font-size: 10px; margin-top: 5px; background-color: #555;">CLEAR KEYS</button>
       </div>
 
+      <div class="control-divider hidden-in-sustain"></div>
+
+      <!-- MIDI File group -->
       <div class="control-group playback-controls hidden-in-sustain" id="group-memory">
-         <span class="control-label">MIDI File</span>
-         <div style="display: flex; gap: 5px; width: 100%; margin-top: 5px;">
-           <input type="file" id="midi-upload" accept=".mid,.midi" style="display: none;" onchange="handleMidiUpload(event)">
-           <button class="control-btn" onclick="document.getElementById('midi-upload').click()" title="Load MIDI File" style="width: 100%; font-size: 10px;">LOAD</button>
-         </div>
-      </div>
-
-      <div class="control-group hidden-in-sustain" id="group-labels">
-        <span class="control-label">Labels</span>
-        <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="cycleLabels()" id="btn-labels">NOTES</button>
-      </div>
-
-      <div class="control-group" id="group-pedal">
-        <button class="control-btn" id="btn-pedal" onclick="toggleSustainMode()" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;" title="Click to Toggle Sustain">
-          <span id="pedal-light" style="width: 12px; height: 12px; border-radius: 50%; background-color: #555; transition: all 0.2s;"></span>
+        <input type="file" id="midi-upload" accept=".mid,.midi" style="display: none;" onchange="handleMidiUpload(event)">
+        <button class="control-btn quick-btn" id="btn-load" onclick="document.getElementById('midi-upload').click()" data-tooltip="Load MIDI File">
+          <img src="icon/load.png" class="btn-icon" alt="Load">
         </button>
       </div>
 
-      <div class="control-group hidden-in-sustain" id="group-transpose">
-        <span class="control-label">Transpose</span>
-        <div class="btn-row" style="display: flex;">
-          <input type="number" class="control-val-input" id="disp-trans" value="0" onchange="setDirectValue('trans', this.value)" title="Transpose">
-        </div>
+      <div class="control-divider hidden-in-sustain"></div>
+
+      <!-- Labels group -->
+      <div class="control-group hidden-in-sustain" id="group-labels">
+        <button class="control-btn quick-btn" onclick="cycleLabels()" id="btn-labels" data-tooltip="Labels: NOTES">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
+          </svg>
+        </button>
       </div>
 
-      <div class="control-group hidden-in-sustain" id="group-settings-btn">
-        <button class="control-btn" id="btn-settings" onclick="toggleSettings()" style="width: 45px; height: 25px; font-size: 16px; background: rgba(111, 111, 111, 0.5);" title="Open Settings">⛭</button>
+      <div class="control-divider hidden-in-sustain"></div>
+
+      <!-- Transpose group -->
+      <div class="control-group hidden-in-sustain" id="group-transpose">
+        <div class="btn-row">
+          <button class="control-btn quick-btn" onclick="changeTranspose(-1)" data-tooltip="Transpose -1">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <div class="quick-val-box" id="disp-trans-box" data-tooltip="Transpose: -2">
+            <input type="number" class="control-val-input" id="disp-trans" value="-2" onchange="setDirectValue('trans', this.value)">
+          </div>
+          <button class="control-btn quick-btn" onclick="changeTranspose(1)" data-tooltip="Transpose +1">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
       </div>
     </div>
+
+    <!-- Top Right Corner Settings Button -->
+    <button class="control-btn quick-btn hidden-in-sustain" id="btn-settings" onclick="toggleSettings()" data-tooltip="Settings">
+      <img src="icon/setting.png" class="btn-icon" alt="Settings">
+    </button>
+
+    <!-- Sustain / Pedal Button (Bottom Right Above Piano Strip) -->
+    <button class="control-btn quick-btn" id="btn-pedal" onclick="toggleSustainMode()" data-tooltip="Sustain: ON">
+      <img src="icon/sustain.png" class="btn-icon" alt="Sustain">
+      <span id="pedal-light" class="pedal-light-dot"></span>
+    </button>
 
     <div id="settings-panel">
       <!-- Tab Bar -->
@@ -62,8 +88,8 @@
         <button class="settings-tab" data-tab="playback" onclick="switchSettingsTab('playback')">Playback</button>
         <button class="settings-tab" data-tab="visuals" onclick="switchSettingsTab('visuals')">Visuals</button>
         <button class="settings-tab" data-tab="reverb" onclick="switchSettingsTab('reverb')">Reverb</button>
-        <button class="settings-tab" data-tab="loadouts" onclick="switchSettingsTab('loadouts')">Loadouts</button>
         <button class="settings-tab" data-tab="strip" onclick="switchSettingsTab('strip')">Strip</button>
+        <button class="settings-tab" data-tab="midi" onclick="switchSettingsTab('midi')">MIDI</button>
       </div>
 
       <!-- Tab: Keyboard -->
@@ -72,19 +98,19 @@
           <span class="control-label">Transpose</span>
           <div class="btn-row">
             <button class="control-btn" onclick="changeTranspose(-1)">-</button>
-            <input type="number" class="control-val-input" id="disp-trans-set" value="0" onchange="setDirectValue('trans', this.value)">
+            <input type="number" class="control-val-input" id="disp-trans-set" value="-2" onchange="setDirectValue('trans', this.value)">
             <button class="control-btn" onclick="changeTranspose(1)">+</button>
           </div>
         </div>
 
         <div class="control-group">
           <span class="control-label">F-Keys</span>
-          <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleFKeys()" id="btn-fkeys">F3-F12</button>
+          <button class="control-btn" style="width: 96px; height: 34px; font-size: 12px;" onclick="toggleFKeys()" id="btn-fkeys">1-1</button>
         </div>
 
         <div class="control-group">
           <span class="control-label">Board</span>
-          <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleBoard()" id="btn-board">HIDE</button>
+          <button class="control-btn" style="width: 96px; height: 34px; font-size: 12px;" onclick="toggleBoard()" id="btn-board">HIDE</button>
         </div>
       </div>
 
@@ -112,7 +138,7 @@
           <span class="control-label">Note Fall</span>
           <div class="btn-row">
             <button class="control-btn" onclick="changeFallDuration(-0.5)">-</button>
-            <input type="number" step="0.5" class="control-val-input" id="disp-fall" value="2.0" onchange="setDirectValue('fall', this.value)">
+            <input type="number" step="0.5" class="control-val-input" id="disp-fall" value="5.0" onchange="setDirectValue('fall', this.value)">
             <button class="control-btn" onclick="changeFallDuration(0.5)">+</button>
           </div>
         </div>
@@ -121,7 +147,7 @@
           <span class="control-label">Manual Speed</span>
           <div class="btn-row">
             <button class="control-btn" onclick="changeManualRiseSpeed(-10)">-</button>
-            <input type="number" step="10" class="control-val-input" id="disp-manual-speed" value="100" onchange="setDirectValue('manual-speed', this.value)">
+            <input type="number" step="10" class="control-val-input" id="disp-manual-speed" value="200" onchange="setDirectValue('manual-speed', this.value)">
             <button class="control-btn" onclick="changeManualRiseSpeed(10)">+</button>
           </div>
         </div>
@@ -131,12 +157,17 @@
       <div class="settings-tab-content" id="tab-visuals">
         <div class="control-group">
           <span class="control-label">Visualizer</span>
-          <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleVisuals()" id="btn-visuals">ON</button>
+          <button class="control-btn" style="width: 96px; height: 34px; font-size: 12px;" onclick="toggleVisuals()" id="btn-visuals">ON</button>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">Quick Panel</span>
+          <button class="control-btn" style="width: 96px; height: 34px; font-size: 12px;" onclick="toggleQuickSettings()" id="btn-quick-settings">HIDE</button>
         </div>
 
         <div class="control-group">
           <span class="control-label">Screen</span>
-          <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleFullScreen()" id="btn-fullscreen">FULL</button>
+          <button class="control-btn" style="width: 96px; height: 34px; font-size: 12px;" onclick="toggleFullScreen()" id="btn-fullscreen">FULL</button>
         </div>
       </div>
 
@@ -144,34 +175,15 @@
       <div class="settings-tab-content" id="tab-reverb">
         <div class="control-group">
           <span class="control-label">Reverb</span>
-          <button class="control-btn" style="width: 80px; font-size: 11px;" onclick="toggleReverb()" id="btn-reverb">ON</button>
+          <button class="control-btn" style="width: 96px; height: 34px; font-size: 12px;" onclick="toggleReverb()" id="btn-reverb">ON</button>
         </div>
         <div class="control-group">
           <span class="control-label">Wet Mix</span>
           <div class="btn-row">
             <button class="control-btn" onclick="changeReverb(-0.05)">-</button>
-            <input type="number" class="control-val-input" id="disp-reverb" value="30" onchange="setDirectValue('reverb', this.value)">
+            <input type="number" class="control-val-input" id="disp-reverb" value="50" onchange="setDirectValue('reverb', this.value)">
             <button class="control-btn" onclick="changeReverb(0.05)">+</button>
           </div>
-        </div>
-      </div>
-
-      <!-- Tab: Loadouts -->
-      <div class="settings-tab-content" id="tab-loadouts">
-        <div class="control-group" style="width: 100%;">
-          <span class="control-label">Saved Presets</span>
-          <select id="loadout-select" style="width: 100%; background: rgba(111,111,111,0.3); color: white; border: 1px solid #444; border-radius: 4px; padding: 4px; font-family: inherit; font-size: 11px;">
-            <option value="">-- Select Loadout --</option>
-          </select>
-        </div>
-        <div class="control-group" style="width: 100%;">
-          <span class="control-label">New Loadout Name</span>
-          <input type="text" id="loadout-name-input" placeholder="e.g. My Preset" style="width: 100%; background: rgba(111,111,111,0.3); color: white; border: 1px solid #444; border-radius: 4px; padding: 4px; font-family: inherit; font-size: 11px; box-sizing: border-box;">
-        </div>
-        <div style="display: flex; gap: 5px; width: 100%;">
-          <button class="control-btn" onclick="saveCurrentLoadout()" style="flex: 1; font-size: 10px; background: rgba(92, 184, 92, 0.5);">SAVE</button>
-          <button class="control-btn" onclick="applySelectedLoadout()" style="flex: 1; font-size: 10px; background: rgba(0, 210, 255, 0.5);">LOAD</button>
-          <button class="control-btn" onclick="deleteSelectedLoadout()" style="flex: 1; font-size: 10px; background: rgba(217, 83, 79, 0.5);">DEL</button>
         </div>
       </div>
 
@@ -184,7 +196,7 @@
               <span class="side-label">LEFT</span>
               <div class="btn-row">
                 <button class="control-btn" onclick="changeStripRange('left', -1)">-</button>
-                <input type="number" class="control-val-input" id="disp-strip-l" value="-27" onchange="setDirectValue('strip-l', this.value)">
+                <input type="number" class="control-val-input" id="disp-strip-l" value="-24" onchange="setDirectValue('strip-l', this.value)">
                 <button class="control-btn" onclick="changeStripRange('left', 1)">+</button>
               </div>
             </div>
@@ -192,7 +204,7 @@
               <span class="side-label">RIGHT</span>
               <div class="btn-row">
                 <button class="control-btn" onclick="changeStripRange('right', -1)">-</button>
-                <input type="number" class="control-val-input" id="disp-strip-r" value="60" onchange="setDirectValue('strip-r', this.value)">
+                <input type="number" class="control-val-input" id="disp-strip-r" value="59" onchange="setDirectValue('strip-r', this.value)">
                 <button class="control-btn" onclick="changeStripRange('right', 1)">+</button>
               </div>
             </div>
@@ -203,9 +215,52 @@
           <span class="control-label">Height</span>
           <div class="btn-row">
             <button class="control-btn" onclick="changeStripHeight(-1)">-</button>
-            <input type="number" class="control-val-input" id="disp-strip-height" value="5" onchange="setDirectValue('strip-height', this.value)">
+            <input type="number" class="control-val-input" id="disp-strip-height" value="18" onchange="setDirectValue('strip-height', this.value)">
             <button class="control-btn" onclick="changeStripHeight(1)">+</button>
           </div>
+        </div>
+      </div>
+
+      <!-- Tab: MIDI -->
+      <div class="settings-tab-content" id="tab-midi">
+        <div class="control-group">
+          <span class="control-label">Status</span>
+          <span id="disp-midi-status" style="font-size: 11px; font-weight: bold; color: #00d2ff; letter-spacing: 0.5px;">Not Connected</span>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">Device</span>
+          <select id="midi-device-select" class="control-select" onchange="setMidiDevice(this.value)">
+            <option value="all">All Devices</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">Channel</span>
+          <select id="midi-channel-select" class="control-select" onchange="setMidiChannel(this.value)">
+            <option value="all">All Channels</option>
+            <option value="1">Channel 1</option>
+            <option value="2">Channel 2</option>
+            <option value="3">Channel 3</option>
+            <option value="4">Channel 4</option>
+            <option value="5">Channel 5</option>
+            <option value="6">Channel 6</option>
+            <option value="7">Channel 7</option>
+            <option value="8">Channel 8</option>
+            <option value="9">Channel 9</option>
+            <option value="10">Channel 10</option>
+            <option value="11">Channel 11</option>
+            <option value="12">Channel 12</option>
+            <option value="13">Channel 13</option>
+            <option value="14">Channel 14</option>
+            <option value="15">Channel 15</option>
+            <option value="16">Channel 16</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">Connection</span>
+          <button class="control-btn" style="width: 140px; height: 34px; font-size: 11px;" onclick="connectMidiDevices()" id="btn-midi-connect">CONNECT / RESCAN</button>
         </div>
       </div>
 
@@ -220,7 +275,7 @@
     <div id="piano-strip"></div>
 
     <div id="progress-container">
-      <input type="range" id="progress-bar" min="0" max="100" value="0" oninput="scrubProgress(this.value)">
+      <input type="range" id="progress-bar" min="0" max="100" value="0" step="any" oninput="scrubProgress(this.value)">
     </div>
     
     <!-- ===== FILE ORGANIZATION =====

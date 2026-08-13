@@ -1,11 +1,11 @@
 body {
   display: flex;
-  justify-content: flex-start; 
+  justify-content: flex-start;
   align-items: center;
   min-height: 100vh;
   min-height: 100dvh;
   height: 100dvh;
-  background-color: transparent; 
+  background-color: transparent;
   font-family: "Courier New", Courier, monospace;
   margin: 0;
   color: rgb(190, 190, 190);
@@ -53,8 +53,13 @@ body {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* --- DROP ZONE OVERLAY --- */
@@ -66,8 +71,8 @@ body {
   height: 100vh;
   height: 100dvh;
   background: rgba(0, 0, 0, 0.85);
-  z-index: 2000; 
-  display: none; 
+  z-index: 2000;
+  display: none;
   justify-content: center;
   align-items: center;
   flex-direction: column;
@@ -92,10 +97,10 @@ body {
   top: 0;
   left: 0;
   width: 100%;
-  height: 83vh; 
-  height: 83dvh; 
-  z-index: 100;   
-  pointer-events: none; 
+  height: 83vh;
+  height: 83dvh;
+  z-index: 100;
+  pointer-events: none;
 }
 
 /* --- TRADITIONAL PIANO STRIP (FIXED BOTTOM) --- */
@@ -104,22 +109,22 @@ body {
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 17vh; 
-  height: 17dvh; 
+  height: 17vh;
+  height: 17dvh;
   margin: 0;
   padding: 0;
   background: #222;
-  border-top: 4px solid #111;
+  border-top: none;
   display: block;
-  overflow: hidden; 
-  z-index: 1000; 
+  overflow: hidden;
+  z-index: 1000;
 }
 
 .piano-wrapper {
   position: relative;
   height: 100%;
   width: 100%;
-  margin: 0 auto; 
+  margin: 0 auto;
 }
 
 .p-key {
@@ -131,11 +136,14 @@ body {
   transition: background-color 0.1s;
   top: 0;
   display: flex;
-  flex-direction: column; /* Stack labels vertically */
-  justify-content: flex-end; /* Align to bottom */
+  flex-direction: column;
+  /* Stack labels vertically */
+  justify-content: flex-end;
+  /* Align to bottom */
   align-items: center;
   padding-bottom: 2px;
-  gap: 1px; /* Small space between dual labels */
+  gap: 1px;
+  /* Small space between dual labels */
   font-size: 10px;
   font-weight: bold;
   overflow: hidden;
@@ -156,12 +164,13 @@ body {
 
 .p-key.white {
   background: #acacac;
-  border: 1px solid #666; 
+  border: 1px solid #666;
   border-top: none;
   height: 100%;
   z-index: 1;
   color: #333;
 }
+
 .p-key.white:active,
 .p-key.white.active {
   background: #555555;
@@ -171,12 +180,13 @@ body {
   background: #111;
   border: 1px solid #000;
   border-top: none;
-  height: 65%; 
+  height: 65%;
   z-index: 10;
   color: #ddd;
   font-size: 9px;
   padding-bottom: 5px;
 }
+
 .p-key.black:active,
 .p-key.black.active {
   background: #7b7b7b;
@@ -185,23 +195,315 @@ body {
 /* --- QUICK CONTROLS (ALWAYS VISIBLE) --- */
 #quick-controls {
   position: fixed;
-  top: 30px;
+  top: 24px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 25px;
+  gap: 12px;
   align-items: center;
-  background: rgba(15, 15, 15, 0.85);
-  padding: 12px 25px;
-  border-radius: 12px;
-  border: 1px solid #333;
+  background: rgba(18, 18, 22, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 10px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   z-index: 2000;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 /* Hide non-essential control groups when pointer is locked (mouse disabled) */
-#quick-controls.sustain-active .control-group.hidden-in-sustain {
-  display: none;
+#quick-controls.sustain-active {
+  display: none !important;
+}
+
+#quick-controls .control-group {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
+
+#quick-controls .btn-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+.control-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 2px;
+}
+
+/* Quick Control Square Buttons */
+#quick-controls .quick-btn {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e0e0e0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+  padding: 0;
+  font-size: 0;
+  user-select: none;
+}
+
+#quick-controls .quick-btn:hover:not(:disabled):not(.disabled) {
+  background: rgba(0, 210, 255, 0.18);
+  border-color: #00d2ff;
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 210, 255, 0.3);
+}
+
+#quick-controls .quick-btn:active:not(:disabled):not(.disabled) {
+  transform: translateY(0);
+  background: rgba(0, 210, 255, 0.28);
+}
+
+#quick-controls .quick-btn:disabled,
+#quick-controls .quick-btn.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Settings Button (Top Right Corner) */
+#btn-settings {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  background: rgba(18, 18, 22, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(0, 210, 255, 0.35);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 2px 10px rgba(0, 210, 255, 0.15);
+  z-index: 2000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+  padding: 0;
+  font-size: 0;
+  user-select: none;
+}
+
+#btn-settings:hover:not(:disabled) {
+  background: rgba(0, 210, 255, 0.28);
+  border-color: #00d2ff;
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 6px 20px rgba(0, 210, 255, 0.45);
+}
+
+#btn-settings.sustain-active {
+  display: none !important;
+}
+
+/* Transpose Square Display Box */
+.quick-val-box {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.quick-val-box:hover {
+  border-color: rgba(0, 210, 255, 0.6);
+}
+
+.quick-val-box .control-val-input {
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #00d2ff;
+  border: none;
+  background: transparent;
+  border-radius: 12px;
+  font-family: inherit;
+  padding: 0;
+}
+
+/* Icons inside quick buttons */
+#quick-controls .quick-btn .btn-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  pointer-events: none;
+  transition: transform 0.2s ease;
+  display: block;
+}
+
+#btn-settings .btn-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.quick-btn:hover:not(:disabled) .btn-icon {
+  transform: scale(1.1);
+}
+
+/* --- SUSTAIN BUTTON (FIXED BOTTOM RIGHT ABOVE PIANO STRIP) --- */
+#btn-pedal {
+  position: fixed;
+  bottom: calc(17dvh + 16px);
+  right: 24px;
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  background: rgba(18, 18, 22, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(0, 210, 255, 0.35);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 2px 10px rgba(0, 210, 255, 0.15);
+  z-index: 2600;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, bottom 0.2s ease;
+  box-sizing: border-box;
+  padding: 0;
+  font-size: 0;
+  user-select: none;
+}
+
+#btn-pedal:hover:not(:disabled) {
+  background: rgba(0, 210, 255, 0.28);
+  border-color: #00d2ff;
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 6px 20px rgba(0, 210, 255, 0.45);
+}
+
+#btn-pedal:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  background: rgba(0, 210, 255, 0.38);
+}
+
+#btn-pedal .btn-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  pointer-events: none;
+  transition: transform 0.2s ease;
+  display: block;
+}
+
+#btn-pedal:hover:not(:disabled) .btn-icon {
+  transform: scale(1.1);
+}
+
+.pedal-light-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #555;
+  transition: all 0.2s ease;
+}
+
+/* Tooltip bubble positioning above for bottom-right sustain button */
+#btn-pedal[data-tooltip]::after {
+  top: auto;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%) translateY(6px);
+}
+
+#btn-pedal[data-tooltip]::before {
+  top: auto;
+  bottom: calc(100% + 4px);
+  transform: translateX(-50%) translateY(6px);
+  border-width: 6px 5px 0 5px;
+  border-color: rgba(14, 14, 18, 0.96) transparent transparent transparent;
+}
+
+#btn-pedal[data-tooltip]:hover::after,
+#btn-pedal[data-tooltip]:hover::before {
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Tooltip Bubble (Hover Popup) */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px);
+  background: rgba(14, 14, 18, 0.96);
+  color: #ffffff;
+  padding: 6px 11px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+  z-index: 3000;
+}
+
+[data-tooltip]::before {
+  content: '';
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px);
+  border-width: 0 5px 6px 5px;
+  border-style: solid;
+  border-color: transparent transparent rgba(14, 14, 18, 0.96) transparent;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 3001;
+}
+
+[data-tooltip]:hover::after,
+[data-tooltip]:hover::before {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
 }
 
 /* --- SETTINGS PANEL (GEAR ICON MODAL) --- */
@@ -212,7 +514,7 @@ body {
   transform: translate(-50%, -50%) scale(0.95);
   opacity: 0;
   pointer-events: none;
-  
+
   background: rgba(20, 20, 20, 0.98);
   border: 1px solid #444;
   border-radius: 16px;
@@ -223,9 +525,9 @@ body {
   gap: 15px;
   min-width: 280px;
   z-index: 2500;
-  
+
   transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.9);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.9);
 }
 
 #settings-panel.settings-visible {
@@ -302,7 +604,7 @@ body {
   display: flex;
   align-items: center;
   gap: 5px;
-  background: rgba(111, 111, 111, 0.3); 
+  background: rgba(111, 111, 111, 0.3);
   padding: 4px;
   border-radius: 6px;
 }
@@ -318,23 +620,29 @@ body {
 }
 
 .control-btn {
-  background: rgba(111, 111, 111, 0.3); 
-  border: none;
+  background: rgba(111, 111, 111, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: white;
-  width: 25px;
-  height: 25px;
-  border-radius: 4px;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 16px;
   display: flex;
   justify-content: center;
   align-items: center;
+  transition: all 0.2s ease;
+}
+
+.control-btn:hover {
+  background: rgba(0, 210, 255, 0.2);
+  border-color: #00d2ff;
 }
 
 .control-btn:active {
   transform: translateY(2px);
-  background: rgba(111, 111, 111, 0.3); 
+  background: rgba(111, 111, 111, 0.3);
 }
 
 .control-btn.recording {
@@ -362,15 +670,31 @@ body {
 }
 
 @keyframes pulse-red {
-  0% { opacity: 1; }
-  50% { opacity: 0.7; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
+
+  100% {
+    opacity: 1;
+  }
 }
 
 @keyframes pulse-yellow {
-  0% { opacity: 1; }
-  50% { opacity: 0.5; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+
+  100% {
+    opacity: 1;
+  }
 }
 
 .control-val {
@@ -407,6 +731,37 @@ body {
   background: rgba(0, 0, 0, 0.6);
 }
 
+.control-select {
+  background: rgba(30, 30, 35, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #00d2ff;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 6px 10px;
+  border-radius: 8px;
+  outline: none;
+  cursor: pointer;
+  width: 160px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.control-select:hover {
+  background: rgba(40, 40, 50, 0.95);
+  border-color: #00d2ff;
+}
+
+.control-select:focus {
+  border-color: #00d2ff;
+  box-shadow: 0 0 8px rgba(0, 210, 255, 0.4);
+}
+
+.control-select option {
+  background: #18181c;
+  color: #ffffff;
+}
+
 .side-label {
   color: #888;
   font-size: 9px;
@@ -421,89 +776,110 @@ body {
   align-items: center;
 }
 
-/* --- VERTICAL PROGRESS BAR (RIGHT SIDE) --- */
+/* --- HORIZONTAL PROGRESS BAR (TOP OF PIANO STRIP) --- */
 #progress-container {
   position: fixed;
-  right: 0;
-  top: 0;
-  height: 83vh;      /* Span full height minus piano strip (100vh - 17vh) */
-  height: 83dvh;
-  width: 50px;       /* Clickable area width */
-  z-index: 2500;     /* Above other overlays */
-  background: rgba(0, 0, 0, 0.0); /* Transparent but captures hover if needed */
+  left: 0;
+  bottom: calc(18dvh + 6px);
+  width: 100%;
+  height: 16px;
+  z-index: 2500;
+  background: transparent;
   pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 0 1px;
 }
 
 #progress-bar {
   -webkit-appearance: none;
   appearance: none;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  /* Rotate -90deg: Bottom is 0 (Start), Top is 100 (End) */
-  transform: translate(-50%, -50%) rotate(-90deg); 
-  
-  /* NOTE: Because it's rotated, 'width' becomes the visual height */
-  width: calc(83vh - 10px); /* Full height minus small margin */
-  width: calc(83dvh - 10px);
-  height: 8px;       /* Thickness of the bar */
-  
-  background: rgba(80, 80, 80, 0.6);
+  width: 100%;
+  height: 4px;
+  margin: 0;
+  background: linear-gradient(to right, #00d2ff var(--progress-pct, 0%), rgba(255, 255, 255, 0.2) var(--progress-pct, 0%));
   outline: none;
-  border-radius: 4px;
+  border-radius: 2px;
   cursor: pointer;
-  box-shadow: 0 0 10px rgba(0,0,0,0.5);
-  transition: background 0.2s, height 0.2s;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  transition: height 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+#progress-container:hover #progress-bar,
 #progress-bar:hover {
-  background: rgba(100, 100, 100, 0.9);
-  height: 12px; /* Thicken on hover */
+  height: 6px;
 }
 
-/* Chrome/Safari Thumb */
+/* Chrome/Safari/Edge Thumb */
 #progress-bar::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 20px;
-  height: 20px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: #00d2ff;
+  border: 2px solid #ffffff;
   cursor: pointer;
-  box-shadow: 0 0 5px rgba(0, 210, 255, 0.8);
-  transition: transform 0.1s;
+  box-shadow: 0 0 8px rgba(0, 210, 255, 0.9);
+  opacity: 0;
+  transform: scale(0);
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease;
+}
+
+#progress-container:hover #progress-bar::-webkit-slider-thumb,
+#progress-bar:hover::-webkit-slider-thumb {
+  opacity: 1;
+  transform: scale(1);
 }
 
 #progress-bar::-webkit-slider-thumb:hover {
-  transform: scale(1.3);
-  background: #fff;
+  transform: scale(1.35);
+  background: #ffffff;
+  border-color: #00d2ff;
 }
 
 /* Firefox Thumb */
 #progress-bar::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  border: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #ffffff;
   border-radius: 50%;
   background: #00d2ff;
   cursor: pointer;
-  box-shadow: 0 0 5px rgba(0, 210, 255, 0.8);
+  box-shadow: 0 0 8px rgba(0, 210, 255, 0.9);
+  opacity: 0;
+  transform: scale(0);
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease;
+}
+
+#progress-container:hover #progress-bar::-moz-range-thumb,
+#progress-bar:hover::-moz-range-thumb {
+  opacity: 1;
+  transform: scale(1);
+}
+
+#progress-bar::-moz-range-thumb:hover {
+  transform: scale(1.35);
+  background: #ffffff;
+  border-color: #00d2ff;
 }
 
 #board-wrapper {
   display: flex;
   flex-direction: row;
   justify-content: center;
-  
+
   /* Centering */
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(calc(-50% + 30px), -50%) scale(0.85);
-  
+
   /* Layering: Lower than canvas (100) but visible */
-  z-index: 50; 
-  
+  z-index: 50;
+
   pointer-events: none;
 }
 
@@ -525,19 +901,24 @@ body {
 }
 
 /* Dynamic Wicki-Hayden Staggering */
-.even-row { margin-left: -84px; }
-.odd-row { margin-left: 0px; }
+.even-row {
+  margin-left: -84px;
+}
+
+.odd-row {
+  margin-left: 0px;
+}
 
 /* --- KEY STYLING --- */
 .key {
   width: 60px;
   height: 60px;
-  border-radius: 50%; 
+  border-radius: 50%;
   margin: 0 12px;
   cursor: pointer;
   position: relative;
-  will-change: transform, background-color; 
-  transition: transform 0.05s, background-color 0.1s; 
+  will-change: transform, background-color;
+  transition: transform 0.05s, background-color 0.1s;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -556,19 +937,45 @@ body {
 }
 
 .key.natural {
-  background: rgba(254, 254, 254, 0.4); 
+  background: rgba(254, 254, 254, 0.4);
   color: #000000;
 }
+
 .key.natural.active {
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(0, 210, 255, 0.6);
+  color: #ffffff;
+}
+
+.key.natural.right-side {
+  background: rgba(245, 225, 250, 0.45);
+  color: #2b1330;
+  border-color: rgba(200, 122, 209, 0.25);
+}
+
+.key.natural.right-side.active {
+  background: rgba(200, 122, 209, 0.65);
+  color: #ffffff;
 }
 
 .key.accidental {
   background: rgba(104, 104, 104, 0.4);
   color: #c1c1c1;
 }
+
 .key.accidental.active {
-  background: rgba(75, 75, 75, 0.2);
+  background: rgba(0, 180, 220, 0.5);
+  color: #ffffff;
+}
+
+.key.accidental.right-side {
+  background: rgba(120, 90, 125, 0.45);
+  color: #e5c8eb;
+  border-color: rgba(200, 122, 209, 0.25);
+}
+
+.key.accidental.right-side.active {
+  background: rgba(180, 90, 190, 0.6);
+  color: #ffffff;
 }
 
 /* --- PERSISTENT PLAYED NOTE MARKER --- */
@@ -576,12 +983,16 @@ body {
   border-style: solid;
   border-width: 2px;
   border-color: #00d2ff;
+  box-shadow: 0 0 6px rgba(0, 210, 255, 0.5);
 }
 
-/* --- WICKI BOARD RANGE HIGHLIGHTING --- */
-.p-key.out-of-range:not(.active):not(:active) {
-  filter: brightness(0.3);
+.key.right-side.played-note {
+  border-style: solid;
+  border-width: 2px;
+  border-color: #c87ad1;
+  box-shadow: 0 0 6px rgba(200, 122, 209, 0.5);
 }
+
 
 /* --- SETTINGS PANEL CUSTOM SCROLLBAR --- */
 #settings-panel::-webkit-scrollbar {
@@ -626,6 +1037,7 @@ body {
     opacity: 0.8;
     border-width: 4px;
   }
+
   100% {
     width: 250%;
     height: 250%;
@@ -637,5 +1049,5 @@ body {
 /* --- SUSTAIN PEDAL LIGHT --- */
 #pedal-light.active-light {
   background-color: #00d2ff !important;
-  box-shadow: 0 0 10px #00d2ff, inset 0 0 3px rgba(255,255,255,0.8) !important;
+  box-shadow: 0 0 10px #00d2ff, inset 0 0 3px rgba(255, 255, 255, 0.8) !important;
 }
