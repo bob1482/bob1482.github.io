@@ -31,13 +31,36 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: piano/package-lock.json
+
+      - name: Install dependencies and build Piano
+        run: |
+          cd piano
+          npm ci
+          npm run build
+          cd ..
+          rm -rf _temp_piano
+          mv piano/out _temp_piano
+          rm -rf piano
+          mv _temp_piano piano
+          touch .nojekyll
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           # Upload entire repository
           path: '.'
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
