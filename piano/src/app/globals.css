@@ -23,6 +23,33 @@ html, body {
   font-family: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+*, *::before, *::after {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+  -moz-appearance: none;
+  appearance: none;
+  outline: none;
+}
+
+button::-moz-focus-inner {
+  border: 0 !important;
+  padding: 0 !important;
+}
+
+button:-moz-focusring {
+  outline: none !important;
+}
+
+button:focus,
+button:focus-visible,
+button:active {
+  outline: none !important;
 }
 
 /* Minimalist Range Sliders */

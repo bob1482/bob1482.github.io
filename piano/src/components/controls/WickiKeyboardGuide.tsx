@@ -406,11 +406,11 @@ export const WickiKeyboardGuide: React.FC<WickiKeyboardGuideProps> = React.memo(
         visualEl.style.transition = 'transform 0.05s ease-out, opacity 0.05s ease-out';
         visualEl.style.opacity = '1';
         visualEl.style.backgroundColor = color;
-        visualEl.style.borderColor = 'rgba(255, 255, 255, 0.95)';
+        visualEl.style.borderColor = 'transparent';
         visualEl.style.transform = 'scale(0.93) translateY(1px)';
         visualEl.style.boxShadow = isOutline
-          ? '0 0 16px rgba(255, 255, 255, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
-          : `0 0 16px ${color}b3, inset 0 1px 0 rgba(255, 255, 255, 0.6)`;
+          ? '0 0 0 1.5px rgba(255, 255, 255, 0.95), 0 0 16px rgba(255, 255, 255, 0.7)'
+          : `0 0 0 1.5px rgba(255, 255, 255, 0.95), 0 0 16px ${color}b3`;
         el.setAttribute('data-active', 'true');
         if (labelEl) {
           labelEl.style.transition = 'opacity 0.05s ease-out';
@@ -895,12 +895,18 @@ export const WickiKeyboardGuide: React.FC<WickiKeyboardGuideProps> = React.memo(
                           gridColumn: cIdx === 0 ? `${colStart} / span 2` : 'span 2',
                           height: `${buttonSize}px`,
                           WebkitTouchCallout: 'none',
+                          WebkitTapHighlightColor: 'transparent',
+                          outline: 'none',
                         }}
-                        className="group relative flex items-center justify-center w-full h-full select-none touch-none cursor-pointer p-0 bg-transparent border-0 outline-none [-webkit-touch-callout:none]"
+                        className="group relative flex items-center justify-center w-full h-full select-none touch-none cursor-pointer p-0 bg-transparent border-0 outline-none rounded-[20%] appearance-none [-moz-appearance:none] [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent] focus:outline-none focus-visible:outline-none active:outline-none"
                       >
                         <div
                           data-visual="true"
-                          className={`w-full h-full flex flex-col items-center justify-center rounded-[20%] border text-center transition-colors duration-75 select-none touch-none ${
+                          style={{
+                            backgroundClip: 'padding-box',
+                            WebkitBackgroundClip: 'padding-box',
+                          }}
+                          className={`w-full h-full flex flex-col items-center justify-center rounded-[20%] border text-center transition-colors duration-75 select-none touch-none overflow-hidden [background-clip:padding-box] ${
                             buttonSize < 34 ? 'p-0' : buttonSize < 48 ? 'p-[1px]' : 'p-0.5'
                           } pointer-events-none ${
                             isRebinding
@@ -908,8 +914,8 @@ export const WickiKeyboardGuide: React.FC<WickiKeyboardGuideProps> = React.memo(
                               : currentWickiMode === 'fade'
                                 ? 'opacity-0 bg-transparent border-transparent text-zinc-100 shadow-none'
                                 : isBlackKey
-                                  ? 'bg-zinc-900/90 group-hover:bg-zinc-800/90 border-white/[0.16] group-hover:border-white/30 text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_4px_rgba(0,0,0,0.5)]'
-                                  : 'bg-zinc-700/65 group-hover:bg-zinc-600/80 border-zinc-500/60 group-hover:border-zinc-400/85 text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_2px_4px_rgba(0,0,0,0.4)]'
+                                  ? 'bg-zinc-900/90 group-hover:bg-zinc-800/90 border-white/[0.16] group-hover:border-white/30 text-zinc-200 shadow-[0_2px_4px_rgba(0,0,0,0.5)]'
+                                  : 'bg-zinc-700/65 group-hover:bg-zinc-600/80 border-zinc-500/60 group-hover:border-zinc-400/85 text-zinc-100 shadow-[0_2px_4px_rgba(0,0,0,0.4)]'
                           }`}
                         >
                           {/* Keyboard mapping key label: shown in 'mapping' mode, or while rebinding */}
