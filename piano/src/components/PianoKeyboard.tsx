@@ -2,218 +2,219 @@
 
 import React, { memo, useCallback, useRef, useEffect } from 'react';
 import {
-  WHITE_KEYS,
-  BLACK_KEYS,
-  MIDDLE_WHITE_KEYS,
-  MIDDLE_BLACK_KEYS,
+  PIANO_KEYS,
   PIANO_KEYS_BY_MIDI,
+  MIN_MIDI,
+  MAX_MIDI,
+  TRIMMED_MIN_MIDI,
+  TRIMMED_MAX_MIDI,
+  getTotalWidthUnits,
   getKeyLayoutPercent,
-  getNoteColorHex,
-  mixColors,
+  isBlackMidi,
+  getMidiNoteName,
 } from '@/lib/pianoGeometry';
 import { midiManager } from '@/lib/midiEngine';
-import { ColorMode } from '@/lib/settings';
+import type { NoteSide } from '@/lib/audioEngine';
 
 interface PianoKeyboardProps {
-  colorMode?: ColorMode;
-  isMobilePortrait?: boolean;
-  onNoteOn: (midi: number, velocity?: number, color?: string, inputId?: string) => void;
+  trimOuterOctaves?: boolean;
+  fadeJankoMode?: boolean;
+  leftNoteColor?: string;
+  rightNoteColor?: string;
+  jankoBoardColor?: string;
+  jankoTranspose?: number;
+  onNoteOn: (midi: number, velocity?: number, inputId?: string) => void;
   onNoteOff: (midi: number, inputId?: string) => void;
-  activeMidiNotes?: Set<number>;
-  activeColors?: Map<number, string>;
-  isRetracted?: boolean;
 }
 
 export const PianoKeyboard: React.FC<PianoKeyboardProps> = memo(({
-  colorMode = 'track',
-  isMobilePortrait = false,
+  trimOuterOctaves = true,
+  fadeJankoMode = false,
+  leftNoteColor = '#ffffff',
+  rightNoteColor = '#ffffff',
+  jankoBoardColor = '#ffffff',
+  jankoTranspose = 0,
   onNoteOn,
   onNoteOff,
-  isRetracted = false,
 }) => {
-  const keyElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
-  const activeInputsPerMidiRef = useRef<Map<number, Map<string, string>>>(new Map());
+  const keyElementsRef = useRef<Map<number, Set<HTMLDivElement>>>(new Map());
+  const activeInputsPerMidiRef = useRef<Map<number, Set<string>>>(new Map());
   const activePointersRef = useRef<Map<number, number>>(new Map());
   const isMouseDownRef = useRef(false);
-  const colorModeRef = useRef(colorMode);
-  colorModeRef.current = colorMode;
+  const fadeJankoModeRef = useRef(fadeJankoMode);
+  fadeJankoModeRef.current = fadeJankoMode;
+  const leftColorRef = useRef(leftNoteColor);
+  leftColorRef.current = leftNoteColor;
+  const rightColorRef = useRef(rightNoteColor);
+  rightColorRef.current = rightNoteColor;
+  const boardColorRef = useRef(jankoBoardColor);
+  boardColorRef.current = jankoBoardColor;
+  const jankoTransposeRef = useRef(jankoTranspose);
+  jankoTransposeRef.current = jankoTranspose;
+
+  const applyInactiveStyle = useCallback((el: HTMLDivElement, isBlack: boolean, boardColor: string) => {
+    el.style.backgroundColor = isBlack ? '' : boardColor;
+    el.style.borderColor = boardColor;
+  }, []);
 
   const resetAllKeys = useCallback(() => {
     activeInputsPerMidiRef.current.clear();
-    keyElementsRef.current.forEach((el, midi) => {
-      const keyData = PIANO_KEYS_BY_MIDI[midi];
-      if (keyData && el) {
-        el.style.backgroundColor = keyData.isBlack ? '#111115' : '#c8c8cf';
+    keyElementsRef.current.forEach((elements, midi) => {
+      if (!PIANO_KEYS_BY_MIDI[midi]) return;
+      const isBlack = isBlackMidi(midi + jankoTransposeRef.current);
+      elements.forEach((el) => {
+        el.style.transition = '';
+        el.style.opacity = fadeJankoModeRef.current ? '0' : '';
+        applyInactiveStyle(el, isBlack, boardColorRef.current);
         el.removeAttribute('data-active');
-      }
+      });
     });
-  }, []);
+  }, [applyInactiveStyle]);
 
-  // Direct Single-Key DOM Updates from MIDI Engine (Zero React Re-renders)
+  useEffect(() => {
+    keyElementsRef.current.forEach((elements, midi) => {
+      if (activeInputsPerMidiRef.current.has(midi)) return;
+      const hasKey = Boolean(PIANO_KEYS_BY_MIDI[midi]);
+      const isBlack = isBlackMidi(midi + jankoTranspose);
+      elements.forEach((el) => {
+        el.style.transition = '';
+        el.style.opacity = fadeJankoMode ? '0' : '';
+        if (!fadeJankoMode && hasKey) {
+          applyInactiveStyle(el, isBlack, jankoBoardColor);
+        }
+      });
+    });
+  }, [fadeJankoMode, jankoBoardColor, jankoTranspose, applyInactiveStyle]);
+
+  useEffect(() => {
+    resetAllKeys();
+  }, [jankoTranspose, resetAllKeys]);
+
   useEffect(() => {
     const handleNoteOn = (
       midi: number,
       _velocity: number,
       isLiveInput: boolean,
-      color?: string,
-      inputId?: string
+      inputId?: string,
+      side?: NoteSide
     ) => {
-      const keyEl = keyElementsRef.current.get(midi);
-      if (!keyEl) return;
+      const boardMidi = midi - jankoTransposeRef.current;
+      const elements = keyElementsRef.current.get(boardMidi);
+      if (!elements || elements.size === 0) return;
 
-      const resolvedColor = color || getNoteColorHex(midi, 0, colorModeRef.current);
-      const keyId = inputId || (isLiveInput ? `live-anon-${Date.now()}-${Math.random()}` : `song-anon-${Date.now()}-${Math.random()}`);
-
-      let inputsMap = activeInputsPerMidiRef.current.get(midi);
-      if (!inputsMap) {
-        inputsMap = new Map();
-        activeInputsPerMidiRef.current.set(midi, inputsMap);
+      const keyId = inputId || (isLiveInput ? `live-${Date.now()}-${Math.random()}` : `song-${Date.now()}-${Math.random()}`);
+      let inputs = activeInputsPerMidiRef.current.get(boardMidi);
+      if (!inputs) {
+        inputs = new Set();
+        activeInputsPerMidiRef.current.set(boardMidi, inputs);
       }
-      inputsMap.set(keyId, resolvedColor);
+      inputs.add(keyId);
 
-      const colors = Array.from(inputsMap.values());
-      const mixedColor = colors.length === 1 ? colors[0] : mixColors(colors);
-      keyEl.style.backgroundColor = mixedColor;
-      keyEl.setAttribute('data-active', 'true');
+      const isBlack = isBlackMidi(midi);
+      const resolvedSide = side === 'left' || side === 'right' ? side : (midi >= 60 ? 'right' : 'left');
+      const color = resolvedSide === 'right' ? rightColorRef.current : leftColorRef.current;
+
+      elements.forEach((el) => {
+        if (fadeJankoModeRef.current) {
+          el.style.transition = 'none';
+          el.style.borderColor = color;
+          if (!isBlack) {
+            el.style.backgroundColor = color;
+          } else {
+            el.style.backgroundColor = '';
+          }
+          el.style.opacity = '1';
+        } else {
+          el.style.transition = '';
+          el.style.opacity = '0';
+        }
+        el.setAttribute('data-active', 'true');
+      });
     };
 
     const handleNoteOff = (midi: number, isLiveInput: boolean, inputId?: string) => {
-      const keyEl = keyElementsRef.current.get(midi);
-      if (!keyEl) return;
-      const keyData = PIANO_KEYS_BY_MIDI[midi];
-      if (!keyData) return;
+      const boardMidi = midi - jankoTransposeRef.current;
+      const elements = keyElementsRef.current.get(boardMidi);
+      if (!elements || elements.size === 0 || !PIANO_KEYS_BY_MIDI[boardMidi]) return;
 
-      const inputsMap = activeInputsPerMidiRef.current.get(midi);
-      if (inputsMap) {
+      const inputs = activeInputsPerMidiRef.current.get(boardMidi);
+      if (inputs) {
         if (inputId) {
-          if (inputsMap.has(inputId)) {
-            inputsMap.delete(inputId);
-          } else {
-            return;
-          }
+          if (!inputs.delete(inputId)) return;
         } else {
-          // If no specific inputId provided, look for an entry matching the event type (song vs live)
-          let targetKey: string | undefined;
-          if (!isLiveInput) {
-            for (const k of inputsMap.keys()) {
-              if (k.startsWith('song')) {
-                targetKey = k;
-                break;
-              }
-            }
-          } else {
-            for (const k of inputsMap.keys()) {
-              if (!k.startsWith('song')) {
-                targetKey = k;
-                break;
-              }
-            }
-          }
-          if (!targetKey) {
-            targetKey = inputsMap.keys().next().value;
-          }
-          if (targetKey !== undefined) {
-            inputsMap.delete(targetKey);
-          }
+          const target = Array.from(inputs).find((k) => (isLiveInput ? !k.startsWith('song') : k.startsWith('song')))
+            ?? inputs.values().next().value;
+          if (target !== undefined) inputs.delete(target);
         }
-
-        if (inputsMap.size === 0) {
-          activeInputsPerMidiRef.current.delete(midi);
+        if (inputs.size === 0) {
+          activeInputsPerMidiRef.current.delete(boardMidi);
         }
       }
 
-      const remaining = activeInputsPerMidiRef.current.get(midi);
-      if (remaining && remaining.size > 0) {
-        const colors = Array.from(remaining.values());
-        keyEl.style.backgroundColor = colors.length === 1 ? colors[0] : mixColors(colors);
-      } else {
-        keyEl.style.backgroundColor = keyData.isBlack ? '#111115' : '#c8c8cf';
-        keyEl.removeAttribute('data-active');
+      if (!activeInputsPerMidiRef.current.has(boardMidi)) {
+        const isBlack = isBlackMidi(midi);
+        elements.forEach((el) => {
+          if (fadeJankoModeRef.current) {
+            void el.offsetWidth;
+            el.style.transition = 'opacity 900ms ease-out';
+            el.style.opacity = '0';
+          } else {
+            el.style.transition = '';
+            el.style.opacity = '';
+            applyInactiveStyle(el, isBlack, boardColorRef.current);
+          }
+          el.removeAttribute('data-active');
+        });
       }
     };
 
-    const unsubNoteOn = midiManager.onNoteOn(handleNoteOn);
-    const unsubNoteOff = midiManager.onNoteOff(handleNoteOff);
-
+    const unsubOn = midiManager.onNoteOn(handleNoteOn);
+    const unsubOff = midiManager.onNoteOff(handleNoteOff);
     return () => {
-      unsubNoteOn?.();
-      unsubNoteOff?.();
+      unsubOn();
+      unsubOff();
     };
   }, []);
 
-  // Update active key colors when colorMode changes
-  useEffect(() => {
-    colorModeRef.current = colorMode;
-    activeInputsPerMidiRef.current.forEach((inputsMap, midi) => {
-      const keyEl = keyElementsRef.current.get(midi);
-      if (keyEl && inputsMap.size > 0) {
-        inputsMap.forEach((_, keyId) => {
-          if (keyId.startsWith('pointer:') || keyId.startsWith('touch:')) {
-            inputsMap.set(keyId, colorMode === 'outline' ? '#ffffff' : getNoteColorHex(midi, 0, 'gradient'));
-          } else {
-            inputsMap.set(keyId, getNoteColorHex(midi, 0, colorMode));
-          }
-        });
-        const colors = Array.from(inputsMap.values());
-        keyEl.style.backgroundColor = colors.length === 1 ? colors[0] : mixColors(colors);
-      }
-    });
-  }, [colorMode]);
-
-  // Helper to extract MIDI note from DOM coordinates
   const getMidiFromPoint = useCallback((clientX: number, clientY: number): number | null => {
     const el = document.elementFromPoint(clientX, clientY);
     const keyEl = el?.closest('[data-midi]');
-    if (!keyEl) return null;
-    const midiAttr = keyEl.getAttribute('data-midi');
+    const midiAttr = keyEl?.getAttribute('data-midi');
     return midiAttr ? parseInt(midiAttr, 10) : null;
   }, []);
 
-  // Pointer / Mouse interaction handlers
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
+    if (e.pointerType === 'mouse') isMouseDownRef.current = true;
 
-    if (e.pointerType === 'mouse') {
-      isMouseDownRef.current = true;
-    }
-
-    const midi = getMidiFromPoint(e.clientX, e.clientY);
-    if (midi !== null) {
-      activePointersRef.current.set(e.pointerId, midi);
-      const color = colorModeRef.current === 'outline' ? '#ffffff' : getNoteColorHex(midi, 0, 'gradient');
-      const inputId = `pointer:${e.pointerId}`;
-      onNoteOn(midi, 0.85, color, inputId);
+    const boardMidi = getMidiFromPoint(e.clientX, e.clientY);
+    const soundingMidi = boardMidi !== null ? boardMidi + jankoTransposeRef.current : -1;
+    if (soundingMidi >= 0 && soundingMidi <= 127) {
+      activePointersRef.current.set(e.pointerId, soundingMidi);
+      onNoteOn(soundingMidi, 0.85, `pointer:${e.pointerId}`);
     } else {
       activePointersRef.current.set(e.pointerId, -1);
     }
   }, [getMidiFromPoint, onNoteOn]);
 
-  // Window pointer listeners for movement, release, blur, and tab switching
   useEffect(() => {
     const handleGlobalPointerMove = (e: PointerEvent) => {
-      const hasPointer = activePointersRef.current.has(e.pointerId);
-      if (!hasPointer) {
-        if (e.pointerType === 'mouse' && (e.buttons & 1) === 1 && isMouseDownRef.current) {
-          // Allow mouse drag into keys
-        } else {
-          return;
-        }
+      if (!activePointersRef.current.has(e.pointerId)) {
+        if (!(e.pointerType === 'mouse' && (e.buttons & 1) === 1 && isMouseDownRef.current)) return;
       }
 
-      const previousMidi = activePointersRef.current.get(e.pointerId);
-      const newMidi = getMidiFromPoint(e.clientX, e.clientY);
-      const effectiveNewMidi = newMidi ?? -1;
+      const prevMidi = activePointersRef.current.get(e.pointerId) ?? -1;
+      const nextBoardMidi = getMidiFromPoint(e.clientX, e.clientY);
+      const nextRawMidi = nextBoardMidi !== null ? nextBoardMidi + jankoTransposeRef.current : -1;
+      const nextMidi = nextRawMidi >= 0 && nextRawMidi <= 127 ? nextRawMidi : -1;
 
-      if (effectiveNewMidi !== (previousMidi ?? -1)) {
+      if (nextMidi !== prevMidi) {
         const inputId = `pointer:${e.pointerId}`;
-        if (previousMidi !== undefined && previousMidi !== -1) {
-          onNoteOff(previousMidi, inputId);
-        }
-        if (effectiveNewMidi !== -1) {
-          activePointersRef.current.set(e.pointerId, effectiveNewMidi);
-          const color = colorModeRef.current === 'outline' ? '#ffffff' : getNoteColorHex(effectiveNewMidi, 0, 'gradient');
-          onNoteOn(effectiveNewMidi, 0.85, color, inputId);
+        if (prevMidi !== -1) onNoteOff(prevMidi, inputId);
+        if (nextMidi !== -1) {
+          activePointersRef.current.set(e.pointerId, nextMidi);
+          onNoteOn(nextMidi, 0.85, inputId);
         } else {
           activePointersRef.current.set(e.pointerId, -1);
         }
@@ -221,14 +222,10 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = memo(({
     };
 
     const handleGlobalPointerUp = (e: PointerEvent) => {
-      if (e.pointerType === 'mouse') {
-        isMouseDownRef.current = false;
-      }
-      const previousMidi = activePointersRef.current.get(e.pointerId);
-      if (previousMidi !== undefined) {
-        if (previousMidi !== -1) {
-          onNoteOff(previousMidi, `pointer:${e.pointerId}`);
-        }
+      if (e.pointerType === 'mouse') isMouseDownRef.current = false;
+      const prevMidi = activePointersRef.current.get(e.pointerId);
+      if (prevMidi !== undefined) {
+        if (prevMidi !== -1) onNoteOff(prevMidi, `pointer:${e.pointerId}`);
         activePointersRef.current.delete(e.pointerId);
       }
     };
@@ -236,18 +233,14 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = memo(({
     const handleWindowBlur = () => {
       isMouseDownRef.current = false;
       activePointersRef.current.forEach((midi, pointerId) => {
-        if (midi !== -1) {
-          onNoteOff(midi, `pointer:${pointerId}`);
-        }
+        if (midi !== -1) onNoteOff(midi, `pointer:${pointerId}`);
       });
       activePointersRef.current.clear();
       resetAllKeys();
     };
 
     const handleVisibility = () => {
-      if (document.hidden) {
-        handleWindowBlur();
-      }
+      if (document.hidden) handleWindowBlur();
     };
 
     window.addEventListener('pointermove', handleGlobalPointerMove);
@@ -265,64 +258,64 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = memo(({
     };
   }, [getMidiFromPoint, onNoteOn, onNoteOff, resetAllKeys]);
 
+  const minMidi = trimOuterOctaves ? TRIMMED_MIN_MIDI : MIN_MIDI;
+  const maxMidi = trimOuterOctaves ? TRIMMED_MAX_MIDI : MAX_MIDI;
+  const visibleKeys = PIANO_KEYS.filter((k) => k.midi >= minMidi && k.midi <= maxMidi);
+  const totalWidthUnits = getTotalWidthUnits(trimOuterOctaves);
+
   return (
     <nav
-      aria-label="Piano keyboard"
+      aria-label="Jankó keyboard"
       suppressHydrationWarning
       onPointerDown={handlePointerDown}
-      onContextMenu={e => e.preventDefault()}
-      className={`relative w-full bg-[#08080b] select-none touch-none overflow-hidden z-30 shrink-0 transition-all duration-300 ease-in-out ${
-        isRetracted ? 'h-0 opacity-0 pointer-events-none' : 'h-[20%] opacity-100'
-      }`}
+      onContextMenu={(e) => e.preventDefault()}
+      className="relative w-full bg-transparent select-none touch-none overflow-hidden z-30 shrink-0"
+      style={{ height: `calc((100vw / ${totalWidthUnits}) * 4 + 12px)` }}
     >
-      {/* White Keys */}
-      {(isMobilePortrait ? MIDDLE_WHITE_KEYS : WHITE_KEYS).map(key => {
-        const { leftPercent, widthPercent } = getKeyLayoutPercent(key.midi, isMobilePortrait);
-        return (
+      {visibleKeys.flatMap((key) => {
+        const { leftPercent, widthPercent, row } = getKeyLayoutPercent(key.midi, trimOuterOctaves);
+        const soundingMidi = key.midi + jankoTranspose;
+        const isBlack = isBlackMidi(soundingMidi);
+        const noteName = getMidiNoteName(soundingMidi);
+        return [row, row + 2].map((rowIndex) => (
           <div
-            key={key.midi}
-            ref={el => {
-              if (el) keyElementsRef.current.set(key.midi, el);
-              else keyElementsRef.current.delete(key.midi);
-            }}
+            key={`${key.midi}-${rowIndex}`}
             role="button"
             tabIndex={-1}
-            aria-label={`Key ${key.name}`}
+            aria-label={`Key ${noteName}`}
             data-midi={key.midi}
-            className="absolute top-0 h-full select-none cursor-pointer border-r border-[#1c1c21] rounded-t-[3px] rounded-b-[4px] transition-colors duration-75 flex flex-col justify-end items-center pb-1.5"
+            className="absolute p-[2px] flex items-center justify-center cursor-pointer select-none"
             style={{
               left: `${leftPercent}%`,
               width: `${widthPercent}%`,
-              backgroundColor: '#c8c8cf',
-              zIndex: 1,
+              top: `calc(${rowIndex * 25}% + 1px)`,
+              height: 'calc(25% - 2px)',
             }}
-          />
-        );
-      })}
-
-      {/* Black Keys */}
-      {(isMobilePortrait ? MIDDLE_BLACK_KEYS : BLACK_KEYS).map(key => {
-        const { leftPercent, widthPercent } = getKeyLayoutPercent(key.midi, isMobilePortrait);
-        return (
-          <div
-            key={key.midi}
-            ref={el => {
-              if (el) keyElementsRef.current.set(key.midi, el);
-              else keyElementsRef.current.delete(key.midi);
-            }}
-            role="button"
-            tabIndex={-1}
-            aria-label={`Key ${key.name}`}
-            data-midi={key.midi}
-            className="absolute top-0 h-[64%] select-none cursor-pointer rounded-b-[5px] transition-colors duration-75 border-b border-l border-r border-[#09090b]"
-            style={{
-              left: `${leftPercent}%`,
-              width: `${widthPercent}%`,
-              backgroundColor: '#111115',
-              zIndex: 10,
-            }}
-          />
-        );
+          >
+            <div
+              ref={(el) => {
+                if (el) {
+                  let set = keyElementsRef.current.get(key.midi);
+                  if (!set) {
+                    set = new Set();
+                    keyElementsRef.current.set(key.midi, set);
+                  }
+                  set.add(el);
+                } else {
+                  keyElementsRef.current.delete(key.midi);
+                }
+              }}
+              className={`w-full aspect-square rounded-[32%] transition-all duration-75 pointer-events-none ${
+                isBlack ? 'bg-transparent border-[3px]' : 'border-2'
+              }`}
+              style={{
+                backgroundColor: isBlack ? undefined : jankoBoardColor,
+                borderColor: jankoBoardColor,
+                opacity: fadeJankoMode ? 0 : undefined,
+              }}
+            />
+          </div>
+        ));
       })}
     </nav>
   );

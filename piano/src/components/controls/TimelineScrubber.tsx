@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { midiManager } from '@/lib/midiEngine';
 import { formatTime } from './utils';
 
@@ -20,6 +20,21 @@ export const TimelineScrubber: React.FC<TimelineScrubberProps> = React.memo(({
   const [playbackTime, setPlaybackTime] = useState<number>(() => midiManager.getPlaybackTime());
   const [songDuration, setSongDuration] = useState<number>(() => midiManager.getCurrentSong()?.duration || 0);
   const isDraggingRef = useRef(false);
+
+  const stopDragging = useCallback(() => {
+    isDraggingRef.current = false;
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('pointerup', stopDragging);
+    window.addEventListener('pointercancel', stopDragging);
+    window.addEventListener('blur', stopDragging);
+    return () => {
+      window.removeEventListener('pointerup', stopDragging);
+      window.removeEventListener('pointercancel', stopDragging);
+      window.removeEventListener('blur', stopDragging);
+    };
+  }, [stopDragging]);
 
   useEffect(() => {
     const unsubTime = midiManager.onTimeUpdate((time, dur) => {

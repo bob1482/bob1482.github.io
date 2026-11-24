@@ -13,71 +13,73 @@ CANDIDATE_DEVICE_PATTERNS = [
 
 KEY_MAP = {
     # Row 0 (Keyboard Matrix Row 0)
-    'KEY_SHIFTRIGHT': 89,   # F6
-    'KEY_RIGHTSHIFT': 89,
-    'KEY_SLASH': 91,        # G6
-    'KEY_PERIOD': 93,       # A6
-    'KEY_DOT': 93,
-    'KEY_COMMA': 95,        # B6
-    'KEY_M': 97,            # C#7
-    'KEY_N': 99,            # D#7
-    'KEY_B': 101,           # F7
-    'KEY_V': 103,           # G7
-    'KEY_C': 105,           # A7
-    'KEY_X': 107,           # B7
-    'KEY_Z': 109,           # C#8
-    'KEY_SHIFTLEFT': 111,   # D#8
-    'KEY_LEFTSHIFT': 111,
-    'KEY_SHIFT': 111,
+    'KEY_SHIFTRIGHT': 70,   # A#4
+    'KEY_RIGHTSHIFT': 70,
+    'KEY_SLASH': 72,        # C5
+    'KEY_PERIOD': 74,       # D5
+    'KEY_DOT': 74,
+    'KEY_COMMA': 76,        # E5
+    'KEY_M': 78,            # F#5
+    'KEY_N': 80,            # G#5
+    'KEY_B': 82,            # A#5
+    'KEY_V': 84,            # C6
+    'KEY_C': 86,            # D6
+    'KEY_X': 88,            # E6
+    'KEY_Z': 90,            # F#6
+    'KEY_SHIFTLEFT': 92,    # G#6
+    'KEY_LEFTSHIFT': 92,
+    'KEY_SHIFT': 92,
 
     # Row 1 (Keyboard Matrix Row 1)
-    'KEY_ENTER': 82,        # A#5
-    'KEY_QUOTE': 84,        # C6
-    'KEY_APOSTROPHE': 84,
-    'KEY_SEMICOLON': 86,    # D6
-    'KEY_L': 88,            # E6
-    'KEY_K': 90,            # F#6
-    'KEY_J': 92,            # G#6
-    'KEY_H': 94,            # A#6
-    'KEY_G': 96,            # C7
-    'KEY_F': 98,            # D7
-    'KEY_D': 100,           # E7
-    'KEY_S': 102,           # F#7
-    'KEY_A': 104,           # G#7
+    'KEY_ENTER': 63,        # D#4
+    'KEY_QUOTE': 65,        # F4
+    'KEY_APOSTROPHE': 65,
+    'KEY_SEMICOLON': 67,    # G4
+    'KEY_L': 69,            # A4
+    'KEY_K': 71,            # B4
+    'KEY_J': 73,            # C#5
+    'KEY_H': 75,            # D#5
+    'KEY_G': 77,            # F5
+    'KEY_F': 79,            # G5
+    'KEY_D': 81,            # A5
+    'KEY_S': 83,            # B5
+    'KEY_A': 85,            # C#6
 
     # Row 2 (Keyboard Matrix Row 2)
-    'KEY_BRACKETRIGHT': 77, # F5
-    'KEY_RIGHTBRACE': 77,
-    'KEY_CLOSEBRACE': 77,
+    'KEY_BRACKETRIGHT': 58, # A#3
+    'KEY_RIGHTBRACE': 58,
+    'KEY_CLOSEBRACE': 58,
 
-    'KEY_BRACKETLEFT': 79,  # G5
-    'KEY_LEFTBRACE': 79,
-    'KEY_OPENBRACE': 79,
-    'KEY_P': 81,            # A5
-    'KEY_O': 83,            # B5
-    'KEY_I': 85,            # C#6
-    'KEY_U': 87,            # D#6
-    'KEY_Y': 89,            # F6
-    'KEY_T': 91,            # G6
-    'KEY_R': 93,            # A6
-    'KEY_E': 95,            # B6
-    'KEY_W': 97,            # C#7
-    'KEY_Q': 99,            # D#7
+    'KEY_BRACKETLEFT': 60,  # C4
+    'KEY_LEFTBRACE': 60,
+    'KEY_OPENBRACE': 60,
+    'KEY_P': 62,            # D4
+    'KEY_O': 64,            # E4
+    'KEY_I': 66,            # F#4
+    'KEY_U': 68,            # G#4
+    'KEY_Y': 70,            # A#4
+    'KEY_T': 72,            # C5
+    'KEY_R': 74,            # D5
+    'KEY_E': 76,            # E5
+    'KEY_W': 78,            # F#5
+    'KEY_Q': 80,            # G#5
 
     # Row 3 (Keyboard Matrix Row 3)
-    'KEY_BACKSPACE': 70,    # A#4
-    'KEY_DELETE': 70,
-    'KEY_EQUAL': 72,        # C5
-    'KEY_MINUS': 74,        # D5
-    'KEY_0': 76,            # E5
-    'KEY_9': 78,            # F#5
-    'KEY_8': 80,            # G#5
-    'KEY_7': 82,            # A#5
-    'KEY_6': 84,            # C6
-    'KEY_5': 86,            # D6
-    'KEY_4': 88,            # E6
-    'KEY_3': 90,            # F#6
-    'KEY_2': 92,            # G#6
+    'KEY_BACKSPACE': 51,    # D#3
+    'KEY_DELETE': 51,
+    'KEY_EQUAL': 53,        # F3
+    'KEY_MINUS': 55,        # G3
+    'KEY_0': 57,            # A3
+    'KEY_9': 59,            # B3
+    'KEY_8': 61,            # C#4
+    'KEY_7': 63,            # D#4
+    'KEY_6': 65,            # F4
+    'KEY_5': 67,            # G4
+    'KEY_4': 69,            # A4
+    'KEY_3': 71,            # B4
+    'KEY_2': 73,            # C#5
+    'KEY_RIGHTALT': 81,     # A5
+    'KEY_SPACE': 93,        # A6 (A7 with default +12 left-octave)
 }
 
 # Right-hand board keys send on MIDI Channel 2 (0x91/0x81) for Magenta color
@@ -91,6 +93,7 @@ RIGHT_BOARD_KEYS = {
     'KEY_BRACKETRIGHT', 'KEY_RIGHTBRACE', 'KEY_CLOSEBRACE', 'KEY_BRACKETLEFT', 'KEY_LEFTBRACE', 'KEY_OPENBRACE', 'KEY_P', 'KEY_O', 'KEY_I', 'KEY_U',
     # Row 3 Right
     'KEY_BACKSPACE', 'KEY_DELETE', 'KEY_EQUAL', 'KEY_MINUS', 'KEY_0', 'KEY_9', 'KEY_8',
+    'KEY_RIGHTALT',
 }
 
 
@@ -314,10 +317,10 @@ def main():
                             base_note = KEY_MAP[matched_key]
                             note = max(0, min(127, base_note + transpose + octave_offset))
 
-                            # Left board  -> Channel 1 (0x90 / 0x80 -> Cyan)
-                            # Right board -> Channel 2 (0x91 / 0x81 -> Magenta)
-                            note_on_cmd = 0x91 if is_right else 0x90
-                            note_off_cmd = 0x81 if is_right else 0x80
+                            # Left board  -> Channel 2 (0x91 / 0x81)
+                            # Right board -> Channel 1 (0x90 / 0x80)
+                            note_on_cmd = 0x90 if is_right else 0x91
+                            note_off_cmd = 0x80 if is_right else 0x81
 
                             if key_event.keystate == key_event.key_down:
                                 if matched_key in active_notes:
