@@ -224,7 +224,7 @@ export function generateWickiBoardKeys(
   return keys;
 }
 
-export const WICKI_LEFT_KEYS = generateWickiBoardKeys(27); // D#1 base
-export const WICKI_RIGHT_KEYS = generateWickiBoardKeys(51); // D#3 base
-export const WICKI_TOUCH_LEFT_KEYS = generateWickiBoardKeys(27, WICKI_BOARD_ROWS, WICKI_BOARD_COLS, true);
-export const WICKI_TOUCH_RIGHT_KEYS = generateWickiBoardKeys(51, WICKI_BOARD_ROWS, WICKI_BOARD_COLS, true);
+export const WICKI_LEFT_KEYS = generateWickiBoardKeys(39); // D#2 base
+export const WICKI_RIGHT_KEYS = generateWickiBoardKeys(39); // D#2 base
+export const WICKI_TOUCH_LEFT_KEYS = generateWickiBoardKeys(39, WICKI_BOARD_ROWS, WICKI_BOARD_COLS, true);
+export const WICKI_TOUCH_RIGHT_KEYS = generateWickiBoardKeys(39, WICKI_BOARD_ROWS, WICKI_BOARD_COLS, true);
