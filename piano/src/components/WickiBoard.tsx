@@ -8,6 +8,7 @@ import {
   WICKI_BOARD_WIDTH_UNITS,
   isBlackMidi,
   getMidiNoteName,
+  getJianpuNote,
 } from '@/lib/pianoGeometry';
 import { midiManager } from '@/lib/midiEngine';
 import type { NoteSide } from '@/lib/audioEngine';
@@ -19,8 +20,18 @@ interface WickiBoardProps {
   rightNoteColor?: string;
   boardColor?: string;
   midiInputTranspose?: number;
+  maximized?: boolean;
   onNoteOn: (midi: number, velocity?: number, inputId?: string, side?: 'left' | 'right') => void;
   onNoteOff: (midi: number, inputId?: string, side?: 'left' | 'right') => void;
+}
+
+function isLightColor(hex: string): boolean {
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6) return true;
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5;
 }
 
 export const WickiBoard: React.FC<WickiBoardProps> = memo(({
@@ -30,6 +41,7 @@ export const WickiBoard: React.FC<WickiBoardProps> = memo(({
   rightNoteColor = '#ffffff',
   boardColor = '#ffffff',
   midiInputTranspose = 0,
+  maximized = false,
   onNoteOn,
   onNoteOff,
 }) => {
@@ -260,7 +272,9 @@ export const WickiBoard: React.FC<WickiBoardProps> = memo(({
       onContextMenu={(e) => e.preventDefault()}
       className="relative bg-transparent select-none touch-none overflow-hidden"
       style={{
-        width: 'clamp(260px, 30vw, 440px)',
+        width: maximized
+          ? `min(calc(50vw - 16px), calc((100dvh - 16px) * ${WICKI_BOARD_WIDTH_UNITS} / ${WICKI_BOARD_ROWS}))`
+          : 'clamp(260px, 30vw, 440px)',
         aspectRatio: `${WICKI_BOARD_WIDTH_UNITS} / ${WICKI_BOARD_ROWS}`,
       }}
     >
@@ -268,6 +282,15 @@ export const WickiBoard: React.FC<WickiBoardProps> = memo(({
         const soundingMidi = key.midi + midiInputTranspose;
         const isBlack = isBlackMidi(soundingMidi);
         const noteName = getMidiNoteName(soundingMidi);
+        const jianpu = getJianpuNote(soundingMidi);
+        const topDots = jianpu.octaveOffset > 0 ? jianpu.octaveOffset : 0;
+        const bottomDots = jianpu.octaveOffset < 0 ? -jianpu.octaveOffset : 0;
+        const labelColor = isBlack
+          ? boardColor
+          : isLightColor(boardColor)
+            ? '#09090b'
+            : '#ffffff';
+
         return (
           <div
             key={`${key.row}-${key.col}`}
@@ -297,15 +320,51 @@ export const WickiBoard: React.FC<WickiBoardProps> = memo(({
                   keyElementsRef.current.delete(key.midi);
                 }
               }}
-              className={`w-full aspect-square rounded-[32%] transition-all duration-75 pointer-events-none ${
+              className={`w-full aspect-square rounded-[32%] transition-all duration-75 pointer-events-none flex flex-col items-center justify-center ${
                 isBlack ? 'bg-transparent border-[4px]' : 'border-[3px]'
               }`}
               style={{
+                containerType: 'size',
                 backgroundColor: isBlack ? undefined : boardColor,
                 borderColor: boardColor,
+                color: labelColor,
                 opacity: fadeJankoMode ? 0 : undefined,
               }}
-            />
+            >
+              <div
+                className="flex flex-col-reverse items-center justify-start"
+                style={{ height: '27cqw', gap: '2cqw' }}
+              >
+                {Array.from({ length: topDots }, (_, i) => (
+                  <span
+                    key={i}
+                    className="rounded-full bg-current"
+                    style={{ width: '7cqw', height: '7cqw' }}
+                  />
+                ))}
+              </div>
+              <span
+                className="font-bold leading-none tracking-tight flex items-baseline justify-center"
+                style={{ fontSize: jianpu.isSharp ? '28cqw' : '34cqw' }}
+              >
+                {jianpu.isSharp && (
+                  <span style={{ fontSize: '20cqw', marginRight: '1cqw' }}>#</span>
+                )}
+                {jianpu.number}
+              </span>
+              <div
+                className="flex flex-col items-center justify-start"
+                style={{ height: '27cqw', gap: '2cqw' }}
+              >
+                {Array.from({ length: bottomDots }, (_, i) => (
+                  <span
+                    key={i}
+                    className="rounded-full bg-current"
+                    style={{ width: '7cqw', height: '7cqw' }}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         );
       })}

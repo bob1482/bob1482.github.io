@@ -30,6 +30,7 @@ export default function Home() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [renderNoteBlocks, setRenderNoteBlocks] = useState(true);
   const [fadeJankoMode, setFadeJankoMode] = useState(false);
+  const [touchscreenMode, setTouchscreenMode] = useState(false);
   const [leftNoteColor, setLeftNoteColor] = useState('#ffffff');
   const [rightNoteColor, setRightNoteColor] = useState('#ffffff');
   const [jankoBoardColor, setJankoBoardColor] = useState('#ffffff');
@@ -186,6 +187,16 @@ export default function Home() {
     });
   }, []);
 
+  const handleEnableTouchscreenMode = useCallback(() => {
+    setTouchscreenMode(true);
+    setFadeJankoMode(false);
+    window.localStorage.setItem('piano:fadeJankoMode', 'false');
+    setLeftSustain(true);
+    audioEngine.setSustainPedal(true, 'left');
+    setRightSustain(true);
+    audioEngine.setSustainPedal(true, 'right');
+  }, []);
+
   const handleLeftNoteColorChange = useCallback((color: string) => {
     setLeftNoteColor(color);
     window.localStorage.setItem('piano:leftNoteColor', color);
@@ -236,6 +247,12 @@ export default function Home() {
           target.isContentEditable ||
           (target.tagName === 'INPUT' && (target as HTMLInputElement).type !== 'range'))
       ) {
+        return;
+      }
+
+      if (e.code === 'Escape' && touchscreenMode) {
+        e.preventDefault();
+        setTouchscreenMode(false);
         return;
       }
 
@@ -342,7 +359,7 @@ export default function Home() {
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
     };
-  }, [currentSong, handleTogglePlay, handleToggleLeftSustain, handleToggleRightSustain]);
+  }, [currentSong, touchscreenMode, handleTogglePlay, handleToggleLeftSustain, handleToggleRightSustain]);
 
   const handleNoteOn = useCallback((midi: number, velocity = 0.85, inputId?: string, side?: 'left' | 'right') => {
     midiManager.triggerLiveNoteOn(midi, velocity, inputId, side);
@@ -352,8 +369,23 @@ export default function Home() {
     midiManager.triggerLiveNoteOff(midi, inputId, side);
   }, []);
 
+  const handleTouchscreenFullscreen = useCallback(() => {
+    if (!touchscreenMode) return;
+    const doc = document as Document & { webkitFullscreenElement?: Element | null };
+    if (doc.fullscreenElement || doc.webkitFullscreenElement) return;
+    const el = document.documentElement as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void> | void;
+    };
+    if (el.requestFullscreen) {
+      void el.requestFullscreen().catch(() => {});
+    } else if (el.webkitRequestFullscreen) {
+      void Promise.resolve(el.webkitRequestFullscreen()).catch(() => {});
+    }
+  }, [touchscreenMode]);
+
   return (
     <main
+      onPointerDownCapture={handleTouchscreenFullscreen}
       onDragOver={(e) => {
         e.preventDefault();
         setIsDragOver(true);
@@ -385,42 +417,46 @@ export default function Home() {
       )}
 
       {/* Minimal Top HUD */}
-      <ControlsOverlay
-        isSongActive={Boolean(currentSong)}
-        isPlaying={isPlaying}
-        leftSustain={leftSustain}
-        rightSustain={rightSustain}
-        hasBackground={Boolean(backgroundImage)}
-        isSamplerLoaded={isSamplerLoaded}
-        renderNoteBlocks={renderNoteBlocks}
-        fadeJankoMode={fadeJankoMode}
-        leftNoteColor={leftNoteColor}
-        rightNoteColor={rightNoteColor}
-        jankoBoardColor={jankoBoardColor}
-        jankoTranspose={jankoTranspose}
-        midiTranspose={midiTranspose}
-        midiInputTranspose={midiInputTranspose}
-        onMidiFileSelected={handleLoadMidiFile}
-        onTogglePlay={handleTogglePlay}
-        onSeek={handleSeek}
-        onClearSong={handleClearSong}
-        onToggleLeftSustain={handleToggleLeftSustain}
-        onToggleRightSustain={handleToggleRightSustain}
-        onBackgroundSelected={handleBackgroundSelected}
-        onClearBackground={handleClearBackground}
-        onToggleNoteBlocks={handleToggleNoteBlocks}
-        onToggleFadeJankoMode={handleToggleFadeJankoMode}
-        onLeftNoteColorChange={handleLeftNoteColorChange}
-        onRightNoteColorChange={handleRightNoteColorChange}
-        onJankoBoardColorChange={handleJankoBoardColorChange}
-        onJankoTransposeChange={handleJankoTransposeChange}
-        onMidiTransposeChange={handleMidiTransposeChange}
-        onMidiInputTransposeChange={handleMidiInputTransposeChange}
-      />
+      {!touchscreenMode && (
+        <ControlsOverlay
+          isSongActive={Boolean(currentSong)}
+          isPlaying={isPlaying}
+          leftSustain={leftSustain}
+          rightSustain={rightSustain}
+          hasBackground={Boolean(backgroundImage)}
+          isSamplerLoaded={isSamplerLoaded}
+          renderNoteBlocks={renderNoteBlocks}
+          fadeJankoMode={fadeJankoMode}
+          touchscreenMode={touchscreenMode}
+          leftNoteColor={leftNoteColor}
+          rightNoteColor={rightNoteColor}
+          jankoBoardColor={jankoBoardColor}
+          jankoTranspose={jankoTranspose}
+          midiTranspose={midiTranspose}
+          midiInputTranspose={midiInputTranspose}
+          onMidiFileSelected={handleLoadMidiFile}
+          onTogglePlay={handleTogglePlay}
+          onSeek={handleSeek}
+          onClearSong={handleClearSong}
+          onToggleLeftSustain={handleToggleLeftSustain}
+          onToggleRightSustain={handleToggleRightSustain}
+          onBackgroundSelected={handleBackgroundSelected}
+          onClearBackground={handleClearBackground}
+          onToggleNoteBlocks={handleToggleNoteBlocks}
+          onToggleFadeJankoMode={handleToggleFadeJankoMode}
+          onEnableTouchscreenMode={handleEnableTouchscreenMode}
+          onLeftNoteColorChange={handleLeftNoteColorChange}
+          onRightNoteColorChange={handleRightNoteColorChange}
+          onJankoBoardColorChange={handleJankoBoardColorChange}
+          onJankoTransposeChange={handleJankoTransposeChange}
+          onMidiTransposeChange={handleMidiTransposeChange}
+          onMidiInputTransposeChange={handleMidiInputTransposeChange}
+        />
+      )}
 
       {/* Falling / Rising Note Canvas & Side Wicki Boards */}
       <div className="relative flex-1 w-full overflow-hidden z-10">
-        {renderNoteBlocks && (
+        {!touchscreenMode && renderNoteBlocks && (
           <SynthesiaCanvas
             isPlaying={isPlaying}
             jankoTranspose={jankoTranspose}
@@ -429,43 +465,55 @@ export default function Home() {
           />
         )}
 
-        <div className="absolute bottom-2 left-2 z-20">
-          <WickiBoard
-            side="left"
-            fadeJankoMode={fadeJankoMode}
-            leftNoteColor={leftNoteColor}
-            rightNoteColor={rightNoteColor}
-            boardColor={jankoBoardColor}
-            midiInputTranspose={midiInputTranspose}
-            onNoteOn={handleNoteOn}
-            onNoteOff={handleNoteOff}
-          />
-        </div>
+        <div
+          className={
+            touchscreenMode
+              ? 'w-full h-full flex items-center justify-between px-2'
+              : ''
+          }
+        >
+          <div className={touchscreenMode ? 'z-20' : 'absolute bottom-2 left-2 z-20'}>
+            <WickiBoard
+              side="left"
+              fadeJankoMode={fadeJankoMode}
+              leftNoteColor={leftNoteColor}
+              rightNoteColor={rightNoteColor}
+              boardColor={jankoBoardColor}
+              midiInputTranspose={midiInputTranspose}
+              maximized={touchscreenMode}
+              onNoteOn={handleNoteOn}
+              onNoteOff={handleNoteOff}
+            />
+          </div>
 
-        <div className="absolute bottom-2 right-2 z-20">
-          <WickiBoard
-            side="right"
-            fadeJankoMode={fadeJankoMode}
-            leftNoteColor={leftNoteColor}
-            rightNoteColor={rightNoteColor}
-            boardColor={jankoBoardColor}
-            midiInputTranspose={midiInputTranspose}
-            onNoteOn={handleNoteOn}
-            onNoteOff={handleNoteOff}
-          />
+          <div className={touchscreenMode ? 'z-20' : 'absolute bottom-2 right-2 z-20'}>
+            <WickiBoard
+              side="right"
+              fadeJankoMode={fadeJankoMode}
+              leftNoteColor={leftNoteColor}
+              rightNoteColor={rightNoteColor}
+              boardColor={jankoBoardColor}
+              midiInputTranspose={midiInputTranspose}
+              maximized={touchscreenMode}
+              onNoteOn={handleNoteOn}
+              onNoteOff={handleNoteOff}
+            />
+          </div>
         </div>
       </div>
 
       {/* Jankó Piano */}
-      <PianoKeyboard
-        fadeJankoMode={fadeJankoMode}
-        leftNoteColor={leftNoteColor}
-        rightNoteColor={rightNoteColor}
-        jankoBoardColor={jankoBoardColor}
-        jankoTranspose={jankoTranspose}
-        onNoteOn={handleNoteOn}
-        onNoteOff={handleNoteOff}
-      />
+      {!touchscreenMode && (
+        <PianoKeyboard
+          fadeJankoMode={fadeJankoMode}
+          leftNoteColor={leftNoteColor}
+          rightNoteColor={rightNoteColor}
+          jankoBoardColor={jankoBoardColor}
+          jankoTranspose={jankoTranspose}
+          onNoteOn={handleNoteOn}
+          onNoteOff={handleNoteOff}
+        />
+      )}
     </main>
   );
 }

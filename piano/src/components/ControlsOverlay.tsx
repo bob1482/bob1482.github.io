@@ -24,6 +24,7 @@ interface ControlsOverlayProps {
   isSamplerLoaded: boolean;
   renderNoteBlocks: boolean;
   fadeJankoMode: boolean;
+  touchscreenMode: boolean;
   leftNoteColor: string;
   rightNoteColor: string;
   jankoBoardColor: string;
@@ -40,6 +41,7 @@ interface ControlsOverlayProps {
   onClearBackground: () => void;
   onToggleNoteBlocks: () => void;
   onToggleFadeJankoMode: () => void;
+  onEnableTouchscreenMode: () => void;
   onLeftNoteColorChange: (color: string) => void;
   onRightNoteColorChange: (color: string) => void;
   onJankoBoardColorChange: (color: string) => void;
@@ -114,6 +116,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   isSamplerLoaded,
   renderNoteBlocks,
   fadeJankoMode,
+  touchscreenMode,
   leftNoteColor,
   rightNoteColor,
   jankoBoardColor,
@@ -130,6 +133,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   onClearBackground,
   onToggleNoteBlocks,
   onToggleFadeJankoMode,
+  onEnableTouchscreenMode,
   onLeftNoteColorChange,
   onRightNoteColorChange,
   onJankoBoardColorChange,
@@ -308,6 +312,25 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
               <span
                 className={`inline-block h-3.5 w-3.5 rounded-full transition-transform ${
                   fadeJankoMode ? 'translate-x-4.5 bg-black' : 'translate-x-1 bg-zinc-300'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="border-t border-white/10 pt-3 flex items-center justify-between gap-3">
+            <span className="text-xs font-medium text-white">Touchscreen Mode</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={touchscreenMode}
+              onClick={onEnableTouchscreenMode}
+              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors cursor-pointer ${
+                touchscreenMode ? 'bg-white' : 'bg-zinc-700'
+              }`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 rounded-full transition-transform ${
+                  touchscreenMode ? 'translate-x-4.5 bg-black' : 'translate-x-1 bg-zinc-300'
                 }`}
               />
             </button>

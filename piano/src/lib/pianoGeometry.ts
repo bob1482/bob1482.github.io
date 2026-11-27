@@ -24,7 +24,28 @@ export function getTotalWidthUnits(trimOuterOctaves = false): number {
 }
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const JIANPU_DEGREES = ['1', '#1', '2', '#2', '3', '4', '#4', '5', '#5', '6', '#6', '7'] as const;
 const IS_BLACK_PATTERN = [false, true, false, true, false, false, true, false, true, false, true, false];
+
+export interface JianpuNote {
+  degree: string;
+  isSharp: boolean;
+  number: string;
+  octaveOffset: number;
+}
+
+export function getJianpuNote(midi: number): JianpuNote {
+  const pitchClass = ((midi % 12) + 12) % 12;
+  const octave = Math.floor(midi / 12) - 1;
+  const degree = JIANPU_DEGREES[pitchClass];
+  const isSharp = degree.startsWith('#');
+  return {
+    degree,
+    isSharp,
+    number: isSharp ? degree.slice(1) : degree,
+    octaveOffset: octave - 4,
+  };
+}
 
 export function isBlackMidi(midi: number): boolean {
   return IS_BLACK_PATTERN[((midi % 12) + 12) % 12];
