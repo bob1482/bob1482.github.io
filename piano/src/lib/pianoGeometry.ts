@@ -175,34 +175,47 @@ export const WICKI_BOARD_ROWS = 8;
 export const WICKI_BOARD_COLS = 6;
 export const WICKI_BOARD_WIDTH_UNITS = WICKI_BOARD_COLS + 0.5;
 
+export const WICKI_TOUCH_BOARD_ROWS = WICKI_BOARD_ROWS - 2;
+export const WICKI_TOUCH_BOARD_COLS = WICKI_BOARD_COLS - 2;
+export const WICKI_TOUCH_BOARD_WIDTH_UNITS = WICKI_TOUCH_BOARD_COLS + 0.5;
+
 export function generateWickiBoardKeys(
   baseMidi: number,
   rows = WICKI_BOARD_ROWS,
-  cols = WICKI_BOARD_COLS
+  cols = WICKI_BOARD_COLS,
+  trimOuter = false
 ): WickiKey[] {
   const keys: WickiKey[] = [];
-  const totalWidthUnits = cols + 0.5;
+  const rowStart = trimOuter ? 1 : 0;
+  const rowEnd = trimOuter ? rows - 1 : rows;
+  const colStart = trimOuter ? 1 : 0;
+  const colEnd = trimOuter ? cols - 1 : cols;
+  const visibleRows = rowEnd - rowStart;
+  const visibleCols = colEnd - colStart;
+  const totalWidthUnits = visibleCols + 0.5;
   const widthPercent = (1 / totalWidthUnits) * 100;
-  const heightPercent = (1 / rows) * 100;
+  const heightPercent = (1 / visibleRows) * 100;
 
-  for (let row = 0; row < rows; row++) {
+  for (let row = rowStart; row < rowEnd; row++) {
     const rowFromBottom = rows - 1 - row;
     const octaveOffset = Math.floor(rowFromBottom / 2) * 12;
     const isStaggered = rowFromBottom % 2 === 1;
     const fifthOffset = isStaggered ? 7 : 0;
     const colStagger = isStaggered ? 0.5 : 0;
+    const visibleRow = row - rowStart;
 
-    for (let col = 0; col < cols; col++) {
+    for (let col = colStart; col < colEnd; col++) {
       const midi = baseMidi + octaveOffset + fifthOffset + col * 2;
+      const visibleCol = col - colStart;
       keys.push({
         midi,
         name: getMidiNoteName(midi),
-        row,
-        col,
+        row: visibleRow,
+        col: visibleCol,
         isBlack: isBlackMidi(midi),
-        leftPercent: ((col + colStagger) / totalWidthUnits) * 100,
+        leftPercent: ((visibleCol + colStagger) / totalWidthUnits) * 100,
         widthPercent,
-        topPercent: (row / rows) * 100,
+        topPercent: (visibleRow / visibleRows) * 100,
         heightPercent,
       });
     }
@@ -213,3 +226,5 @@ export function generateWickiBoardKeys(
 
 export const WICKI_LEFT_KEYS = generateWickiBoardKeys(27); // D#1 base
 export const WICKI_RIGHT_KEYS = generateWickiBoardKeys(51); // D#3 base
+export const WICKI_TOUCH_LEFT_KEYS = generateWickiBoardKeys(27, WICKI_BOARD_ROWS, WICKI_BOARD_COLS, true);
+export const WICKI_TOUCH_RIGHT_KEYS = generateWickiBoardKeys(51, WICKI_BOARD_ROWS, WICKI_BOARD_COLS, true);

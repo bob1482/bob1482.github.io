@@ -4,8 +4,12 @@ import React, { memo, useCallback, useEffect, useRef } from 'react';
 import {
   WICKI_LEFT_KEYS,
   WICKI_RIGHT_KEYS,
+  WICKI_TOUCH_LEFT_KEYS,
+  WICKI_TOUCH_RIGHT_KEYS,
   WICKI_BOARD_ROWS,
   WICKI_BOARD_WIDTH_UNITS,
+  WICKI_TOUCH_BOARD_ROWS,
+  WICKI_TOUCH_BOARD_WIDTH_UNITS,
   isBlackMidi,
   getMidiNoteName,
   getJianpuNote,
@@ -45,7 +49,11 @@ export const WickiBoard: React.FC<WickiBoardProps> = memo(({
   onNoteOn,
   onNoteOff,
 }) => {
-  const keys = side === 'left' ? WICKI_LEFT_KEYS : WICKI_RIGHT_KEYS;
+  const keys = maximized
+    ? (side === 'left' ? WICKI_TOUCH_LEFT_KEYS : WICKI_TOUCH_RIGHT_KEYS)
+    : (side === 'left' ? WICKI_LEFT_KEYS : WICKI_RIGHT_KEYS);
+  const boardRows = maximized ? WICKI_TOUCH_BOARD_ROWS : WICKI_BOARD_ROWS;
+  const boardWidthUnits = maximized ? WICKI_TOUCH_BOARD_WIDTH_UNITS : WICKI_BOARD_WIDTH_UNITS;
   const keyElementsRef = useRef<Map<number, Set<HTMLDivElement>>>(new Map());
   const activeInputsPerMidiRef = useRef<Map<number, Set<string>>>(new Map());
   const activePointersRef = useRef<Map<number, number>>(new Map());
@@ -273,9 +281,9 @@ export const WickiBoard: React.FC<WickiBoardProps> = memo(({
       className="relative bg-transparent select-none touch-none overflow-hidden"
       style={{
         width: maximized
-          ? `min(calc(50vw - 16px), calc((100dvh - 16px) * ${WICKI_BOARD_WIDTH_UNITS} / ${WICKI_BOARD_ROWS}))`
+          ? `min(calc(50vw - 16px), calc((100dvh - 16px) * ${boardWidthUnits} / ${boardRows}))`
           : 'clamp(260px, 30vw, 440px)',
-        aspectRatio: `${WICKI_BOARD_WIDTH_UNITS} / ${WICKI_BOARD_ROWS}`,
+        aspectRatio: `${boardWidthUnits} / ${boardRows}`,
       }}
     >
       {keys.map((key) => {
